@@ -1,0 +1,12 @@
+bot:
+  token: ${BOT_TOKEN:}
+  username: ${BOT_NAME:}
+  proxy:
+    host: ${PROXY_HOST:localhost}
+    port: ${PROXY_PORT:7890}
+    type: ${PROXY_TYPE:SOCKS5} #SOCKS4 | SOCKS5 | HTTP
+
+logging:
+  level:
+    kurenai.mybot:
+      trace
