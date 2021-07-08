@@ -21,7 +21,7 @@ import java.util.Optional;
 @Slf4j
 @Component
 @ConditionalOnProperty(prefix = "bot.handler.anti-mini-app", name = "enable", havingValue = "true", matchIfMissing = true)
-@EnableConfigurationProperties(AntiMiniAppHandlerProperties.class)
+@EnableConfigurationProperties({AntiMiniAppHandlerProperties.class, ForwardHandlerProperties.class})
 public class AntiMiniAppHandler implements Handler {
 
     private static final String ANTI_PREFIX = "Anti mini app or share link by qq!\r\n";

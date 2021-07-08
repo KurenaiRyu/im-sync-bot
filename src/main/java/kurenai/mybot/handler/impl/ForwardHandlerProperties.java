@@ -19,10 +19,10 @@ public class ForwardHandlerProperties extends HandlerProperties {
     @PostConstruct
     public void init() {
         if (group.qqTelegram == null) group.qqTelegram = new HashMap<>();
-        if (group.telegramQQ == null) group.telegramQQ = new HashMap<>();
+        if (group.telegramQq == null) group.telegramQq = new HashMap<>();
 
-        group.qqTelegram.forEach((k, v) -> group.telegramQQ.putIfAbsent(v, k));
-        group.telegramQQ.forEach((k, v) -> group.qqTelegram.putIfAbsent(v, k));
+        group.qqTelegram.forEach((k, v) -> group.telegramQq.putIfAbsent(v, k));
+        group.telegramQq.forEach((k, v) -> group.qqTelegram.putIfAbsent(v, k));
     }
 
     @Getter
@@ -31,7 +31,7 @@ public class ForwardHandlerProperties extends HandlerProperties {
         private Long            defaultQQ;
         private Long            defaultTelegram;
         private Map<Long, Long> qqTelegram;
-        private Map<Long, Long> telegramQQ;
+        private Map<Long, Long> telegramQq;
     }
 }
 

@@ -1,6 +1,7 @@
 package kurenai.mybot.handler.impl;
 
 import io.ktor.util.collections.ConcurrentList;
+import kurenai.mybot.CacheHolder;
 import kurenai.mybot.QQBotClient;
 import kurenai.mybot.TelegramBotClient;
 import kurenai.mybot.handler.Handler;
@@ -19,8 +20,8 @@ import org.telegram.telegrambots.meta.api.methods.send.SendAnimation;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
-import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaAnimation;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
@@ -29,7 +30,10 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import javax.validation.constraints.NotNull;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -43,11 +47,9 @@ import java.util.stream.Collectors;
 @SuppressWarnings("KotlinInternalInJava")
 public class ForwardHandler implements Handler {
 
-    private final Map<Integer, MessageSource> tgQQMsgIdCache = new WeakHashMap<>();   // tg - qq message id cache;
-    private final Map<Integer, Integer>       qqTgMsgIdCache = new WeakHashMap<>();   // qq - tg message id cache;
-    private final ExecutorService             uploadPool     = Executors.newFixedThreadPool(10);
-    private final ExecutorService             cachePool      = Executors.newFixedThreadPool(1);
-    private final ForwardHandlerProperties    properties;
+    private final ExecutorService          uploadPool = Executors.newFixedThreadPool(10);
+    private final ExecutorService          cachePool  = Executors.newFixedThreadPool(1);
+    private final ForwardHandlerProperties properties;
 
     public ForwardHandler(ForwardHandlerProperties properties) {
         this.properties = properties;
@@ -60,9 +62,10 @@ public class ForwardHandler implements Handler {
         var bot    = qqClient.getBot();
         var quoteMsgSource = Optional.ofNullable(message.getReplyToMessage())
                 .map(Message::getMessageId)
-                .map(tgQQMsgIdCache::get);
+                .map(CacheHolder.TG_QQ_MSG_ID_CACHE::get)
+                .map(CacheHolder.QQ_MSG_CACHE::get);
         var groupId = quoteMsgSource.map(MessageSource::getTargetId)
-                .orElse(properties.getGroup().getTelegramQQ().getOrDefault(chatId, properties.getGroup().getDefaultQQ()));
+                .orElse(properties.getGroup().getTelegramQq().getOrDefault(chatId, properties.getGroup().getDefaultQQ()));
         Group group = bot.getGroup(groupId);
         if (group == null) {
             log.error("QQ group[{}] not found.", groupId);
@@ -107,10 +110,7 @@ public class ForwardHandler implements Handler {
                     .or(() -> Optional.ofNullable(message.getText()))
                     .ifPresent(builder::add);
             MessageReceipt<?> receipt = group.sendMessage(builder.build());
-            cachePool.execute(() -> {
-                tgQQMsgIdCache.put(message.getMessageId(), receipt.getSource());
-                qqTgMsgIdCache.put(receipt.getSource().getIds()[0], message.getMessageId());
-            });
+            cachePool.execute(() -> CacheHolder.cache(receipt.getSource(), message));
         } else if (message.hasPhoto()) {
             List<PhotoSize> photos = new ArrayList<>();
             message.getPhoto().stream()
@@ -136,19 +136,13 @@ public class ForwardHandler implements Handler {
             builder.addAll(images);
             Optional.ofNullable(message.getCaption()).ifPresent(builder::add);
             MessageReceipt<?> receipt = group.sendMessage(builder.build());
-            cachePool.execute(() -> {
-                tgQQMsgIdCache.put(message.getMessageId(), receipt.getSource());
-                qqTgMsgIdCache.put(receipt.getSource().getIds()[0], message.getMessageId());
-            });
+            cachePool.execute(() -> CacheHolder.cache(receipt.getSource(), message));
         } else if (message.hasText()) {
             MessageChainBuilder builder = new MessageChainBuilder();
             quoteMsgSource.map(QuoteReply::new).ifPresent(builder::add);
             builder.add(message.getText());
             MessageReceipt<?> receipt = group.sendMessage(builder.build());
-            cachePool.execute(() -> {
-                tgQQMsgIdCache.put(message.getMessageId(), receipt.getSource());
-                qqTgMsgIdCache.put(receipt.getSource().getIds()[0], message.getMessageId());
-            });
+            cachePool.execute(() -> CacheHolder.cache(receipt.getSource(), message));
         }
         return true;
     }
@@ -156,15 +150,15 @@ public class ForwardHandler implements Handler {
     // qq 2 tg
     @Override
     public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) {
-        long              groupId      = event.getGroup().getId();
-        MessageChain      messageChain = event.getMessage();
+        long         groupId      = event.getGroup().getId();
+        MessageChain messageChain = event.getMessage();
 
-        var source = Optional.ofNullable(messageChain.get(MessageSource.Key));
+        var source = Optional.ofNullable(messageChain.get(OnlineMessageSource.Key));
         Optional<Integer> replyId = Optional.ofNullable(messageChain.get(QuoteReply.Key))
                 .map(QuoteReply::getSource)
                 .map(MessageSource::getIds)
                 .map(ints -> ints[0])
-                .map(qqTgMsgIdCache::get);
+                .map(CacheHolder.QQ_TG_MSG_ID_CACHE::get);
         String content = formatContent(messageChain.stream().filter(m -> !(m instanceof Image)).map(SingleMessage::contentToString).collect(Collectors.joining()));
         String msg = String.format("[%s] %s\r\n%s",
                 handleLongString(event.getSenderName(), 25),
@@ -198,9 +192,7 @@ public class ForwardHandler implements Handler {
                         if (throwable != null) {
                             log.error(throwable.getMessage(), throwable);
                         } else {
-                            var messageId = messages.get(0).getMessageId();
-                            source.ifPresent(s -> tgQQMsgIdCache.put(messageId, s));
-                            source.map(MessageSource::getIds).map(ids -> ids[0]).ifPresent(id -> qqTgMsgIdCache.put(id, messageId));
+                            cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, messages.get(0))));
                         }
                         return true;
                     });
@@ -219,9 +211,7 @@ public class ForwardHandler implements Handler {
                         if (throwable != null) {
                             log.error(throwable.getMessage(), throwable);
                         } else {
-                            var messageId = message.getMessageId();
-                            source.ifPresent(s -> tgQQMsgIdCache.put(messageId, s));
-                            source.map(MessageSource::getIds).map(ids -> ids[0]).ifPresent(id -> qqTgMsgIdCache.put(id, messageId));
+                            cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, message)));
                         }
                         return true;
                     });
@@ -234,9 +224,7 @@ public class ForwardHandler implements Handler {
                         if (throwable != null) {
                             log.error(throwable.getMessage(), throwable);
                         } else {
-                            var messageId = message.getMessageId();
-                            source.ifPresent(s -> tgQQMsgIdCache.put(messageId, s));
-                            source.map(MessageSource::getIds).map(ids -> ids[0]).ifPresent(id -> qqTgMsgIdCache.put(id, messageId));
+                            cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, message)));
                         }
                         return true;
                     });
@@ -252,9 +240,7 @@ public class ForwardHandler implements Handler {
                             if (throwable != null) {
                                 log.error(throwable.getMessage(), throwable);
                             } else {
-                                var messageId = message.getMessageId();
-                                source.ifPresent(s -> tgQQMsgIdCache.put(messageId, s));
-                                source.map(MessageSource::getIds).map(ids -> ids[0]).ifPresent(id -> qqTgMsgIdCache.put(id, messageId));
+                                cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, message)));
                             }
                             return true;
                         });
