@@ -1,4 +1,4 @@
-package kurenai.mybot.config;
+package kurenai.mybot.telegram;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -10,10 +10,9 @@ import org.telegram.telegrambots.bots.DefaultBotOptions.ProxyType;
  */
 
 @Data
-@ConfigurationProperties(prefix = "bot.proxy")
+@ConfigurationProperties(prefix = "bot.telegram.proxy")
 public class ProxyProperties {
-
-  private String host = "localhost";
-  private int port = 1080;
-  private ProxyType type = ProxyType.NO_PROXY;
+    private String    host = "localhost";
+    private int       port = 1080;
+    private ProxyType type = ProxyType.NO_PROXY;
 }

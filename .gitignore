@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### bot ###
+device.json
+
+### log ###
+*.log
+*.gz

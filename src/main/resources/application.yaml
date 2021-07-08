@@ -1,12 +1,35 @@
 bot:
-  token: ${BOT_TOKEN:}
-  username: ${BOT_NAME:}
-  proxy:
-    host: ${PROXY_HOST:localhost}
-    port: ${PROXY_PORT:7890}
-    type: ${PROXY_TYPE:SOCKS5} #SOCKS4 | SOCKS5 | HTTP
+  telegram:
+    token: ${BOT_TOKEN:}
+    username: ${BOT_NAME:}
+    proxy:
+      host: ${PROXY_HOST:localhost}
+      port: ${PROXY_PORT:1080}
+      type: ${PROXY_TYPE:NO_PROXY} #SOCKS4 | SOCKS5 | HTTP
+  qq:
+    account: ${QQ:}
+    password: ${QQ_PW:}
+    protocol: ${QQ_PROTOCOL:ANDROID_WATCH} #ANDROID_PAD | ANDROID_PHONE | ANDROID_WATCH
+#    filter:
+#      qq: 123456789, 987654321
+  handler:
+    forward:
+      enable: true
+      group:
+        default-qq: 123456789
+        default-telegram: 987654321
+        qq-telegram:
+          123456789: 987654321
+    anti-mini-app:
+      enable: true
+#      ignore-group: 123456789
+
+
+
 
 logging:
-  level:
-    kurenai.mybot:
-      trace
+  file:
+    name: im-sync.log
+#  level:
+#    kurenai.mybot:
+#      trace

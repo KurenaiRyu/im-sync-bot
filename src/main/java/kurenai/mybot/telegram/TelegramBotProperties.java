@@ -1,4 +1,4 @@
-package kurenai.mybot.config;
+package kurenai.mybot.telegram;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -9,8 +9,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 
 @Data
-@ConfigurationProperties(prefix = "bot")
-public class BotProperties {
+@ConfigurationProperties(prefix = "bot.telegram")
+public class TelegramBotProperties {
   private String token;
   private String username;
 }
