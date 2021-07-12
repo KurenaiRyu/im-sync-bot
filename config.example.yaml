@@ -1,0 +1,36 @@
+bot:
+  telegram:
+    token: 1234567:adgcgasdfadf # tg机器人token
+    username: your_bot_name  # tg机器人用户名
+  #    proxy:
+  #      host: 127.0.0.1    # tg代理地址
+  #      port: 1080
+  #      type: socks5   # socks5 | http
+  qq:
+    account: 12354547  # qq账号
+    password: your-qq-password # qq密码
+    protocol: ANDROID_PAD #ANDROID_PAD | ANDROID_PHONE | ANDROID_WATCH
+  #    filter:   # 过滤qq群，注释掉不填则全部接受处理
+  #      qq: 123456234，45678234234，1234234234
+  handler:
+    forward:
+      enable: true  # 开启转发（就算删除也默认开启）
+      group:
+        default-qq: 622032041   # 若找不到对应关系默认转发的qq群
+        default-telegram: -529721195 # 若找不到对应关系默认转发的tg组
+        qq-telegram: # qq-tg对应关系（一对一）
+          1234546768: -12345435646576
+    anti-mini-app:
+      enable: true  # 开启反小程序
+      ignore-group: 284466675
+    pic-source:
+      enable: true  # 开启图片搜源
+    pixiv:
+      enable: true  # 开启pixiv拼接连接
+
+
+
+
+logging:
+  file:
+    name: ./log/im-sync.log

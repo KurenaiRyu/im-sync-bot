@@ -7,8 +7,10 @@ import kurenai.mybot.handler.Handler;
 import lombok.extern.slf4j.Slf4j;
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent;
 import net.mamoe.mirai.internal.message.OnlineImage;
+import net.mamoe.mirai.message.data.MessageChain;
 import net.mamoe.mirai.message.data.OnlineMessageSource;
 import net.mamoe.mirai.message.data.QuoteReply;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -22,9 +24,10 @@ import java.util.Optional;
 @SuppressWarnings("KotlinInternalInJava")
 @Component
 @EnableConfigurationProperties(ForwardHandlerProperties.class)
+@ConditionalOnProperty(prefix = "bot.handler.pic-source", name = "enable", havingValue = "true")
 public class PicSourceHandler implements Handler {
 
-    private static final String ASCII2D   = "https://ascii2d.net/search/url/%s?type=color";
+    //    private static final String ASCII2D   = "https://ascii2d.net/search/url/%s?type=color";
     private static final String SAUCE_NAO = "https://saucenao.com/search.php?db=999&dbmaski=32768&url=%s";
 
     private final ForwardHandlerProperties forwardProperties;
@@ -35,7 +38,10 @@ public class PicSourceHandler implements Handler {
 
     @Override
     public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) {
-        if (Optional.of(event.getMessage().contentToString()).filter(m -> m.contains("source")).isPresent()) {
+        if (Optional.of(event.getMessage())
+                .map(MessageChain::contentToString)
+                .filter(m -> m.contains("source") || m.contains("Source"))
+                .isPresent()) {
             Optional.ofNullable(event.getMessage().get(OnlineImage.Key))
                     .or(() ->
                             Optional.ofNullable(event.getMessage().get(QuoteReply.Key))
@@ -52,13 +58,13 @@ public class PicSourceHandler implements Handler {
                         var contact = event.getSubject();
                         var chartId = forwardProperties.getGroup().getQqTelegram().getOrDefault(contact.getId(), forwardProperties.getGroup().getDefaultTelegram()).toString();
 
-                        var ascii2d  = String.format(ASCII2D, url);
+//                        var ascii2d  = String.format(ASCII2D, url);
                         var sauceNao = String.format(SAUCE_NAO, url);
-                        contact.sendMessage(ascii2d);
+//                        contact.sendMessage(ascii2d);
                         contact.sendMessage(sauceNao);
 
                         try {
-                            telegramBotClient.execute(SendMessage.builder().chatId(chartId).text(ascii2d).build());
+//                            telegramBotClient.execute(SendMessage.builder().chatId(chartId).text(ascii2d).build());
                             telegramBotClient.execute(SendMessage.builder().chatId(chartId).text(sauceNao).build());
                         } catch (TelegramApiException e) {
                             log.error(e.getMessage(), e);

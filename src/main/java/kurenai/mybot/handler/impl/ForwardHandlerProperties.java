@@ -3,6 +3,7 @@ package kurenai.mybot.handler.impl;
 import kurenai.mybot.handler.HandlerProperties;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import javax.annotation.PostConstruct;
@@ -12,6 +13,7 @@ import java.util.Map;
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "bot.handler.forward")
+@Slf4j
 public class ForwardHandlerProperties extends HandlerProperties {
 
     private Group group;
@@ -23,6 +25,8 @@ public class ForwardHandlerProperties extends HandlerProperties {
 
         group.qqTelegram.forEach((k, v) -> group.telegramQq.putIfAbsent(v, k));
         group.telegramQq.forEach((k, v) -> group.qqTelegram.putIfAbsent(v, k));
+
+        log.info("qq-telegram map: {}", group.qqTelegram);
     }
 
     @Getter

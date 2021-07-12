@@ -13,7 +13,7 @@ import net.mamoe.mirai.event.events.GroupMessageSyncEvent;
 import net.mamoe.mirai.utils.BotConfiguration;
 import org.springframework.context.ApplicationContext;
 
-import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -45,12 +45,13 @@ public class QQBotClient {
 
     public void run() {
         EventChannel<BotEvent> filter = this.bot.getEventChannel().filter(event -> {
-            if (properties.getFilter().getQq() == null || properties.getFilter().getQq().isEmpty()) {
+            var f = Optional.ofNullable(properties.getFilter());
+            if (f.map(QQBotProperties.Filter::getQq).filter(l -> !l.isEmpty()).isEmpty()) {
                 return true;
             }
-            List<Long> filterList = properties.getFilter().getQq();
+            var filterList = properties.getFilter().getQq();
             if (event instanceof GroupMessageEvent) {
-                long       id   = ((GroupMessageEvent) event).getGroup().getId();
+                long id = ((GroupMessageEvent) event).getGroup().getId();
                 return filterList.contains(id);
             } else if (event instanceof GroupMessageSyncEvent) {
                 GroupMessageSyncEvent syncEvent = (GroupMessageSyncEvent) event;

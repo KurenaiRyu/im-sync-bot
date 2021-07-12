@@ -24,8 +24,6 @@ import java.util.Optional;
 @EnableConfigurationProperties({AntiMiniAppHandlerProperties.class, ForwardHandlerProperties.class})
 public class AntiMiniAppHandler implements Handler {
 
-    private static final String ANTI_PREFIX = "Anti mini app or share link by qq!\r\n";
-
     private final ObjectMapper                 jsonMapper = new ObjectMapper();
     private final XmlMapper                    xmlMapper  = new XmlMapper();
     private final AntiMiniAppHandlerProperties properties;
@@ -58,7 +56,7 @@ public class AntiMiniAppHandler implements Handler {
                                     .map(JsonNode::asText))
                             .orElse("");
                     var url = "url:   " + Optional.ofNullable(jsonNode.get("url")).map(JsonNode::asText).orElse("");
-                    event.getSubject().sendMessage(String.join("\r\n", ANTI_PREFIX, title, url));
+                    event.getSubject().sendMessage(String.join("\r\n", title, url));
                     sendTg(telegramBotClient, chatId.toString(), url);
                     return false;
                 }
@@ -80,7 +78,7 @@ public class AntiMiniAppHandler implements Handler {
                     title += item.map(m -> m.get("desc")).map(JsonNode::asText).orElse("");
                     url += item.map(m -> m.get("qqdocurl")).map(JsonNode::asText).orElse("");
                 }
-                event.getSubject().sendMessage(String.join("\r\n", ANTI_PREFIX, title, handleUrl(url)));
+                event.getSubject().sendMessage(String.join("\r\n", title, handleUrl(url)));
                 sendTg(telegramBotClient, chatId.toString(), url);
             } catch (JsonProcessingException e) {
                 log.error(e.getMessage(), e);
@@ -108,6 +106,9 @@ public class AntiMiniAppHandler implements Handler {
 
     private String handleUrl(String url) {
         if (StringUtils.isNotBlank(url) && url.contains("?") && url.contains("b23.tv")) {
+            // ok http get real url
+            var u = url.substring(0, url.indexOf("?"));
+
             return url.substring(0, url.indexOf("?"));
         }
         return url;

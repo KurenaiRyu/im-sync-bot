@@ -12,6 +12,8 @@ import net.mamoe.mirai.internal.message.OnlineGroupImage;
 import net.mamoe.mirai.internal.utils.ExternalResourceImplByByteArray;
 import net.mamoe.mirai.message.MessageReceipt;
 import net.mamoe.mirai.message.data.*;
+import net.mamoe.mirai.utils.ExternalResource;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
@@ -47,9 +49,16 @@ import java.util.stream.Collectors;
 @SuppressWarnings("KotlinInternalInJava")
 public class ForwardHandler implements Handler {
 
+    private static final String QQ_PATTNER    = "{qq}";
+    private static final String NAME_PATTNER  = "{name}";
+    private static final String MSG_PATTNER   = "{msg}";
+    private static final String TG_ID_PATTNER = "{id}";
+
     private final ExecutorService          uploadPool = Executors.newFixedThreadPool(10);
     private final ExecutorService          cachePool  = Executors.newFixedThreadPool(1);
     private final ForwardHandlerProperties properties;
+
+    private String tgMsgFormat = "{name}: {msg}";
 
     public ForwardHandler(ForwardHandlerProperties properties) {
         this.properties = properties;
@@ -58,22 +67,33 @@ public class ForwardHandler implements Handler {
     // tg 2 qq
     @Override
     public boolean handle(TelegramBotClient client, QQBotClient qqClient, Update update, Message message) {
-        var chatId = message.getChatId();
-        var bot    = qqClient.getBot();
+        final var chatId = message.getChatId();
+        var       bot    = qqClient.getBot();
         var quoteMsgSource = Optional.ofNullable(message.getReplyToMessage())
                 .map(Message::getMessageId)
                 .map(CacheHolder.TG_QQ_MSG_ID_CACHE::get)
                 .map(CacheHolder.QQ_MSG_CACHE::get);
-        var groupId = quoteMsgSource.map(MessageSource::getTargetId)
+        final var groupId = quoteMsgSource.map(MessageSource::getTargetId)
                 .orElse(properties.getGroup().getTelegramQq().getOrDefault(chatId, properties.getGroup().getDefaultQQ()));
+        if (groupId.equals(0L)) return true;
         Group group = bot.getGroup(groupId);
+//        var   isMe = client.getBotUsername().equals(message.getFrom().getUserName());
+        final var isMe     = false;
+        final var username = message.getFrom().getFirstName();
         if (group == null) {
             log.error("QQ group[{}] not found.", groupId);
             return true;
         }
+//        if (message.hasDocument()) {
+//            var document = message.getDocument();
+//            handleFile(client, group, document.getFileId(), document.getFileUniqueId());
+//        } else if (message.hasVideo()) {
+//            var video = message.getVideo();
+//            handleFile(client, group, video.getFileId(), video.getFileUniqueId());
+//        }
 //        if (message.hasAnimation()) {
 //            Animation recMsg = message.getAnimation();
-//            File    file    = new File();
+//            File      file   = new File();
 //            file.setFileId(recMsg.getFileId());
 //            file.setFileUniqueId(recMsg.getFileUniqueId());
 //            try {
@@ -103,7 +123,8 @@ public class ForwardHandler implements Handler {
             }
 
             MessageChainBuilder builder = new MessageChainBuilder();
-            quoteMsgSource.map(QuoteReply::new).ifPresent(builder::add);
+            preHandleMsg(quoteMsgSource, isMe, username, builder);
+            builder.add(message.getSticker().getEmoji());
             getImage(client, group, sticker.getFileId(), sticker.getFileUniqueId())
                     .ifPresent(builder::add);
             Optional.ofNullable(message.getCaption())
@@ -132,38 +153,76 @@ public class ForwardHandler implements Handler {
                 }
             });
             MessageChainBuilder builder = new MessageChainBuilder();
-            quoteMsgSource.map(QuoteReply::new).ifPresent(builder::add);
+            preHandleMsg(quoteMsgSource, isMe, username, builder);
             builder.addAll(images);
             Optional.ofNullable(message.getCaption()).ifPresent(builder::add);
             MessageReceipt<?> receipt = group.sendMessage(builder.build());
             cachePool.execute(() -> CacheHolder.cache(receipt.getSource(), message));
         } else if (message.hasText()) {
+            var text = message.getText();
+            if (changeTgMsgFormat(text)) return false;
+
             MessageChainBuilder builder = new MessageChainBuilder();
-            quoteMsgSource.map(QuoteReply::new).ifPresent(builder::add);
-            builder.add(message.getText());
+            preHandleMsg(quoteMsgSource, isMe, username, builder);
+            builder.add(text);
             MessageReceipt<?> receipt = group.sendMessage(builder.build());
             cachePool.execute(() -> CacheHolder.cache(receipt.getSource(), message));
         }
         return true;
     }
 
+    private void handleFile(TelegramBotClient client, Group group, String fileId, String fileUniqueId) {
+        File   file   = getFile(client, fileId, fileUniqueId);
+        String suffix = getSuffix(file);
+        try (ExternalResource er = ExternalResource.create(client.downloadFile(file), suffix)) {
+            group.getFilesRoot().uploadAndSend(er);
+        } catch (TelegramApiException | IOException e) {
+            log.error(e.getMessage(), e);
+        }
+    }
+
+    @org.jetbrains.annotations.NotNull
+    private File getFile(TelegramBotClient client, String fileId, String fileUniqueId) {
+        File file = new File();
+        file.setFileId(fileId);
+        file.setFileUniqueId(fileUniqueId);
+        try {
+            file.setFilePath(client.execute(GetFile.builder().fileId(file.getFileId()).build()).getFilePath());
+        } catch (TelegramApiException e) {
+            log.error(e.getMessage(), e);
+        }
+        return file;
+    }
+
     // qq 2 tg
     @Override
     public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) {
-        long         groupId      = event.getGroup().getId();
+        var          group        = event.getGroup();
+        long         groupId      = group.getId();
+
         MessageChain messageChain = event.getMessage();
 
         var source = Optional.ofNullable(messageChain.get(OnlineMessageSource.Key));
+//        var atUsername = Optional.ofNullable(messageChain.get(At.Key)).map(at -> (At) at).map(at -> at.getDisplay(group));
         Optional<Integer> replyId = Optional.ofNullable(messageChain.get(QuoteReply.Key))
                 .map(QuoteReply::getSource)
                 .map(MessageSource::getIds)
                 .map(ints -> ints[0])
                 .map(CacheHolder.QQ_TG_MSG_ID_CACHE::get);
-        String content = formatContent(messageChain.stream().filter(m -> !(m instanceof Image)).map(SingleMessage::contentToString).collect(Collectors.joining()));
-        String msg = String.format("[%s] %s\r\n%s",
-                handleLongString(event.getSenderName(), 25),
-                event.getSender().getId(),
-                content);
+        String content = formatContent(messageChain.stream().filter(m -> !(m instanceof Image)).map(msg -> {
+            if (msg instanceof At) {
+                return " " + ((At) msg).getDisplay(group) + " ";
+            } else {
+                return msg.contentToString();
+            }
+        }).collect(Collectors.joining()));
+        if (content.startsWith("\n")) {
+            content = content.substring(2);
+        }
+
+        var msg = tgMsgFormat.replace(QQ_PATTNER, String.valueOf(event.getSender().getId()))
+                .replace(NAME_PATTNER, handleLongString(event.getSenderName(), 25).replace(" @", " "))
+                .replace(MSG_PATTNER, content);
         String chatId = properties.getGroup().getQqTelegram().getOrDefault(groupId, properties.getGroup().getDefaultTelegram()).toString();
 
         long count = messageChain.stream().filter(m -> m instanceof OnlineGroupImage).count();
@@ -233,6 +292,7 @@ public class ForwardHandler implements Handler {
 
         } else {
             var builder = SendMessage.builder();
+
             replyId.ifPresent(builder::replyToMessageId);
             try {
                 telegramBotClient.executeAsync(builder.chatId(chatId).text(msg).build())
@@ -248,26 +308,19 @@ public class ForwardHandler implements Handler {
                 log.error(e.getMessage(), e);
             }
         }
-        log.debug("{}({}) - {}({}): {}", event.getGroup().getName(), groupId, event.getSenderName(), event.getSender().getId(), content);
+        log.debug("{}({}) - {}({}): {}", group.getName(), groupId, event.getSenderName(), event.getSender().getId(), content);
         return true;
     }
 
     @Override
     public int order() {
-        return 0;
+        return 100;
     }
 
     @NotNull
     private Optional<Image> getImage(TelegramBotClient client, Group group, String fileId, String fileUniqueId) {
-        File file = new File();
-        file.setFileId(fileId);
-        file.setFileUniqueId(fileUniqueId);
-        try {
-            file.setFilePath(client.execute(GetFile.builder().fileId(file.getFileId()).build()).getFilePath());
-        } catch (TelegramApiException e) {
-            log.error(e.getMessage(), e);
-        }
-        String suffix = file.getFilePath().substring(file.getFilePath().lastIndexOf('.') + 1);
+        File   file   = getFile(client, fileId, fileUniqueId);
+        String suffix = getSuffix(file);
         try (var is = client.downloadFileAsStream(file);
              var er = new ExternalResourceImplByByteArray(is.readAllBytes(), suffix)) {
 
@@ -276,6 +329,15 @@ public class ForwardHandler implements Handler {
             log.error(e.getMessage(), e);
         }
         return Optional.empty();
+    }
+
+    private boolean changeTgMsgFormat(String text) {
+        String msgFormat;
+        if (text.startsWith("/msg") && text.length() > 4 && StringUtils.isNotBlank(msgFormat = text.substring(5))) {
+            this.tgMsgFormat = msgFormat;
+            return true;
+        }
+        return false;
     }
 
     private String formatContent(String msg) {
@@ -287,5 +349,15 @@ public class ForwardHandler implements Handler {
             return target.substring(0, maxLength) + "...";
         }
         return target;
+    }
+
+    @org.jetbrains.annotations.NotNull
+    private String getSuffix(File file) {
+        return file.getFilePath().substring(file.getFilePath().lastIndexOf('.') + 1);
+    }
+
+    private void preHandleMsg(Optional<OnlineMessageSource> quoteMsgSource, boolean isMaster, String username, MessageChainBuilder builder) {
+        quoteMsgSource.map(QuoteReply::new).ifPresent(builder::add);
+        if (!isMaster) builder.add(username + ": ");
     }
 }

@@ -1,0 +1,9 @@
+version: '3.5'
+services:
+  bot:
+    build: .
+    restart: always
+    volumes:
+      - ./device.json:/im-sync-bot/device.json
+      - ./cache:/im-sync-bot/cache
+      - ./config.yaml:/im-sync-bot/config.yaml

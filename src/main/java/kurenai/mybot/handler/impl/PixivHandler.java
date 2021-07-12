@@ -5,6 +5,7 @@ import kurenai.mybot.TelegramBotClient;
 import kurenai.mybot.handler.Handler;
 import lombok.extern.slf4j.Slf4j;
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -15,6 +16,7 @@ import java.util.regex.Pattern;
 @Component
 @Slf4j
 @EnableConfigurationProperties(ForwardHandlerProperties.class)
+@ConditionalOnProperty(prefix = "bot.handler.pixiv", name = "enable", havingValue = "true")
 public class PixivHandler implements Handler {
 
     private static final String PIXIV_ART_PREFIX  = "https://www.pixiv.net/artworks/";

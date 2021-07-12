@@ -7,14 +7,12 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Lazy;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.io.Serializable;
 import java.util.Optional;
 
 /**
@@ -51,13 +49,13 @@ public class TelegramBotClient extends TelegramLongPollingBot {
     log.trace("update: {}", update);
 
     // We check if the update has a message and the message has text
-    if (update.hasMessage() && update.getMessage().isGroupMessage()) {
-      Long gid = update.getMessage().getChatId();
+    if (update.hasMessage() && (update.getMessage().isGroupMessage() || update.getMessage().isSuperGroupMessage())) {
+      Long    gid     = update.getMessage().getChatId();
       Message message = update.getMessage();
 
-      Optional<Chat> chat       = Optional.ofNullable(message.getChat());
+      Optional<Chat> chat = Optional.ofNullable(message.getChat());
       Optional<User> from = Optional.ofNullable(message.getFrom());
-      log.debug("{}({}) - {}({}): ({}) {}",
+      log.info("{}({}) - {}({}): ({}) {}",
               chat.map(Chat::getTitle).orElse("Null"),
               chat.map(Chat::getId).orElse(0L),
               from.map(User::getFirstName).orElse(from.map(User::getLastName).orElse("Null")),

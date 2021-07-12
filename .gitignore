@@ -34,7 +34,12 @@ build/
 
 ### bot ###
 device.json
+device.json.*
 
 ### log ###
 *.log
 *.gz
+
+## config ##
+config.yaml
+src/main/resources/application*
