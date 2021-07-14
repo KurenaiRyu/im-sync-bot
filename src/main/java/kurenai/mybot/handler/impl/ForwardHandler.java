@@ -197,8 +197,11 @@ public class ForwardHandler implements Handler {
                 .map(MessageSource::getIds)
                 .map(ints -> ints[0])
                 .map(CacheHolder.QQ_TG_MSG_ID_CACHE::get);
+
+        long atAccount = -100;
         String content = formatContent(messageChain.stream().filter(m -> !(m instanceof Image)).map(msg -> {
             if (msg instanceof At) {
+                if (((At) msg).getTarget() == atAccount) return "";
                 return " " + ((At) msg).getDisplay(group) + " ";
             } else {
                 return msg.contentToString();
