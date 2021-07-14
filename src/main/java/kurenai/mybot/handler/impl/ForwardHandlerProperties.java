@@ -16,6 +16,7 @@ import java.util.Map;
 @Slf4j
 public class ForwardHandlerProperties extends HandlerProperties {
 
+    private Long  master;
     private Group group;
 
     @PostConstruct

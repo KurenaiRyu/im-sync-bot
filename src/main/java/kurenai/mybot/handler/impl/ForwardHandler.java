@@ -61,9 +61,9 @@ public class ForwardHandler implements Handler {
         this.properties = properties;
         String encoderPath;
         if (System.getProperties().getProperty("os.name").equalsIgnoreCase("Linux")) {
-            encoderPath = new java.io.File("bin/dwebp").getPath();
+            encoderPath = new java.io.File("./bin/dwebp").getPath();
         } else {
-            encoderPath = new java.io.File("bin/dwebp.exe").getPath();
+            encoderPath = new java.io.File("./bin/dwebp.exe").getPath();
         }
         webpCmdPattern = encoderPath + " %s -o %s";
     }
@@ -81,8 +81,8 @@ public class ForwardHandler implements Handler {
                 .orElse(properties.getGroup().getTelegramQq().getOrDefault(chatId, properties.getGroup().getDefaultQQ()));
         if (groupId.equals(0L)) return true;
         Group group = bot.getGroup(groupId);
-//        var   isMe = client.getBotUsername().equals(message.getFrom().getUserName());
-        final var isMe     = false;
+        boolean isMaster = properties.getMaster() != null
+                && Optional.ofNullable(message.getFrom()).map(User::getId).filter(properties.getMaster()::equals).isPresent();
         final var username = getUsername(message);
         if (group == null) {
             log.error("QQ group[{}] not found.", groupId);
@@ -127,7 +127,7 @@ public class ForwardHandler implements Handler {
             }
 
             MessageChainBuilder builder = new MessageChainBuilder();
-            preHandleMsg(quoteMsgSource, isMe, username, builder);
+            preHandleMsg(quoteMsgSource, isMaster, username, builder);
             getImage(client, group, sticker.getFileId(), sticker.getFileUniqueId())
                     .ifPresent(builder::add);
             Optional.ofNullable(message.getCaption())
@@ -156,7 +156,7 @@ public class ForwardHandler implements Handler {
                 }
             });
             MessageChainBuilder builder = new MessageChainBuilder();
-            preHandleMsg(quoteMsgSource, isMe, username, builder);
+            preHandleMsg(quoteMsgSource, isMaster, username, builder);
             builder.addAll(images);
             Optional.ofNullable(message.getCaption()).ifPresent(builder::add);
             MessageReceipt<?> receipt = group.sendMessage(builder.build());
@@ -166,7 +166,7 @@ public class ForwardHandler implements Handler {
             if (changeTgMsgFormat(text)) return false;
 
             MessageChainBuilder builder = new MessageChainBuilder();
-            preHandleMsg(quoteMsgSource, isMe, username, builder);
+            preHandleMsg(quoteMsgSource, isMaster, username, builder);
             builder.add(text);
             MessageReceipt<?> receipt = group.sendMessage(builder.build());
             cachePool.execute(() -> CacheHolder.cache(receipt.getSource(), message));
