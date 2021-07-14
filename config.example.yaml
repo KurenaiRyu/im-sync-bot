@@ -18,8 +18,10 @@ bot:
       group:
         default-qq: 622032041   # 若找不到对应关系默认转发的qq群
         default-telegram: -529721195 # 若找不到对应关系默认转发的tg组
-        qq-telegram: # qq-tg对应关系（一对一）
-          1234546768: -12345435646576
+        qq-telegram:
+          # qq-tg对应关系（一对一）
+          1234546768: -12345435646
+          5434524234: -94847336525
     anti-mini-app:
       enable: true  # 开启反小程序
       ignore-group: 284466675
