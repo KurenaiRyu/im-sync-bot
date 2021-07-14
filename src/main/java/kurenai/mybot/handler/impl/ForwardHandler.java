@@ -207,6 +207,9 @@ public class ForwardHandler implements Handler {
                 return msg.contentToString();
             }
         }).collect(Collectors.joining()));
+
+        if (content.startsWith("<?xml version='1.0'") || content.contains("\"app\":")) return true;
+
         if (content.startsWith("\n")) {
             content = content.substring(2);
         }
