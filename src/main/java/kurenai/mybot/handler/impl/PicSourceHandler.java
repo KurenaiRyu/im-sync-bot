@@ -37,7 +37,7 @@ public class PicSourceHandler implements Handler {
     }
 
     @Override
-    public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) {
+    public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) throws Exception {
         if (Optional.of(event.getMessage())
                 .map(MessageChain::contentToString)
                 .filter(m -> m.contains("source") || m.contains("Source"))

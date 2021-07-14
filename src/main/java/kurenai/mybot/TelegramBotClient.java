@@ -63,7 +63,11 @@ public class TelegramBotClient extends TelegramLongPollingBot {
               message.getMessageId(), message.getText());
 
       for (Handler handler : handlerHolder.getCurrentHandlerList()) {
-        if (!handler.handle(this, context.getBean(QQBotClient.class), update, message)) break;
+        try {
+          if (!handler.handle(this, context.getBean(QQBotClient.class), update, message)) break;
+        } catch (Exception e) {
+          log.error(e.getMessage(), e);
+        }
       }
     }
   }

@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import net.mamoe.mirai.contact.Group;
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent;
 import net.mamoe.mirai.internal.message.OnlineGroupImage;
-import net.mamoe.mirai.internal.utils.ExternalResourceImplByByteArray;
 import net.mamoe.mirai.message.MessageReceipt;
 import net.mamoe.mirai.message.data.*;
 import net.mamoe.mirai.utils.ExternalResource;
@@ -36,10 +35,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 @Component
@@ -54,6 +50,7 @@ public class ForwardHandler implements Handler {
     private static final String MSG_PATTNER   = "{msg}";
     private static final String TG_ID_PATTNER = "{id}";
 
+    private final String                   webpCmdPattern;
     private final ExecutorService          uploadPool = Executors.newFixedThreadPool(10);
     private final ExecutorService          cachePool  = Executors.newFixedThreadPool(1);
     private final ForwardHandlerProperties properties;
@@ -62,11 +59,18 @@ public class ForwardHandler implements Handler {
 
     public ForwardHandler(ForwardHandlerProperties properties) {
         this.properties = properties;
+        String encoderPath;
+        if (System.getProperties().getProperty("os.name").equalsIgnoreCase("Linux")) {
+            encoderPath = new java.io.File("bin/dwebp").getPath();
+        } else {
+            encoderPath = new java.io.File("bin/dwebp.exe").getPath();
+        }
+        webpCmdPattern = encoderPath + " %s -o %s";
     }
 
     // tg 2 qq
     @Override
-    public boolean handle(TelegramBotClient client, QQBotClient qqClient, Update update, Message message) {
+    public boolean handle(TelegramBotClient client, QQBotClient qqClient, Update update, Message message) throws Exception {
         final var chatId = message.getChatId();
         var       bot    = qqClient.getBot();
         var quoteMsgSource = Optional.ofNullable(message.getReplyToMessage())
@@ -79,7 +83,7 @@ public class ForwardHandler implements Handler {
         Group group = bot.getGroup(groupId);
 //        var   isMe = client.getBotUsername().equals(message.getFrom().getUserName());
         final var isMe     = false;
-        final var username = message.getFrom().getFirstName();
+        final var username = getUsername(message);
         if (group == null) {
             log.error("QQ group[{}] not found.", groupId);
             return true;
@@ -124,7 +128,6 @@ public class ForwardHandler implements Handler {
 
             MessageChainBuilder builder = new MessageChainBuilder();
             preHandleMsg(quoteMsgSource, isMe, username, builder);
-            builder.add(message.getSticker().getEmoji());
             getImage(client, group, sticker.getFileId(), sticker.getFileUniqueId())
                     .ifPresent(builder::add);
             Optional.ofNullable(message.getCaption())
@@ -171,39 +174,24 @@ public class ForwardHandler implements Handler {
         return true;
     }
 
-    private void handleFile(TelegramBotClient client, Group group, String fileId, String fileUniqueId) {
-        File   file   = getFile(client, fileId, fileUniqueId);
-        String suffix = getSuffix(file);
-        try (ExternalResource er = ExternalResource.create(client.downloadFile(file), suffix)) {
-            group.getFilesRoot().uploadAndSend(er);
-        } catch (TelegramApiException | IOException e) {
-            log.error(e.getMessage(), e);
-        }
-    }
-
     @org.jetbrains.annotations.NotNull
-    private File getFile(TelegramBotClient client, String fileId, String fileUniqueId) {
-        File file = new File();
-        file.setFileId(fileId);
-        file.setFileUniqueId(fileUniqueId);
-        try {
-            file.setFilePath(client.execute(GetFile.builder().fileId(file.getFileId()).build()).getFilePath());
-        } catch (TelegramApiException e) {
-            log.error(e.getMessage(), e);
+    private String getUsername(Message message) {
+        var from = Optional.ofNullable(message.getFrom());
+        if (from.map(User::getUserName).filter("GroupAnonymousBot"::equalsIgnoreCase).isPresent()) {
+            return message.getAuthorSignature();    //匿名用头衔作为前缀
         }
-        return file;
+        return from.map(User::getFirstName).orElse("Null");
     }
 
     // qq 2 tg
     @Override
-    public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) {
-        var          group        = event.getGroup();
-        long         groupId      = group.getId();
+    public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) throws Exception {
+        var  group   = event.getGroup();
+        long groupId = group.getId();
 
         MessageChain messageChain = event.getMessage();
 
         var source = Optional.ofNullable(messageChain.get(OnlineMessageSource.Key));
-//        var atUsername = Optional.ofNullable(messageChain.get(At.Key)).map(at -> (At) at).map(at -> at.getDisplay(group));
         Optional<Integer> replyId = Optional.ofNullable(messageChain.get(QuoteReply.Key))
                 .map(QuoteReply::getSource)
                 .map(MessageSource::getIds)
@@ -224,6 +212,8 @@ public class ForwardHandler implements Handler {
                 .replace(NAME_PATTNER, handleLongString(event.getSenderName(), 25).replace(" @", " "))
                 .replace(MSG_PATTNER, content);
         String chatId = properties.getGroup().getQqTelegram().getOrDefault(groupId, properties.getGroup().getDefaultTelegram()).toString();
+
+        if (StringUtils.isBlank(chatId) || chatId.equals("0")) return true;
 
         long count = messageChain.stream().filter(m -> m instanceof OnlineGroupImage).count();
         if (count > 0) {
@@ -317,18 +307,49 @@ public class ForwardHandler implements Handler {
         return 100;
     }
 
+    @org.jetbrains.annotations.NotNull
+    private File getFile(TelegramBotClient client, String fileId, String fileUniqueId) {
+        try {
+            return client.execute(GetFile.builder().fileId(fileId).build());
+        } catch (TelegramApiException e) {
+            log.error(e.getMessage(), e);
+        }
+        File file = new File();
+        file.setFileId(fileId);
+        file.setFileUniqueId(fileUniqueId);
+        return file;
+    }
+
     @NotNull
-    private Optional<Image> getImage(TelegramBotClient client, Group group, String fileId, String fileUniqueId) {
+    private Optional<Image> getImage(TelegramBotClient client, Group group, String fileId, String fileUniqueId) throws TelegramApiException, IOException {
         File   file   = getFile(client, fileId, fileUniqueId);
         String suffix = getSuffix(file);
-        try (var is = client.downloadFileAsStream(file);
-             var er = new ExternalResourceImplByByteArray(is.readAllBytes(), suffix)) {
-
+        var    image  = client.downloadFile(file);
+        if (suffix.equalsIgnoreCase("webp")) {
+            var png = webp2png(file.getFileId(), image);
+            if (png != null) image = png;
+        }
+        try (var er = ExternalResource.create(image)) {
             return Optional.of(group.uploadImage(er));
-        } catch (TelegramApiException | IOException e) {
+        } catch (IOException e) {
             log.error(e.getMessage(), e);
         }
         return Optional.empty();
+    }
+
+    private java.io.File webp2png(String id, java.io.File webpFile) {
+        var pngFile = new java.io.File("./cache/img/" + id + ".png");
+        if (pngFile.exists()) return pngFile;
+
+        pngFile.getParentFile().mkdirs();
+        CompletableFuture<Process> future;
+        try {
+            future = Runtime.getRuntime().exec(String.format(webpCmdPattern, webpFile.getPath(), pngFile.getPath()).replace("\\", "\\\\")).onExit();
+            if (future.get().exitValue() >= 0 || pngFile.exists()) return pngFile;
+        } catch (IOException | ExecutionException | InterruptedException e) {
+            log.error(e.getMessage(), e);
+        }
+        return null;
     }
 
     private boolean changeTgMsgFormat(String text) {

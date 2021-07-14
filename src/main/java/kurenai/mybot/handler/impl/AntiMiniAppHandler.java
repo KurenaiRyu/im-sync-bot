@@ -35,8 +35,8 @@ public class AntiMiniAppHandler implements Handler {
     }
 
     @Override
-    public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) {
-        var id        = event.getSubject().getId();
+    public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) throws Exception {
+        var id     = event.getSubject().getId();
         var chatId = forwardProperties.getGroup().getQqTelegram().getOrDefault(id, forwardProperties.getGroup().getDefaultTelegram());
 
         var ignoreGroup = properties.getIgnoreGroup();

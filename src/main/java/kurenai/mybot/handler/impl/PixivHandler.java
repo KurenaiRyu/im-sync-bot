@@ -30,7 +30,7 @@ public class PixivHandler implements Handler {
     }
 
     @Override
-    public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) {
+    public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) throws Exception {
         final var content = event.getMessage().serializeToMiraiCode();
         final var matcher = pattern.matcher(content);
         if (matcher.find()) {

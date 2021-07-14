@@ -7,3 +7,4 @@ services:
       - ./device.json:/im-sync-bot/device.json
       - ./cache:/im-sync-bot/cache
       - ./config.yaml:/im-sync-bot/config.yaml
+      - ./bin:/im-sync-bot/bin

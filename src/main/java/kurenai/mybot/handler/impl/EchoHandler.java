@@ -17,7 +17,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 public class EchoHandler implements Handler {
 
     @Override
-    public boolean handle(TelegramBotClient client, QQBotClient qqBotClient, Update update, Message message) {
+    public boolean handle(TelegramBotClient client, QQBotClient qqBotClient, Update update, Message message) throws Exception {
 
         if (message.hasText()) {
             SendMessage sendMessage = new SendMessage(); // Create a SendMessage object with mandatory fields

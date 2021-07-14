@@ -3,11 +3,8 @@ package kurenai.mybot.handler;
 import kurenai.mybot.QQBotClient;
 import kurenai.mybot.TelegramBotClient;
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent;
-import org.telegram.telegrambots.meta.api.methods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
-
-import java.io.Serializable;
 
 public interface Handler {
 
@@ -23,7 +20,7 @@ public interface Handler {
      * @param message
      * @return true 为继续执行，false中断
      */
-    default boolean handle(TelegramBotClient client, QQBotClient qqClient, Update update, Message message) {
+    default boolean handle(TelegramBotClient client, QQBotClient qqClient, Update update, Message message) throws Exception {
         return true;
     }
 
@@ -31,7 +28,7 @@ public interface Handler {
         return true;
     }
 
-    default boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) {
+    default boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) throws Exception {
         return true;
     }
 
