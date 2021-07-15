@@ -174,11 +174,10 @@ public class ForwardHandler implements Handler {
         return true;
     }
 
-    @org.jetbrains.annotations.NotNull
     private String getUsername(Message message) {
         var from = Optional.ofNullable(message.getFrom());
         if (from.map(User::getUserName).filter("GroupAnonymousBot"::equalsIgnoreCase).isPresent()) {
-            return message.getAuthorSignature();    //匿名用头衔作为前缀
+            return Optional.ofNullable(message.getAuthorSignature()).orElse("");    //匿名用头衔作为前缀
         }
         return from.map(User::getFirstName).orElse("Null");
     }
@@ -385,6 +384,6 @@ public class ForwardHandler implements Handler {
 
     private void preHandleMsg(Optional<OnlineMessageSource> quoteMsgSource, boolean isMaster, String username, MessageChainBuilder builder) {
         quoteMsgSource.map(QuoteReply::new).ifPresent(builder::add);
-        if (!isMaster) builder.add(username + ": ");
+        if (!isMaster && StringUtils.isNotBlank(username)) builder.add(username + ": ");  //非空名称或是非主人则添加前缀
     }
 }
