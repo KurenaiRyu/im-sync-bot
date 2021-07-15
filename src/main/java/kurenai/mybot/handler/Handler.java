@@ -9,7 +9,7 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 public interface Handler {
 
 
-    default boolean preHandle(TelegramBotClient client, Update update, Message message) {
+    default boolean preHandle(TelegramBotClient client, Update update) {
         return true;
     }
 
@@ -17,10 +17,13 @@ public interface Handler {
      * @param client
      * @param qqClient
      * @param update
-     * @param message
      * @return true 为继续执行，false中断
      */
-    default boolean handle(TelegramBotClient client, QQBotClient qqClient, Update update, Message message) throws Exception {
+    default boolean handleMessage(TelegramBotClient client, QQBotClient qqClient, Update update, Message message) throws Exception {
+        return true;
+    }
+
+    default boolean handleEditMessage(TelegramBotClient client, QQBotClient qqClient, Update update, Message message) throws Exception {
         return true;
     }
 

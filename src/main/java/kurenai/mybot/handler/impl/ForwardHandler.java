@@ -78,7 +78,7 @@ public class ForwardHandler implements Handler {
 
     // tg 2 qq
     @Override
-    public boolean handle(TelegramBotClient client, QQBotClient qqClient, Update update, Message message) throws Exception {
+    public boolean handleMessage(TelegramBotClient client, QQBotClient qqClient, Update update, Message message) throws Exception {
         final var chatId = message.getChatId();
         var       bot    = qqClient.getBot();
         var quoteMsgSource = Optional.ofNullable(message.getReplyToMessage())
@@ -182,6 +182,15 @@ public class ForwardHandler implements Handler {
         return true;
     }
 
+    @Override
+    public boolean handleEditMessage(TelegramBotClient client, QQBotClient qqClient, Update update, Message message) throws Exception {
+        Optional.ofNullable(message.getMessageId())
+                .map(CacheHolder.TG_QQ_MSG_ID_CACHE::get)
+                .map(CacheHolder.QQ_MSG_CACHE::get)
+                .ifPresent(MessageSource::recall);
+        return handleMessage(client, qqClient, update, message);
+    }
+
     private String getUsername(Message message) {
         var from = Optional.ofNullable(message.getFrom());
         if (from.map(User::getUserName).filter("GroupAnonymousBot"::equalsIgnoreCase).isPresent()) {
@@ -221,15 +230,10 @@ public class ForwardHandler implements Handler {
                 .map(CacheHolder.QQ_TG_MSG_ID_CACHE::get);
 
         AtomicLong atAccount = new AtomicLong(-100);
-        String content = formatContent(messageChain.stream().filter(m -> !(m instanceof Image)).map(msg -> {
-            if (msg instanceof At) {
-                if (((At) msg).getTarget() == atAccount.get()) return "";
-                else atAccount.set(((At) msg).getTarget());
-                return " " + ((At) msg).getDisplay(group) + " ";
-            } else {
-                return msg.contentToString();
-            }
-        }).collect(Collectors.joining()));
+        String content = formatContent(messageChain.stream()
+                .filter(m -> !(m instanceof Image))
+                .map(msg -> getContent(group, atAccount, msg))
+                .collect(Collectors.joining()));
 
         if (content.startsWith("<?xml version='1.0'") || content.contains("\"app\":")) return true;
 
@@ -331,6 +335,29 @@ public class ForwardHandler implements Handler {
         return true;
     }
 
+    private String getContent(Group group, AtomicLong atAccount, SingleMessage msg) {
+        if (msg instanceof At) {
+            if (((At) msg).getTarget() == atAccount.get()) return "";
+            else atAccount.set(((At) msg).getTarget());
+            return " " + ((At) msg).getDisplay(group) + " ";
+        } else if (msg instanceof ForwardMessage) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("\r\n----forward message----\r\n");
+            for (ForwardMessage.Node node : ((ForwardMessage) msg).getNodeList()) {
+                sb.append(node.getSenderName()).append(": ");
+                AtomicLong account = new AtomicLong(-100);
+                for (SingleMessage singleMessage : node.getMessageChain()) {
+                    sb.append(getContent(group, account, singleMessage));
+                }
+                sb.append("\r\n");
+            }
+            sb.append("-----------------------");
+            return sb.toString();
+        } else {
+            return msg.contentToString();
+        }
+    }
+
     @Override
     public int order() {
         return 100;
@@ -407,7 +434,7 @@ public class ForwardHandler implements Handler {
     }
 
     private void preHandleMsg(Optional<OnlineMessageSource> quoteMsgSource, boolean isMaster, String username, MessageChainBuilder builder) {
-        quoteMsgSource.map(QuoteReply::new).ifPresent(builder::add);
+        quoteMsgSource.map(MessageSource::quote).ifPresent(builder::add);
         if (!isMaster && StringUtils.isNotBlank(username)) builder.add(username + ": ");  //非空名称或是非主人则添加前缀
     }
 }

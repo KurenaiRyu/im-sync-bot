@@ -1,5 +1,7 @@
 package kurenai.mybot;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kurenai.mybot.handler.Handler;
 import kurenai.mybot.telegram.TelegramBotProperties;
 import lombok.extern.slf4j.Slf4j;
@@ -7,13 +9,9 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Lazy;
 import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.meta.api.objects.Chat;
-import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-
-import java.util.Optional;
 
 /**
  * 机器人实例
@@ -24,9 +22,10 @@ import java.util.Optional;
 @Slf4j
 public class TelegramBotClient extends TelegramLongPollingBot {
 
+  private final ObjectMapper          mapper = new ObjectMapper();
   private final TelegramBotProperties telegramBotProperties;
-  private final HandlerHolder handlerHolder; //初始化时处理器列表
-  private final   ApplicationContext     context;
+  private final HandlerHolder         handlerHolder; //初始化时处理器列表
+  private final ApplicationContext    context;
   public TelegramBotClient(DefaultBotOptions options, TelegramBotProperties telegramBotProperties, @Lazy HandlerHolder handlerHolder, ApplicationContext context) {
     super(options);
     this.telegramBotProperties = telegramBotProperties;
@@ -46,31 +45,36 @@ public class TelegramBotClient extends TelegramLongPollingBot {
 
   @Override
   public void onUpdateReceived(Update update) {
-    log.trace("update: {}", update);
+    try {
+      log.debug("onUpdateReceived: {}", mapper.writeValueAsString(update));
+    } catch (JsonProcessingException e) {
+      log.debug("onUpdateReceived: {}", update);
+    }
 
-    // We check if the update has a message and the message has text
-    if (update.hasMessage() && (update.getMessage().isGroupMessage() || update.getMessage().isSuperGroupMessage())) {
-      Long    gid     = update.getMessage().getChatId();
-      Message message = update.getMessage();
+    if (update.hasMessage() && (update.getMessage().isGroupMessage() || update.getMessage().isSuperGroupMessage()) ||
+            update.hasEditedMessage() && (update.getEditedMessage().isSuperGroupMessage() || update.getEditedMessage().isGroupMessage())) {
 
-      Optional<Chat> chat = Optional.ofNullable(message.getChat());
-      Optional<User> from = Optional.ofNullable(message.getFrom());
-      log.info("{}({}) - {}({}): ({}) {}",
-              chat.map(Chat::getTitle).orElse("Null"),
-              chat.map(Chat::getId).orElse(0L),
-              from.map(User::getFirstName).orElse(from.map(User::getLastName).orElse("Null")),
-              from.map(User::getId).orElse(0L),
-              message.getMessageId(), message.getText());
-
-      for (Handler handler : handlerHolder.getCurrentHandlerList()) {
-        try {
-          if (!handler.handle(this, context.getBean(QQBotClient.class), update, message)) break;
-        } catch (Exception e) {
-          log.error(e.getMessage(), e);
+      var qqBotClient = context.getBean(QQBotClient.class);
+      if (update.hasMessage()) {
+        for (Handler handler : handlerHolder.getCurrentHandlerList()) {
+          try {
+            if (!handler.handleMessage(this, qqBotClient, update, update.getMessage())) break;
+          } catch (Exception e) {
+            log.error(e.getMessage(), e);
+          }
+        }
+      } else if (update.hasEditedMessage()) {
+        for (Handler handler : handlerHolder.getCurrentHandlerList()) {
+          try {
+            if (!handler.handleEditMessage(this, qqBotClient, update, update.getEditedMessage())) break;
+          } catch (Exception e) {
+            log.error(e.getMessage(), e);
+          }
         }
       }
     }
   }
+
 
   @Override
   public void onRegister() {
