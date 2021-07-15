@@ -5,6 +5,7 @@ import kurenai.mybot.CacheHolder;
 import kurenai.mybot.QQBotClient;
 import kurenai.mybot.TelegramBotClient;
 import kurenai.mybot.handler.Handler;
+import kurenai.mybot.handler.config.ForwardHandlerProperties;
 import lombok.extern.slf4j.Slf4j;
 import net.mamoe.mirai.contact.Group;
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent;
@@ -31,11 +32,9 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import javax.validation.constraints.NotNull;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 @Component
@@ -55,17 +54,26 @@ public class ForwardHandler implements Handler {
     private final ExecutorService          cachePool  = Executors.newFixedThreadPool(1);
     private final ForwardHandlerProperties properties;
 
+    //TODO 最好将属性都提取出来，最少也要把第二层属性提取出来，不然每次判空
+    private final Map<Long, String> bindingName;
+
     private String tgMsgFormat = "{name}: {msg}";
 
     public ForwardHandler(ForwardHandlerProperties properties) {
         this.properties = properties;
         String encoderPath;
+
         if (System.getProperties().getProperty("os.name").equalsIgnoreCase("Linux")) {
             encoderPath = new java.io.File("./bin/dwebp").getPath();
         } else {
             encoderPath = new java.io.File("./bin/dwebp.exe").getPath();
         }
         webpCmdPattern = encoderPath + " %s -o %s";
+
+        bindingName = Optional.ofNullable(properties)
+                .map(ForwardHandlerProperties::getMember)
+                .map(ForwardHandlerProperties.Member::getBindingName)
+                .orElse(Collections.emptyMap());
     }
 
     // tg 2 qq
@@ -177,9 +185,24 @@ public class ForwardHandler implements Handler {
     private String getUsername(Message message) {
         var from = Optional.ofNullable(message.getFrom());
         if (from.map(User::getUserName).filter("GroupAnonymousBot"::equalsIgnoreCase).isPresent()) {
-            return Optional.ofNullable(message.getAuthorSignature()).orElse("");    //匿名用头衔作为前缀
+            return Optional.ofNullable(message.getAuthorSignature()).orElse("");    //匿名用头衔作为前缀，空头衔将会不添加前缀
         }
-        return from.map(User::getFirstName).orElse("Null");
+        return from.map(User::getId).map(bindingName::get).or(() -> from.map(u -> {
+            var flagA = StringUtils.isNotBlank(u.getFirstName());
+            var flagB = StringUtils.isNotBlank(u.getLastName());
+            var flagC = StringUtils.isNotBlank(u.getUserName());
+            if (flagA && flagB) {
+                return u.getFirstName() + " " + u.getLastName();
+            } else if (flagA) {
+                return u.getFirstName();
+            } else if (flagB) {
+                return u.getLastName();
+            } else if (flagC) {
+                return u.getUserName();
+            } else {
+                return "Null";
+            }
+        })).orElse("Null");
     }
 
     // qq 2 tg
@@ -197,10 +220,11 @@ public class ForwardHandler implements Handler {
                 .map(ints -> ints[0])
                 .map(CacheHolder.QQ_TG_MSG_ID_CACHE::get);
 
-        long atAccount = -100;
+        AtomicLong atAccount = new AtomicLong(-100);
         String content = formatContent(messageChain.stream().filter(m -> !(m instanceof Image)).map(msg -> {
             if (msg instanceof At) {
-                if (((At) msg).getTarget() == atAccount) return "";
+                if (((At) msg).getTarget() == atAccount.get()) return "";
+                else atAccount.set(((At) msg).getTarget());
                 return " " + ((At) msg).getDisplay(group) + " ";
             } else {
                 return msg.contentToString();

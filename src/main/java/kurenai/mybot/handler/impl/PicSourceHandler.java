@@ -4,6 +4,7 @@ import kurenai.mybot.CacheHolder;
 import kurenai.mybot.QQBotClient;
 import kurenai.mybot.TelegramBotClient;
 import kurenai.mybot.handler.Handler;
+import kurenai.mybot.handler.config.ForwardHandlerProperties;
 import lombok.extern.slf4j.Slf4j;
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent;
 import net.mamoe.mirai.internal.message.OnlineImage;

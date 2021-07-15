@@ -1,4 +1,4 @@
-package kurenai.mybot.handler.impl;
+package kurenai.mybot.handler.config;
 
 import kurenai.mybot.handler.HandlerProperties;
 import lombok.Getter;
@@ -16,8 +16,9 @@ import java.util.Map;
 @Slf4j
 public class ForwardHandlerProperties extends HandlerProperties {
 
-    private Long  master;
-    private Group group;
+    private Long   master;
+    private Group  group;
+    private Member member;
 
     @PostConstruct
     public void init() {
@@ -32,11 +33,18 @@ public class ForwardHandlerProperties extends HandlerProperties {
 
     @Getter
     @Setter
-    static class Group {
+    public static class Group {
         private Long            defaultQQ;
         private Long            defaultTelegram;
         private Map<Long, Long> qqTelegram;
         private Map<Long, Long> telegramQq;
+    }
+
+    @Getter
+    @Setter
+    public static class Member {
+
+        private Map<Long, String> bindingName;
     }
 }
 

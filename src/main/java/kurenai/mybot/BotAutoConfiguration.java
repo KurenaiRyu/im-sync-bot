@@ -1,12 +1,9 @@
-package kurenai.mybot.config;
+package kurenai.mybot;
 
-import kurenai.mybot.HandlerHolder;
-import kurenai.mybot.QQBotClient;
-import kurenai.mybot.TelegramBotClient;
+import kurenai.mybot.handler.Handler;
 import kurenai.mybot.qq.QQBotProperties;
 import kurenai.mybot.telegram.ProxyProperties;
 import kurenai.mybot.telegram.TelegramBotProperties;
-import kurenai.mybot.handler.Handler;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;

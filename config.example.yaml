@@ -22,6 +22,10 @@ bot:
           # qq-tg对应关系（一对一）
           1234546768: -12345435646
           5434524234: -94847336525
+      member:
+        binding-name:
+          # id(qq) - 绑定名称
+          -12345435646: your-binding-name
     anti-mini-app:
       enable: true  # 开启反小程序
       ignore-group: 284466675

@@ -1,4 +1,4 @@
-package kurenai.mybot.handler.impl;
+package kurenai.mybot.handler.config;
 
 import kurenai.mybot.handler.HandlerProperties;
 import lombok.Getter;
