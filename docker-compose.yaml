@@ -8,3 +8,4 @@ services:
       - ./cache:/im-sync-bot/cache
       - ./config.yaml:/im-sync-bot/config.yaml
       - ./bin:/im-sync-bot/bin
+      - ./logs:/im-sync-bot/logs

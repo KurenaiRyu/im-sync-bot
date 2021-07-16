@@ -39,4 +39,4 @@ bot:
 
 logging:
   file:
-    name: ./log/im-sync.log
+    name: ./logs/im-sync.log

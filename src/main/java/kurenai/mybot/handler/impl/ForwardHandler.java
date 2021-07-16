@@ -6,6 +6,7 @@ import kurenai.mybot.QQBotClient;
 import kurenai.mybot.TelegramBotClient;
 import kurenai.mybot.handler.Handler;
 import kurenai.mybot.handler.config.ForwardHandlerProperties;
+import kurenai.mybot.utils.RetryUtil;
 import lombok.extern.slf4j.Slf4j;
 import net.mamoe.mirai.contact.Group;
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent;
@@ -52,6 +53,7 @@ public class ForwardHandler implements Handler {
     private final String                   webpCmdPattern;
     private final ExecutorService          uploadPool = Executors.newFixedThreadPool(10);
     private final ExecutorService          cachePool  = Executors.newFixedThreadPool(1);
+    private final ScheduledExecutorService retryPool  = Executors.newScheduledThreadPool(5);
     private final ForwardHandlerProperties properties;
 
     //TODO 最好将属性都提取出来，最少也要把第二层属性提取出来，不然每次判空
@@ -267,17 +269,17 @@ public class ForwardHandler implements Handler {
                     media.setCaption(msg);
                     var builder = SendMediaGroup.builder();
                     replyId.ifPresent(builder::replyToMessageId);
-                    telegramBotClient.executeAsync(builder
+
+                    var sendMsg = builder
                             .medias(medias)
                             .chatId(chatId)
-                            .build()).handle((messages, throwable) -> {
-                        if (throwable != null) {
-                            log.error(throwable.getMessage(), throwable);
-                        } else {
-                            cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, messages.get(0))));
-                        }
-                        return true;
-                    });
+                            .build();
+                    try {
+                        var result = RetryUtil.retry(3, () -> telegramBotClient.execute(sendMsg));
+                        cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, result)));
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                    }
                 }
             } else {
                 OnlineGroupImage image = (OnlineGroupImage) messageChain.get(Image.Key);
@@ -285,31 +287,30 @@ public class ForwardHandler implements Handler {
                 if (image.getImageId().endsWith(".gif")) {
                     var builder = SendAnimation.builder();
                     replyId.ifPresent(builder::replyToMessageId);
-                    telegramBotClient.executeAsync(builder
+                    var sendMsg = builder
                             .caption(msg)
                             .chatId(chatId)
                             .animation(new InputFile(image.getOriginUrl()))
-                            .build()).handle((message, throwable) -> {
-                        if (throwable != null) {
-                            log.error(throwable.getMessage(), throwable);
-                        } else {
-                            cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, message)));
-                        }
-                        return true;
-                    });
+                            .build();
+                    try {
+                        var result = RetryUtil.retry(3, () -> telegramBotClient.execute(sendMsg));
+                        cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, result)));
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                    }
                 } else {
-                    telegramBotClient.executeAsync(SendPhoto.builder()
+                    var sendMsg = SendPhoto.builder()
                             .caption(msg)
                             .chatId(chatId)
                             .photo(new InputFile(image.getOriginUrl()))
-                            .build()).handle((message, throwable) -> {
-                        if (throwable != null) {
-                            log.error(throwable.getMessage(), throwable);
-                        } else {
-                            cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, message)));
-                        }
-                        return true;
-                    });
+                            .build();
+                    try {
+                        var result = RetryUtil.retry(3, () -> telegramBotClient.execute(sendMsg));
+                        cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, result)));
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                    }
+
                 }
             }
 
@@ -317,16 +318,10 @@ public class ForwardHandler implements Handler {
             var builder = SendMessage.builder();
 
             replyId.ifPresent(builder::replyToMessageId);
+            var sendMsg = builder.chatId(chatId).text(msg).build();
             try {
-                telegramBotClient.executeAsync(builder.chatId(chatId).text(msg).build())
-                        .handle((message, throwable) -> {
-                            if (throwable != null) {
-                                log.error(throwable.getMessage(), throwable);
-                            } else {
-                                cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, message)));
-                            }
-                            return true;
-                        });
+                var result = RetryUtil.retry(3, () -> telegramBotClient.execute(sendMsg));
+                cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, result)));
             } catch (TelegramApiException e) {
                 log.error(e.getMessage(), e);
             }
@@ -437,4 +432,5 @@ public class ForwardHandler implements Handler {
         quoteMsgSource.map(MessageSource::quote).ifPresent(builder::add);
         if (!isMaster && StringUtils.isNotBlank(username)) builder.add(username + ": ");  //非空名称或是非主人则添加前缀
     }
+
 }
