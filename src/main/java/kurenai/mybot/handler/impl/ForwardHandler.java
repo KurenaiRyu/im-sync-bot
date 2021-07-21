@@ -372,7 +372,10 @@ public class ForwardHandler implements Handler {
     private Optional<Image> getImage(TelegramBotClient client, Group group, String fileId, String fileUniqueId) throws TelegramApiException {
         File   file   = getFile(client, fileId, fileUniqueId);
         String suffix = getSuffix(file);
-        var    image  = client.downloadFile(file);
+        var    image  = new java.io.File(file.getFilePath());
+        if (!image.exists()) {
+            image = client.downloadFile(file);
+        }
         if (suffix.equalsIgnoreCase("webp")) {
             var png = webp2png(file.getFileId(), image);
             if (png != null) image = png;

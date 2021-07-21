@@ -4,8 +4,9 @@ services:
     build: .
     restart: always
     volumes:
-      - ./device.json:/im-sync-bot/device.json
-      - ./cache:/im-sync-bot/cache
-      - ./config.yaml:/im-sync-bot/config.yaml
-      - ./bin:/im-sync-bot/bin
-      - ./logs:/im-sync-bot/logs
+      - ./device.json:/im-sync-bot/device.json # mirai生成的设备信息
+      - ./cache:/im-sync-bot/cache # 缓存路径
+      - ./config.yaml:/im-sync-bot/config.yaml # 配置路径
+      - ./bin:/im-sync-bot/bin # 二进制执行文件
+      - ./logs:/im-sync-bot/logs # 日志
+#      - ../telegram-bot-api/data/:/var/lib/telegram-bot-api # 本地tg服务数据路径

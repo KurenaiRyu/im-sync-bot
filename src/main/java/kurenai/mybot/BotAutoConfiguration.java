@@ -13,6 +13,7 @@ import org.telegram.telegrambots.bots.DefaultBotOptions;
 import org.telegram.telegrambots.bots.DefaultBotOptions.ProxyType;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * @author liufuhong
@@ -29,8 +30,9 @@ public class BotAutoConfiguration {
   }
 
   @Bean
-  public DefaultBotOptions defaultBotOptions(ProxyProperties proxyProperties) {
+  public DefaultBotOptions defaultBotOptions(ProxyProperties proxyProperties, TelegramBotProperties botProperties) {
     DefaultBotOptions botOptions = new DefaultBotOptions();
+    Optional.ofNullable(botProperties.getBaseUrl()).ifPresent(botOptions::setBaseUrl);
     if (proxyProperties.getType().equals(ProxyType.NO_PROXY)) return botOptions;
     botOptions.setProxyType(proxyProperties.getType());
     botOptions.setProxyHost(proxyProperties.getHost());

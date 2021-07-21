@@ -2,6 +2,7 @@ bot:
   telegram:
     token: 1234567:adgcgasdfadf # tg机器人token
     username: your_bot_name  # tg机器人用户名
+#    base-url: 'https://api.telegram.org/bot' # 默认不需要改，注意需要加上 /bot
   #    proxy:
   #      host: 127.0.0.1    # tg代理地址
   #      port: 1080
