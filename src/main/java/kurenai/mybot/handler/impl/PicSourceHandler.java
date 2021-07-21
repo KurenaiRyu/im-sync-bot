@@ -7,7 +7,7 @@ import kurenai.mybot.handler.Handler;
 import kurenai.mybot.handler.config.ForwardHandlerProperties;
 import lombok.extern.slf4j.Slf4j;
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent;
-import net.mamoe.mirai.internal.message.OnlineImage;
+import net.mamoe.mirai.message.data.Image;
 import net.mamoe.mirai.message.data.MessageChain;
 import net.mamoe.mirai.message.data.OnlineMessageSource;
 import net.mamoe.mirai.message.data.QuoteReply;
@@ -43,17 +43,16 @@ public class PicSourceHandler implements Handler {
                 .map(MessageChain::contentToString)
                 .filter(m -> m.contains("source") || m.contains("Source"))
                 .isPresent()) {
-            Optional.ofNullable(event.getMessage().get(OnlineImage.Key))
+            Optional.ofNullable(event.getMessage().get(Image.Key))
                     .or(() ->
                             Optional.ofNullable(event.getMessage().get(QuoteReply.Key))
                                     .map(QuoteReply::getSource)
                                     .map(source -> source.getIds()[0])
                                     .map(CacheHolder.QQ_MSG_CACHE::get)
                                     .map(OnlineMessageSource::getOriginalMessage)
-                                    .map(m -> m.get(OnlineImage.Key))
+                                    .map(m -> m.get(Image.Key))
                     )
-                    .map(i -> (OnlineImage) i)
-                    .map(OnlineImage::getOriginUrl)
+                    .map(Image::queryUrl)
                     .map(u -> URLEncoder.encode(u, StandardCharsets.UTF_8))
                     .ifPresent(url -> {
                         var contact = event.getSubject();

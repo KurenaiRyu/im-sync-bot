@@ -9,4 +9,24 @@ services:
       - ./config.yaml:/im-sync-bot/config.yaml # 配置路径
       - ./bin:/im-sync-bot/bin # 二进制执行文件
       - ./logs:/im-sync-bot/logs # 日志
-#      - ../telegram-bot-api/data/:/var/lib/telegram-bot-api # 本地tg服务数据路径
+#      - ./data/:/var/lib/telegram-bot-api # 本地tg服务数据路径
+
+#  # 国内就算上代理也有问题，不建议开
+#  api:
+#    image: aiogram/telegram-bot-api
+#    restart: always
+#    environment:
+#      TELEGRAM_API_ID: 7558156
+#      TELEGRAM_API_HASH: d1bba48bae4a5684717cdcf96dd6fb01
+#      TELEGRAM_STAT: 1
+#      #      TELEGRAM_LOG_FILE: /etc/telegram/bot/api/logs/api.log
+#      # TELEGRAM_PROXY: "http://10.0.0.99:7890"
+#      TELEGRAM_LOCAL: 1
+#      TELEGRAM_VERBOSITY: 4
+#    #      HTTP_PROXY: 'http://10.0,0,99:7890'
+#    #      HTTPS_PROXY: 'http://10.0,0,99:7890'
+#    ports:
+#      - 8082:8082
+#      - 8081:8081
+#    volumes:
+#      - ./data:/var/lib/telegram-bot-api

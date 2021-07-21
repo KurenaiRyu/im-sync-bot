@@ -6,6 +6,7 @@ import kurenai.mybot.QQBotClient;
 import kurenai.mybot.TelegramBotClient;
 import kurenai.mybot.handler.Handler;
 import kurenai.mybot.handler.config.ForwardHandlerProperties;
+import kurenai.mybot.utils.HttpUtil;
 import kurenai.mybot.utils.RetryUtil;
 import lombok.extern.slf4j.Slf4j;
 import net.mamoe.mirai.contact.Group;
@@ -18,10 +19,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
-import org.telegram.telegrambots.meta.api.methods.send.SendAnimation;
-import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.send.*;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
@@ -31,7 +29,11 @@ import org.telegram.telegrambots.meta.api.objects.stickers.Sticker;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import javax.validation.constraints.NotNull;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -216,11 +218,16 @@ public class ForwardHandler implements Handler {
     // qq 2 tg
     @Override
     public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) throws Exception {
-        var  group   = event.getGroup();
-        long groupId = group.getId();
+        var    group        = event.getGroup();
+        String chatId       = properties.getGroup().getQqTelegram().getOrDefault(group.getId(), properties.getGroup().getDefaultTelegram()).toString();
+        var    messageChain = event.getMessage();
+        if (messageChain.contains(ForwardMessage.Key)) {
+            return handleForwardMessage(telegramBotClient, messageChain.get(ForwardMessage.Key), group, chatId, event.getSender());
+        }
+        return handleMessage(telegramBotClient, messageChain, group, chatId, event.getSender().getId(), event.getSenderName());
+    }
 
-        MessageChain messageChain = event.getMessage();
-
+    private boolean handleMessage(TelegramBotClient telegramBotClient, MessageChain messageChain, Group group, String chatId, long senderId, String senderName) throws Exception {
         var source = Optional.ofNullable(messageChain.get(OnlineMessageSource.Key));
         Optional<Integer> replyId = Optional.ofNullable(messageChain.get(QuoteReply.Key))
                 .map(QuoteReply::getSource)
@@ -240,10 +247,9 @@ public class ForwardHandler implements Handler {
             content = content.substring(2);
         }
 
-        var msg = tgMsgFormat.replace(QQ_PATTNER, String.valueOf(event.getSender().getId()))
-                .replace(NAME_PATTNER, handleLongString(event.getSenderName(), 25).replace(" @", " "))
+        var msg = tgMsgFormat.replace(QQ_PATTNER, String.valueOf(senderId))
+                .replace(NAME_PATTNER, handleLongString(senderName, 25).replace(" @", " "))
                 .replace(MSG_PATTNER, content);
-        String chatId = properties.getGroup().getQqTelegram().getOrDefault(groupId, properties.getGroup().getDefaultTelegram()).toString();
 
         if (StringUtils.isBlank(chatId) || chatId.equals("0")) return true;
 
@@ -252,8 +258,16 @@ public class ForwardHandler implements Handler {
             if (count > 1) {
                 List<InputMedia> medias = messageChain.stream().filter(m -> m instanceof Image)
                         .map(i -> {
-                            Image image = (Image) i;
-                            String           url   = Image.queryUrl(image);
+                            Image  image = (Image) i;
+                            String url   = Image.queryUrl(image);
+                            try (var is = new ByteArrayInputStream(HttpUtil.download(url))) {
+                                if (!image.getImageId().endsWith(".gif")) {
+                                    var input = new InputMediaPhoto();
+                                    input.setMedia(is, image.getImageId());
+                                }
+                            } catch (Exception e) {
+                                log.error(e.getMessage(), e);
+                            }
                             if (image.getImageId().endsWith(".gif")) {
                                 return new InputMediaAnimation(url);
                             } else {
@@ -261,22 +275,20 @@ public class ForwardHandler implements Handler {
                             }
                         })
                         .collect(Collectors.toList());
-                if (medias.size() > 0) {
-                    InputMedia media = medias.get(0);
-                    media.setCaption(msg);
-                    var builder = SendMediaGroup.builder();
-                    replyId.ifPresent(builder::replyToMessageId);
+                InputMedia media = medias.get(0);
+                media.setCaption(msg);
+                var builder = SendMediaGroup.builder();
+                replyId.ifPresent(builder::replyToMessageId);
 
-                    var sendMsg = builder
-                            .medias(medias)
-                            .chatId(chatId)
-                            .build();
-                    try {
-                        var result = RetryUtil.retry(3, () -> telegramBotClient.execute(sendMsg));
-                        result.forEach(r -> cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, r))));
-                    } catch (Exception e) {
-                        log.error(e.getMessage(), e);
-                    }
+                var sendMsg = builder
+                        .medias(medias)
+                        .chatId(chatId)
+                        .build();
+                try {
+                    var result = RetryUtil.retry(3, () -> telegramBotClient.execute(sendMsg));
+                    result.forEach(r -> cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, r))));
+                } catch (Exception e) {
+                    log.error(e.getMessage(), e);
                 }
             } else {
                 Image image = messageChain.get(Image.Key);
@@ -296,12 +308,13 @@ public class ForwardHandler implements Handler {
                         log.error(e.getMessage(), e);
                     }
                 } else {
-                    var sendMsg = SendPhoto.builder()
-                            .caption(msg)
-                            .chatId(chatId)
-                            .photo(new InputFile(Image.queryUrl(image)))
-                            .build();
-                    try {
+
+                    try (var is = new ByteArrayInputStream(HttpUtil.download(Image.queryUrl(image)))) {
+                        var sendMsg = SendPhoto.builder()
+                                .caption(msg)
+                                .chatId(chatId)
+                                .photo(new InputFile(is, image.getImageId()))
+                                .build();
                         var result = RetryUtil.retry(3, () -> telegramBotClient.execute(sendMsg));
                         cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, result)));
                     } catch (Exception e) {
@@ -311,6 +324,20 @@ public class ForwardHandler implements Handler {
                 }
             }
 
+        } else if (messageChain.contains(FileMessage.Key)) {
+            var downloadInfo = messageChain.get(FileMessage.Key).toRemoteFile(group).getDownloadInfo();
+            var url          = downloadInfo.getUrl();
+            try (var is = new ByteArrayInputStream(HttpUtil.download(url))) {
+                var filename = downloadInfo.getFilename().toLowerCase();
+                if (filename.endsWith(".mkv") || filename.endsWith(".mp4"))
+                    RetryUtil.retry(3, () -> telegramBotClient.execute(SendVideo.builder().video(new InputFile(is, downloadInfo.getFilename())).chatId(chatId).build()));
+                if (filename.endsWith(".bmp") || filename.endsWith(".jpeg") || filename.endsWith(".jpg") || filename.endsWith(".png"))
+                    RetryUtil.retry(3, () -> telegramBotClient.execute(SendDocument.builder().document(new InputFile(is, downloadInfo.getFilename())).thumb(new InputFile(url)).chatId(chatId).build()));
+                else
+                    RetryUtil.retry(3, () -> telegramBotClient.execute(SendDocument.builder().document(new InputFile(is, downloadInfo.getFilename())).chatId(chatId).build()));
+            } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException | IOException e) {
+                log.error(e.getMessage(), e);
+            }
         } else {
             var builder = SendMessage.builder();
 
@@ -323,7 +350,16 @@ public class ForwardHandler implements Handler {
                 log.error(e.getMessage(), e);
             }
         }
-        log.debug("{}({}) - {}({}): {}", group.getName(), groupId, event.getSenderName(), event.getSender().getId(), content);
+        log.debug("{}({}) - {}({}): {}", group.getName(), group.getId(), senderName, senderId, content);
+        return true;
+    }
+
+    private boolean handleForwardMessage(TelegramBotClient telegramBotClient, ForwardMessage msg, Group group, String chatId, net.mamoe.mirai.contact.User sender) throws Exception {
+        telegramBotClient.execute(SendMessage.builder().chatId(chatId).text(sender.getNick() + ":\r\n--------forward message--------").build());
+        for (ForwardMessage.Node node : msg.getNodeList()) {
+            handleMessage(telegramBotClient, node.getMessageChain(), group, chatId, node.getSenderId(), node.getSenderName());
+        }
+        telegramBotClient.execute(SendMessage.builder().chatId(chatId).text("-------------------------------").build());
         return true;
     }
 
@@ -332,19 +368,6 @@ public class ForwardHandler implements Handler {
             if (((At) msg).getTarget() == atAccount.get()) return "";
             else atAccount.set(((At) msg).getTarget());
             return " " + ((At) msg).getDisplay(group) + " ";
-        } else if (msg instanceof ForwardMessage) {
-            StringBuilder sb = new StringBuilder();
-            sb.append("\r\n----forward message----\r\n");
-            for (ForwardMessage.Node node : ((ForwardMessage) msg).getNodeList()) {
-                sb.append(node.getSenderName()).append(": ");
-                AtomicLong account = new AtomicLong(-100);
-                for (SingleMessage singleMessage : node.getMessageChain()) {
-                    sb.append(getContent(group, account, singleMessage));
-                }
-                sb.append("\r\n");
-            }
-            sb.append("-----------------------");
-            return sb.toString();
         } else {
             return msg.contentToString();
         }
@@ -425,7 +448,12 @@ public class ForwardHandler implements Handler {
 
     @org.jetbrains.annotations.NotNull
     private String getSuffix(File file) {
-        return file.getFilePath().substring(file.getFilePath().lastIndexOf('.') + 1);
+        return getSuffix(file.getFilePath());
+    }
+
+    @org.jetbrains.annotations.NotNull
+    private String getSuffix(String filename) {
+        return filename.substring(filename.lastIndexOf('.') + 1);
     }
 
     private void preHandleMsg(Optional<OnlineMessageSource> quoteMsgSource, boolean isMaster, String username, MessageChainBuilder builder) {

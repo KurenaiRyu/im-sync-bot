@@ -46,10 +46,10 @@ public class HttpUtil {
         requestConfig = configBuilder.build();
     }
 
-    public static byte[] getImage(String url) throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException, IOException {
-        CloseableHttpClient client  = buildClient();
-        CloseableHttpResponse res = client.execute(RequestBuilder.get(url).build());
-        HttpEntity entity           = res.getEntity();
+    public static byte[] download(String url) throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException, IOException {
+        CloseableHttpClient   client = buildClient();
+        CloseableHttpResponse res    = client.execute(RequestBuilder.get(url).build());
+        HttpEntity            entity = res.getEntity();
         return EntityUtils.toByteArray(entity);
     }
 
