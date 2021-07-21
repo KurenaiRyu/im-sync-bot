@@ -10,7 +10,6 @@ import kurenai.mybot.utils.RetryUtil;
 import lombok.extern.slf4j.Slf4j;
 import net.mamoe.mirai.contact.Group;
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent;
-import net.mamoe.mirai.internal.message.OnlineGroupImage;
 import net.mamoe.mirai.message.MessageReceipt;
 import net.mamoe.mirai.message.data.*;
 import net.mamoe.mirai.utils.ExternalResource;
@@ -42,7 +41,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @ConditionalOnProperty(prefix = "bot.handler.forward", name = "enable", havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties(ForwardHandlerProperties.class)
-@SuppressWarnings("KotlinInternalInJava")
 public class ForwardHandler implements Handler {
 
     private static final String QQ_PATTNER    = "{qq}";
@@ -53,7 +51,6 @@ public class ForwardHandler implements Handler {
     private final String                   webpCmdPattern;
     private final ExecutorService          uploadPool = Executors.newFixedThreadPool(10);
     private final ExecutorService          cachePool  = Executors.newFixedThreadPool(1);
-    private final ScheduledExecutorService retryPool  = Executors.newScheduledThreadPool(5);
     private final ForwardHandlerProperties properties;
 
     //TODO 最好将属性都提取出来，最少也要把第二层属性提取出来，不然每次判空
@@ -173,7 +170,7 @@ public class ForwardHandler implements Handler {
             cachePool.execute(() -> CacheHolder.cache(receipt.getSource(), message));
         } else if (message.hasText()) {
             var text = message.getText();
-            if (changeTgMsgFormat(text)) return false;
+            if (isChangeTgMsgFormatCmd(text)) return false;
 
             MessageChainBuilder builder = new MessageChainBuilder();
             preHandleMsg(quoteMsgSource, isMaster, username, builder);
@@ -250,13 +247,13 @@ public class ForwardHandler implements Handler {
 
         if (StringUtils.isBlank(chatId) || chatId.equals("0")) return true;
 
-        long count = messageChain.stream().filter(m -> m instanceof OnlineGroupImage).count();
+        long count = messageChain.stream().filter(m -> m instanceof Image).count();
         if (count > 0) {
             if (count > 1) {
-                List<InputMedia> medias = messageChain.stream().filter(m -> m instanceof OnlineGroupImage)
+                List<InputMedia> medias = messageChain.stream().filter(m -> m instanceof Image)
                         .map(i -> {
-                            OnlineGroupImage image = (OnlineGroupImage) i;
-                            String           url   = image.getOriginUrl();
+                            Image image = (Image) i;
+                            String           url   = Image.queryUrl(image);
                             if (image.getImageId().endsWith(".gif")) {
                                 return new InputMediaAnimation(url);
                             } else {
@@ -276,13 +273,13 @@ public class ForwardHandler implements Handler {
                             .build();
                     try {
                         var result = RetryUtil.retry(3, () -> telegramBotClient.execute(sendMsg));
-                        cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, result)));
+                        result.forEach(r -> cachePool.execute(() -> source.ifPresent(s -> CacheHolder.cache(s, r))));
                     } catch (Exception e) {
                         log.error(e.getMessage(), e);
                     }
                 }
             } else {
-                OnlineGroupImage image = (OnlineGroupImage) messageChain.get(Image.Key);
+                Image image = messageChain.get(Image.Key);
                 if (image == null) return true;
                 if (image.getImageId().endsWith(".gif")) {
                     var builder = SendAnimation.builder();
@@ -290,7 +287,7 @@ public class ForwardHandler implements Handler {
                     var sendMsg = builder
                             .caption(msg)
                             .chatId(chatId)
-                            .animation(new InputFile(image.getOriginUrl()))
+                            .animation(new InputFile(Image.queryUrl(image)))
                             .build();
                     try {
                         var result = RetryUtil.retry(3, () -> telegramBotClient.execute(sendMsg));
@@ -302,7 +299,7 @@ public class ForwardHandler implements Handler {
                     var sendMsg = SendPhoto.builder()
                             .caption(msg)
                             .chatId(chatId)
-                            .photo(new InputFile(image.getOriginUrl()))
+                            .photo(new InputFile(Image.queryUrl(image)))
                             .build();
                     try {
                         var result = RetryUtil.retry(3, () -> telegramBotClient.execute(sendMsg));
@@ -372,7 +369,7 @@ public class ForwardHandler implements Handler {
     }
 
     @NotNull
-    private Optional<Image> getImage(TelegramBotClient client, Group group, String fileId, String fileUniqueId) throws TelegramApiException, IOException {
+    private Optional<Image> getImage(TelegramBotClient client, Group group, String fileId, String fileUniqueId) throws TelegramApiException {
         File   file   = getFile(client, fileId, fileUniqueId);
         String suffix = getSuffix(file);
         var    image  = client.downloadFile(file);
@@ -403,7 +400,7 @@ public class ForwardHandler implements Handler {
         return null;
     }
 
-    private boolean changeTgMsgFormat(String text) {
+    private boolean isChangeTgMsgFormatCmd(String text) {
         String msgFormat;
         if (text.startsWith("/msg") && text.length() > 4 && StringUtils.isNotBlank(msgFormat = text.substring(5))) {
             this.tgMsgFormat = msgFormat;
