@@ -1,0 +1,45 @@
+package kurenai.mybot
+
+import kurenai.mybot.handler.Handler
+import kurenai.mybot.qq.QQBotProperties
+import kurenai.mybot.telegram.ProxyProperties
+import kurenai.mybot.telegram.TelegramBotProperties
+import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.context.ApplicationContext
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Lazy
+import org.telegram.telegrambots.bots.DefaultBotOptions
+
+/**
+ * @author liufuhong
+ * @since 2021-06-30 14:08
+ */
+@Configuration
+@EnableConfigurationProperties(TelegramBotProperties::class, ProxyProperties::class, QQBotProperties::class)
+class BotAutoConfiguration {
+    @Bean
+    fun handlerHolder(@Lazy handlerList: List<Handler>): HandlerHolder {
+        return HandlerHolder(handlerList)
+    }
+
+    @Bean
+    fun defaultBotOptions(proxyProperties: ProxyProperties): DefaultBotOptions {
+        val botOptions = DefaultBotOptions()
+        if (proxyProperties.type == DefaultBotOptions.ProxyType.NO_PROXY) return botOptions
+        botOptions.proxyType = proxyProperties.type
+        botOptions.proxyHost = proxyProperties.host
+        botOptions.proxyPort = proxyProperties.port
+        return botOptions
+    }
+
+    @Bean
+    fun telegramBot(defaultBotOptions: DefaultBotOptions, telegramBotProperties: TelegramBotProperties, @Lazy handlerHolder: HandlerHolder, context: ApplicationContext): TelegramBotClient {
+        return TelegramBotClient(defaultBotOptions, telegramBotProperties, handlerHolder, context)
+    }
+
+    @Bean
+    fun qqBot(properties: QQBotProperties, @Lazy handlerHolder: HandlerHolder, context: ApplicationContext): QQBotClient {
+        return QQBotClient(properties, handlerHolder, context)
+    }
+}
