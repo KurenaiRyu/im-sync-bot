@@ -22,7 +22,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 @Slf4j
-@SuppressWarnings("KotlinInternalInJava")
 @Component
 @EnableConfigurationProperties(ForwardHandlerProperties.class)
 @ConditionalOnProperty(prefix = "bot.handler.pic-source", name = "enable", havingValue = "true")
@@ -61,7 +60,8 @@ public class PicSourceHandler implements Handler {
 //                        var ascii2d  = String.format(ASCII2D, url);
                         var sauceNao = String.format(SAUCE_NAO, url);
 //                        contact.sendMessage(ascii2d);
-                        contact.sendMessage(sauceNao);
+                        var quoteReply = new QuoteReply(event.getMessage());
+                        contact.sendMessage(quoteReply.plus(sauceNao));
 
                         try {
 //                            telegramBotClient.execute(SendMessage.builder().chatId(chartId).text(ascii2d).build());

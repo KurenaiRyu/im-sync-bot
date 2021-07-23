@@ -45,10 +45,10 @@ import java.util.stream.Collectors;
 @EnableConfigurationProperties(ForwardHandlerProperties.class)
 public class ForwardHandler implements Handler {
 
-    private static final String QQ_PATTNER    = "{qq}";
-    private static final String NAME_PATTNER  = "{name}";
-    private static final String MSG_PATTNER   = "{msg}";
-    private static final String TG_ID_PATTNER = "{id}";
+    private static final String ID_PATTNER      = "$id";
+    private static final String NAME_PATTNER    = "$name";
+    private static final String MSG_PATTNER     = "$msg";
+    private static final String NEWLINE_PATTNER = "$newline";
 
     private final String                   webpCmdPattern;
     private final ExecutorService          uploadPool = Executors.newFixedThreadPool(10);
@@ -58,9 +58,11 @@ public class ForwardHandler implements Handler {
     //TODO 最好将属性都提取出来，最少也要把第二层属性提取出来，不然每次判空
     private final Map<Long, String> bindingName;
 
-    private String tgMsgFormat = "{name}: {msg}";
+    private String tgMsgFormat = "$name: $msg";
+    private String qqMsgFormat = "$name: $msg";
 
     public ForwardHandler(ForwardHandlerProperties properties) {
+        assert properties != null;
         this.properties = properties;
         String encoderPath;
 
@@ -71,10 +73,13 @@ public class ForwardHandler implements Handler {
         }
         webpCmdPattern = encoderPath + " %s -o %s";
 
-        bindingName = Optional.ofNullable(properties)
+        bindingName = Optional.of(properties)
                 .map(ForwardHandlerProperties::getMember)
                 .map(ForwardHandlerProperties.Member::getBindingName)
                 .orElse(Collections.emptyMap());
+
+        Optional.ofNullable(properties.getTgMsgFormat()).filter(f -> f.contains(MSG_PATTNER)).ifPresent(f -> tgMsgFormat = f);
+        Optional.ofNullable(properties.getQqMsgFormat()).filter(f -> f.contains(MSG_PATTNER)).ifPresent(f -> qqMsgFormat = f);
     }
 
     // tg 2 qq
@@ -90,8 +95,8 @@ public class ForwardHandler implements Handler {
                 .orElse(properties.getGroup().getTelegramQq().getOrDefault(chatId, properties.getGroup().getDefaultQQ()));
         if (groupId.equals(0L)) return true;
         Group group = bot.getGroup(groupId);
-        boolean isMaster = properties.getMaster() != null
-                && Optional.ofNullable(message.getFrom()).map(User::getId).filter(properties.getMaster()::equals).isPresent();
+        boolean isMaster = properties.getMasterOfQq() != null
+                && Optional.ofNullable(message.getFrom()).map(User::getId).filter(properties.getMasterOfTg()::equals).isPresent();
         final var username = getUsername(message);
         if (group == null) {
             log.error("QQ group[{}] not found.", groupId);
@@ -136,11 +141,10 @@ public class ForwardHandler implements Handler {
             }
 
             MessageChainBuilder builder = new MessageChainBuilder();
-            preHandleMsg(quoteMsgSource, isMaster, username, builder);
-            getImage(client, group, sticker.getFileId(), sticker.getFileUniqueId())
-                    .ifPresent(builder::add);
-            Optional.ofNullable(message.getCaption())
+            preHandleMsg(quoteMsgSource, isMaster, message.getFrom().getId(), username, Optional.ofNullable(message.getCaption())
                     .or(() -> Optional.ofNullable(message.getText()))
+                    .orElse(""), builder);
+            getImage(client, group, sticker.getFileId(), sticker.getFileUniqueId())
                     .ifPresent(builder::add);
             MessageReceipt<?> receipt = group.sendMessage(builder.build());
             cachePool.execute(() -> CacheHolder.cache(receipt.getSource(), message));
@@ -165,18 +169,26 @@ public class ForwardHandler implements Handler {
                 }
             });
             MessageChainBuilder builder = new MessageChainBuilder();
-            preHandleMsg(quoteMsgSource, isMaster, username, builder);
+            preHandleMsg(quoteMsgSource, isMaster, message.getFrom().getId(), username, message.getCaption(), builder);
             builder.addAll(images);
-            Optional.ofNullable(message.getCaption()).ifPresent(builder::add);
             MessageReceipt<?> receipt = group.sendMessage(builder.build());
             cachePool.execute(() -> CacheHolder.cache(receipt.getSource(), message));
         } else if (message.hasText()) {
             var text = message.getText();
-            if (isChangeTgMsgFormatCmd(text)) return false;
+            //FIXME: 不知道为啥输出只有第一次会改变消息格式
+            if (isMaster && handleChangeTgMsgFormatCmd(text)) {
+                String demoContent = "demo msg.";
+                var demoMsg = tgMsgFormat
+                        .replace(NEWLINE_PATTNER, "\r\n")
+                        .replace(NAME_PATTNER, "demo username")
+                        .replace(ID_PATTNER, "123456789")
+                        .replace(MSG_PATTNER, demoContent);
+                client.execute(SendMessage.builder().chatId(chatId.toString()).text("changed msg format\r\ne.g.\r\n" + demoMsg).build());
+                return false;
+            }
 
             MessageChainBuilder builder = new MessageChainBuilder();
-            preHandleMsg(quoteMsgSource, isMaster, username, builder);
-            builder.add(text);
+            preHandleMsg(quoteMsgSource, isMaster, message.getFrom().getId(), username, text, builder);
             MessageReceipt<?> receipt = group.sendMessage(builder.build());
             cachePool.execute(() -> CacheHolder.cache(receipt.getSource(), message));
         }
@@ -219,12 +231,28 @@ public class ForwardHandler implements Handler {
     @Override
     public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) throws Exception {
         var    group        = event.getGroup();
+        var    sender       = event.getSender();
         String chatId       = properties.getGroup().getQqTelegram().getOrDefault(group.getId(), properties.getGroup().getDefaultTelegram()).toString();
         var    messageChain = event.getMessage();
-        if (messageChain.contains(ForwardMessage.Key)) {
-            return handleForwardMessage(telegramBotClient, messageChain.get(ForwardMessage.Key), group, chatId, event.getSender());
+
+        boolean isMaster = client.getBot().getId() == sender.getId() || Optional.ofNullable(properties.getMasterOfQq()).filter(m -> m.equals(sender.getId())).isPresent();
+
+        var content = messageChain.contentToString();
+        if (isMaster && handleChangeQQMsgFormatCmd(content)) {
+            String demoContent = "demo msg.";
+            var demoMsg = qqMsgFormat
+                    .replace(NEWLINE_PATTNER, "\r\n")
+                    .replace(NAME_PATTNER, "demo username")
+                    .replace(ID_PATTNER, "123456789")
+                    .replace(MSG_PATTNER, demoContent);
+            event.getSubject().sendMessage("changed msg format\r\ne.g.\r\n" + demoMsg);
+            return false;
         }
-        return handleMessage(telegramBotClient, messageChain, group, chatId, event.getSender().getId(), event.getSenderName());
+
+        if (messageChain.contains(ForwardMessage.Key)) {
+            return handleForwardMessage(telegramBotClient, messageChain.get(ForwardMessage.Key), group, chatId, sender);
+        }
+        return handleMessage(telegramBotClient, messageChain, group, chatId, sender.getId(), event.getSenderName());
     }
 
     private boolean handleMessage(TelegramBotClient telegramBotClient, MessageChain messageChain, Group group, String chatId, long senderId, String senderName) throws Exception {
@@ -247,9 +275,12 @@ public class ForwardHandler implements Handler {
             content = content.substring(2);
         }
 
-        var msg = tgMsgFormat.replace(QQ_PATTNER, String.valueOf(senderId))
+        var msg = tgMsgFormat
+                .replace(NEWLINE_PATTNER, "\r\n")
+                .replace(ID_PATTNER, String.valueOf(senderId))
                 .replace(NAME_PATTNER, handleLongString(senderName, 25).replace(" @", " "))
                 .replace(MSG_PATTNER, content);
+
 
         if (StringUtils.isBlank(chatId) || chatId.equals("0")) return true;
 
@@ -355,11 +386,13 @@ public class ForwardHandler implements Handler {
     }
 
     private boolean handleForwardMessage(TelegramBotClient telegramBotClient, ForwardMessage msg, Group group, String chatId, net.mamoe.mirai.contact.User sender) throws Exception {
-        telegramBotClient.execute(SendMessage.builder().chatId(chatId).text(sender.getNick() + ":\r\n--------forward message--------").build());
         for (ForwardMessage.Node node : msg.getNodeList()) {
-            handleMessage(telegramBotClient, node.getMessageChain(), group, chatId, node.getSenderId(), node.getSenderName());
+            try {
+                handleMessage(telegramBotClient, node.getMessageChain(), group, chatId, node.getSenderId(), sender.getNick() + " forward from " + node.getSenderName());
+            } catch (Exception e) {
+                log.error(e.getMessage(), e);
+            }
         }
-        telegramBotClient.execute(SendMessage.builder().chatId(chatId).text("-------------------------------").build());
         return true;
     }
 
@@ -426,10 +459,21 @@ public class ForwardHandler implements Handler {
         return null;
     }
 
-    private boolean isChangeTgMsgFormatCmd(String text) {
+    private boolean handleChangeQQMsgFormatCmd(String text) {
+        String msgFormat;
+        if (text.startsWith("/msg") && text.length() > 4 && StringUtils.isNotBlank(msgFormat = text.substring(5))) {
+            this.qqMsgFormat = msgFormat;
+            log.info("Change qq message format: {}", qqMsgFormat);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleChangeTgMsgFormatCmd(String text) {
         String msgFormat;
         if (text.startsWith("/msg") && text.length() > 4 && StringUtils.isNotBlank(msgFormat = text.substring(5))) {
             this.tgMsgFormat = msgFormat;
+            log.info("Change tg message format: {}", tgMsgFormat);
             return true;
         }
         return false;
@@ -456,9 +500,18 @@ public class ForwardHandler implements Handler {
         return filename.substring(filename.lastIndexOf('.') + 1);
     }
 
-    private void preHandleMsg(Optional<OnlineMessageSource> quoteMsgSource, boolean isMaster, String username, MessageChainBuilder builder) {
+    private void preHandleMsg(Optional<OnlineMessageSource> quoteMsgSource, boolean isMaster, long id, String username, String content, MessageChainBuilder builder) {
         quoteMsgSource.map(MessageSource::quote).ifPresent(builder::add);
-        if (!isMaster && StringUtils.isNotBlank(username)) builder.add(username + ": ");  //非空名称或是非主人则添加前缀
+        if (isMaster || StringUtils.isBlank(username))
+            builder.add(content);
+        else { //非空名称或是非主人则添加前缀
+            var handledMsg = qqMsgFormat
+                    .replace(NEWLINE_PATTNER, "\r\n")
+                    .replace(NAME_PATTNER, username)
+                    .replace(ID_PATTNER, String.valueOf(id))
+                    .replace(MSG_PATTNER, Optional.ofNullable(content).orElse(""));
+            builder.add(handledMsg);
+        }
     }
 
 }

@@ -16,7 +16,10 @@ import java.util.Map;
 @Slf4j
 public class ForwardHandlerProperties extends HandlerProperties {
 
-    private Long   master;
+    private Long   masterOfQq;
+    private Long   masterOfTg;
+    private String tgMsgFormat;
+    private String qqMsgFormat;
     private Group  group;
     private Member member;
 

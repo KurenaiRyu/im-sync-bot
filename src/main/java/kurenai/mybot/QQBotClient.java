@@ -35,7 +35,7 @@ public class QQBotClient {
         // 使用自定义配置
         bot = BotFactory.INSTANCE.newBot(properties.getAccount(), properties.getPassword(), new BotConfiguration() {{
             fileBasedDeviceInfo(); // 使用 device.json 存储设备信息
-            setProtocol(MiraiProtocol.ANDROID_PAD); // 切换协议
+            setProtocol(Optional.ofNullable(properties.getProtocol()).orElse(MiraiProtocol.ANDROID_PAD)); // 切换协议
         }});
         bot.login();
         ExecutorService pool = Executors.newFixedThreadPool(1);
