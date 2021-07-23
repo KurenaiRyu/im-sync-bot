@@ -361,11 +361,11 @@ public class ForwardHandler implements Handler {
             try (var is = new ByteArrayInputStream(HttpUtil.download(url))) {
                 var filename = downloadInfo.getFilename().toLowerCase();
                 if (filename.endsWith(".mkv") || filename.endsWith(".mp4"))
-                    RetryUtil.retry(3, () -> telegramBotClient.execute(SendVideo.builder().video(new InputFile(is, downloadInfo.getFilename())).chatId(chatId).build()));
+                    RetryUtil.retry(3, () -> telegramBotClient.execute(SendVideo.builder().video(new InputFile(is, downloadInfo.getFilename())).chatId(chatId).caption(msg).build()));
                 if (filename.endsWith(".bmp") || filename.endsWith(".jpeg") || filename.endsWith(".jpg") || filename.endsWith(".png"))
-                    RetryUtil.retry(3, () -> telegramBotClient.execute(SendDocument.builder().document(new InputFile(is, downloadInfo.getFilename())).thumb(new InputFile(url)).chatId(chatId).build()));
+                    RetryUtil.retry(3, () -> telegramBotClient.execute(SendDocument.builder().document(new InputFile(is, downloadInfo.getFilename())).thumb(new InputFile(url)).chatId(chatId).caption(msg).build()));
                 else
-                    RetryUtil.retry(3, () -> telegramBotClient.execute(SendDocument.builder().document(new InputFile(is, downloadInfo.getFilename())).chatId(chatId).build()));
+                    RetryUtil.retry(3, () -> telegramBotClient.execute(SendDocument.builder().document(new InputFile(is, downloadInfo.getFilename())).chatId(chatId).caption(msg).build()));
             } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException | IOException e) {
                 log.error(e.getMessage(), e);
             }
