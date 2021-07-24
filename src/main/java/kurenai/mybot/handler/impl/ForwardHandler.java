@@ -516,9 +516,10 @@ public class ForwardHandler implements Handler {
     }
 
     private void preHandleMsg(Optional<OnlineMessageSource> quoteMsgSource, boolean isMaster, long id, String username, String content, MessageChainBuilder builder) {
+
         quoteMsgSource.map(MessageSource::quote).ifPresent(builder::add);
         if (isMaster || StringUtils.isBlank(username))
-            builder.add(content);
+            builder.add(Optional.ofNullable(content).orElse(""));
         else { //非空名称或是非主人则添加前缀
             var handledMsg = qqMsgFormat
                     .replace(NEWLINE_PATTNER, "\r\n")

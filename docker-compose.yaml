@@ -16,8 +16,8 @@ services:
 #    image: aiogram/telegram-bot-api
 #    restart: always
 #    environment:
-#      TELEGRAM_API_ID: 7558156
-#      TELEGRAM_API_HASH: d1bba48bae4a5684717cdcf96dd6fb01
+#      TELEGRAM_API_ID: 123
+#      TELEGRAM_API_HASH: abcd
 #      TELEGRAM_STAT: 1
 #      #      TELEGRAM_LOG_FILE: /etc/telegram/bot/api/logs/api.log
 #      # TELEGRAM_PROXY: "http://10.0.0.99:7890"
