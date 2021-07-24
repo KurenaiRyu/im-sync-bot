@@ -16,6 +16,10 @@ bot:
   handler:
     forward:
       enable: true  # 开启转发（就算删除也默认开启）
+      master-of-tg: 0 # 主人tg id
+      master-of-qq: 0 # 主人qq账号
+      tgMsgFormat: "$name: $msg" # tg格式化表达式    $name 用户名; $id id(qq); $newline 换行;  $msg 消息;  也可以通过发送/msg [格式化字符] 进行修改
+      qqMsgFormat: "$name: $msg" # qq格式化表达式
       group:
         default-qq: 622032041   # 若找不到对应关系默认转发的qq群
         default-telegram: -529721195 # 若找不到对应关系默认转发的tg组
@@ -27,6 +31,7 @@ bot:
         binding-name:
           # id(qq) - 绑定名称
           -12345435646: your-binding-name
+
     anti-mini-app:
       enable: true  # 开启反小程序
       ignore-group: 284466675

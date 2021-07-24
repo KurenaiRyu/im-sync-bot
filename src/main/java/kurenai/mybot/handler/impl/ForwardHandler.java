@@ -230,10 +230,11 @@ public class ForwardHandler implements Handler {
     // qq 2 tg
     @Override
     public boolean handle(QQBotClient client, TelegramBotClient telegramBotClient, GroupAwareMessageEvent event) throws Exception {
-        var    group        = event.getGroup();
-        var    sender       = event.getSender();
-        String chatId       = properties.getGroup().getQqTelegram().getOrDefault(group.getId(), properties.getGroup().getDefaultTelegram()).toString();
-        var    messageChain = event.getMessage();
+        var group        = event.getGroup();
+        var sender       = event.getSender();
+        var senderName   = Optional.ofNullable(bindingName.get(sender.getId())).orElse(sender.getRemark().length() > 0 ? sender.getRemark() : event.getSenderName());
+        var chatId       = properties.getGroup().getQqTelegram().getOrDefault(group.getId(), properties.getGroup().getDefaultTelegram()).toString();
+        var messageChain = event.getMessage();
 
         boolean isMaster = client.getBot().getId() == sender.getId() || Optional.ofNullable(properties.getMasterOfQq()).filter(m -> m.equals(sender.getId())).isPresent();
 
@@ -250,12 +251,12 @@ public class ForwardHandler implements Handler {
         }
 
         if (messageChain.contains(ForwardMessage.Key)) {
-            return handleForwardMessage(telegramBotClient, messageChain.get(ForwardMessage.Key), group, chatId, sender);
+            return handleForwardMessage(client, telegramBotClient, messageChain.get(ForwardMessage.Key), group, chatId, senderName);
         }
-        return handleMessage(telegramBotClient, messageChain, group, chatId, sender.getId(), event.getSenderName());
+        return handleMessage(client, telegramBotClient, messageChain, group, chatId, sender.getId(), senderName);
     }
 
-    private boolean handleMessage(TelegramBotClient telegramBotClient, MessageChain messageChain, Group group, String chatId, long senderId, String senderName) throws Exception {
+    private boolean handleMessage(QQBotClient client, TelegramBotClient telegramBotClient, MessageChain messageChain, Group group, String chatId, long senderId, String senderName) throws Exception {
         var source = Optional.ofNullable(messageChain.get(OnlineMessageSource.Key));
         Optional<Integer> replyId = Optional.ofNullable(messageChain.get(QuoteReply.Key))
                 .map(QuoteReply::getSource)
@@ -266,7 +267,7 @@ public class ForwardHandler implements Handler {
         AtomicLong atAccount = new AtomicLong(-100);
         String content = formatContent(messageChain.stream()
                 .filter(m -> !(m instanceof Image))
-                .map(msg -> getContent(group, atAccount, msg))
+                .map(msg -> getSingleContent(client, group, atAccount, msg))
                 .collect(Collectors.joining()));
 
         if (content.startsWith("<?xml version='1.0'") || content.contains("\"app\":")) return true;
@@ -278,7 +279,7 @@ public class ForwardHandler implements Handler {
         var msg = tgMsgFormat
                 .replace(NEWLINE_PATTNER, "\r\n")
                 .replace(ID_PATTNER, String.valueOf(senderId))
-                .replace(NAME_PATTNER, handleLongString(senderName, 25).replace(" @", " "))
+                .replace(NAME_PATTNER, senderName.replace(" @", " "))
                 .replace(MSG_PATTNER, content);
 
 
@@ -362,7 +363,7 @@ public class ForwardHandler implements Handler {
                 var filename = downloadInfo.getFilename().toLowerCase();
                 if (filename.endsWith(".mkv") || filename.endsWith(".mp4"))
                     RetryUtil.retry(3, () -> telegramBotClient.execute(SendVideo.builder().video(new InputFile(is, downloadInfo.getFilename())).chatId(chatId).caption(msg).build()));
-                if (filename.endsWith(".bmp") || filename.endsWith(".jpeg") || filename.endsWith(".jpg") || filename.endsWith(".png"))
+                else if (filename.endsWith(".bmp") || filename.endsWith(".jpeg") || filename.endsWith(".jpg") || filename.endsWith(".png"))
                     RetryUtil.retry(3, () -> telegramBotClient.execute(SendDocument.builder().document(new InputFile(is, downloadInfo.getFilename())).thumb(new InputFile(url)).chatId(chatId).caption(msg).build()));
                 else
                     RetryUtil.retry(3, () -> telegramBotClient.execute(SendDocument.builder().document(new InputFile(is, downloadInfo.getFilename())).chatId(chatId).caption(msg).build()));
@@ -385,10 +386,10 @@ public class ForwardHandler implements Handler {
         return true;
     }
 
-    private boolean handleForwardMessage(TelegramBotClient telegramBotClient, ForwardMessage msg, Group group, String chatId, net.mamoe.mirai.contact.User sender) throws Exception {
+    private boolean handleForwardMessage(QQBotClient client, TelegramBotClient telegramBotClient, ForwardMessage msg, Group group, String chatId, String senderName) throws Exception {
         for (ForwardMessage.Node node : msg.getNodeList()) {
             try {
-                handleMessage(telegramBotClient, node.getMessageChain(), group, chatId, node.getSenderId(), sender.getNick() + " forward from " + node.getSenderName());
+                handleMessage(client, telegramBotClient, node.getMessageChain(), group, chatId, node.getSenderId(), senderName + " forward from " + node.getSenderName());
             } catch (Exception e) {
                 log.error(e.getMessage(), e);
             }
@@ -396,11 +397,25 @@ public class ForwardHandler implements Handler {
         return true;
     }
 
-    private String getContent(Group group, AtomicLong atAccount, SingleMessage msg) {
+    private String getSingleContent(QQBotClient client, Group group, AtomicLong atAccount, SingleMessage msg) {
         if (msg instanceof At) {
-            if (((At) msg).getTarget() == atAccount.get()) return "";
-            else atAccount.set(((At) msg).getTarget());
-            return " " + ((At) msg).getDisplay(group) + " ";
+            var at     = (At) msg;
+            var target = at.getTarget();
+            if (target == atAccount.get()) return "";
+            else atAccount.set(target);
+            String name = bindingName.get(target);
+            if (name == null) {
+                var friend = client.getBot().getFriend(target);
+                if (friend != null) {
+                    name = friend.getRemark().length() > 0 ? friend.getRemark() : friend.getNick();
+                } else {
+                    name = at.getDisplay(group);
+                }
+            }
+            if (!name.startsWith("@")) {
+                name = "@" + name;
+            }
+            return " " + name + " ";
         } else {
             return msg.contentToString();
         }
