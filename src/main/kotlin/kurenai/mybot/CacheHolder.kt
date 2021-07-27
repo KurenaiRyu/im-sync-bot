@@ -12,7 +12,7 @@ object CacheHolder {
     val TG_MSG_CACHE = Cache<Int?, Message?>("TG_MSG_CACHE")
     val TG_QQ_MSG_ID_CACHE = Cache<Int?, Int?>("TG_QQ_MSG_ID_CACHE") // tg - qq message id cache;
     val QQ_TG_MSG_ID_CACHE = Cache<Int?, Int?>("QQ_TG_MSG_ID_CACHE") // qq - tg message id cache;
-    fun cache(source: OnlineMessageSource, message: Message) {
+    suspend fun cache(source: OnlineMessageSource, message: Message) {
         val qqMsgId = source.ids[0]
         val tgMsgId = message.messageId
         QQ_TG_MSG_ID_CACHE.put(qqMsgId, tgMsgId, 1, TimeUnit.DAYS)

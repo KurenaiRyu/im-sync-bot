@@ -2,16 +2,17 @@ package kurenai.mybot.qq
 
 import net.mamoe.mirai.utils.BotConfiguration.MiraiProtocol
 import org.springframework.boot.context.properties.ConfigurationProperties
-import kotlin.properties.Delegates
+import java.util.*
 
 @ConfigurationProperties(prefix = "bot.qq")
+//@PropertySource(factory = YamlPropertySourceFactory::class)
 class QQBotProperties {
-    var account by Delegates.notNull<Long>()
-    lateinit var password: String
-    var protocol: MiraiProtocol = MiraiProtocol.ANDROID_PAD
-    lateinit var filter: Filter
+    var account = 0L
+    var password = ""
+    var protocol = MiraiProtocol.ANDROID_PAD
+    var filter = Filter()
 
     class Filter {
-        lateinit var qq: List<Long>
+        var group: List<Long> = Collections.emptyList()
     }
 }

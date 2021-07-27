@@ -1,23 +1,14 @@
-FROM maven:3.6.3-openjdk-11 as build
-MAINTAINER Kurenai
-WORKDIR /im-sync-bot
-
-# Create a first layer to cache the "Maven World" in the local repository.
-# Incremental docker builds will always resume after that, unless you update
-# the pom
-COPY pom.xml .
-RUN mvn package -DskipTests --fail-never
-
-# Do the Maven build!
-# Incremental docker builds will resume here when you change sources
+FROM gradle:6.8-jdk11-hotspot as builder
+WORKDIR /usr/src/java-code
+COPY build.gradle.kts settings.gradle.kts gradle.properties  ./
+RUN gradle clean build -i --stacktrace -x bootJar
 COPY src src
-RUN mvn package -DskipTests
+RUN gradle clean bootJar -i --stacktrace
 
-# 2nd stage, build the runtime image
-FROM openjdk:11-jre-slim
-
+# actual container
+FROM adoptopenjdk:11-jre-hotspot
+#EXPOSE 8080
 WORKDIR /im-sync-bot
-# Copy the binary built in the 1st stage
-COPY --from=build /im-sync-bot/target/*.jar ./app.jar
-
-CMD ["java", "-jar", "-Dspring.config.location=config.yaml", "./app.jar"]
+COPY --from=builder /usr/src/java-code/build/libs/*.jar ./
+#COPY ./build/libs/*.jar ./app.jar
+ENTRYPOINT ["java", "-jar", "-Dspring.config.location=config.yaml", "app.jar"]
