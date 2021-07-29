@@ -12,7 +12,6 @@ import kurenai.mybot.handler.config.ForwardHandlerProperties;
 import lombok.extern.slf4j.Slf4j;
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -22,7 +21,7 @@ import java.util.Optional;
 
 @Slf4j
 @Component
-@ConditionalOnProperty(prefix = "bot.handler.anti-mini-app", name = "enable", havingValue = "true", matchIfMissing = true)
+//@ConditionalOnProperty(prefix = "bot.handler.anti-mini-app", name = "enable", havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties({AntiMiniAppHandlerProperties.class, ForwardHandlerProperties.class})
 public class AntiMiniAppHandler implements Handler {
 
@@ -59,7 +58,10 @@ public class AntiMiniAppHandler implements Handler {
                             .orElse("");
                     var url = "url:   " + Optional.ofNullable(jsonNode.get("url")).map(JsonNode::asText).orElse("");
                     event.getSubject().sendMessage(String.join("\r\n", title, url));
-                    sendTg(telegramBotClient, chatId.toString(), url);
+                    if (properties.isEnable()) {
+                        sendTg(telegramBotClient, chatId.toString(), url);
+                    }
+                    sendTg(telegramBotClient, chatId.toString(), event.getSender().getNick() + "\n\n" + url);
                     return false;
                 }
             } catch (JsonProcessingException e) {
@@ -80,8 +82,11 @@ public class AntiMiniAppHandler implements Handler {
                     title += item.map(m -> m.get("desc")).map(JsonNode::asText).orElse("");
                     url += item.map(m -> m.get("qqdocurl")).map(JsonNode::asText).orElse("");
                 }
-                event.getSubject().sendMessage(String.join("\r\n", title, handleUrl(url)));
-                sendTg(telegramBotClient, chatId.toString(), url);
+                if (properties.isEnable()) {
+                    event.getSubject().sendMessage(String.join("\n", title, handleUrl(url)));
+                }
+                sendTg(telegramBotClient, chatId.toString(), event.getSender().getNick() + "\n\n" + url);
+                return false;
             } catch (JsonProcessingException e) {
                 log.error(e.getMessage(), e);
             }

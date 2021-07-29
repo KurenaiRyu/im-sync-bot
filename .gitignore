@@ -39,7 +39,10 @@ device.json.*
 ### log ###
 *.log
 *.gz
+logs
 
 ## config ##
 config.yaml
 src/main/resources/application*
+
+cache
