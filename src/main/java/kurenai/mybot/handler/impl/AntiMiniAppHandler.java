@@ -57,9 +57,8 @@ public class AntiMiniAppHandler implements Handler {
                                     .map(JsonNode::asText))
                             .orElse("");
                     var url = "url:   " + Optional.ofNullable(jsonNode.get("url")).map(JsonNode::asText).orElse("");
-                    event.getSubject().sendMessage(String.join("\r\n", title, url));
                     if (properties.isEnable()) {
-                        sendTg(telegramBotClient, chatId.toString(), url);
+                        event.getSubject().sendMessage(String.join("\r\n", title, url));
                     }
                     sendTg(telegramBotClient, chatId.toString(), event.getSender().getNick() + "\n\n" + url);
                     return false;
