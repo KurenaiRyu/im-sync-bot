@@ -13,8 +13,11 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.util.List;
+
 /**
  * 机器人实例
+ *
  * @author liufuhong
  * @since 2021-06-30 14:05
  */
@@ -22,73 +25,93 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 @Slf4j
 public class TelegramBotClient extends TelegramLongPollingBot {
 
-  private final ObjectMapper          mapper = new ObjectMapper();
-  private final TelegramBotProperties telegramBotProperties;
-  private final HandlerHolder         handlerHolder; //初始化时处理器列表
-  private final ApplicationContext    context;
-  public TelegramBotClient(DefaultBotOptions options, TelegramBotProperties telegramBotProperties, @Lazy HandlerHolder handlerHolder, ApplicationContext context) {
-    super(options);
-    this.telegramBotProperties = telegramBotProperties;
-    this.handlerHolder = handlerHolder;
-    this.context = context;
-  }
+    private final ObjectMapper          mapper = new ObjectMapper();
+    private final TelegramBotProperties telegramBotProperties;
+    private final BanProperties         banProperties;
+    private final HandlerHolder         handlerHolder; //初始化时处理器列表
+    private final ApplicationContext    context;
 
-  @Override
-  public String getBotUsername() {
-    return telegramBotProperties.getUsername();
-  }
-
-  @Override
-  public String getBotToken() {
-    return telegramBotProperties.getToken();
-  }
-
-  @Override
-  public void onUpdateReceived(Update update) {
-    try {
-      log.debug("onUpdateReceived: {}", mapper.writeValueAsString(update));
-    } catch (JsonProcessingException e) {
-      log.debug("onUpdateReceived: {}", update);
+    public TelegramBotClient(DefaultBotOptions options, TelegramBotProperties telegramBotProperties, BanProperties banProperties, @Lazy HandlerHolder handlerHolder, ApplicationContext context) {
+        super(options);
+        this.telegramBotProperties = telegramBotProperties;
+        this.banProperties = banProperties;
+        this.handlerHolder = handlerHolder;
+        this.context = context;
     }
 
-    if (update.hasMessage() && (update.getMessage().isGroupMessage() || update.getMessage().isSuperGroupMessage()) ||
-            update.hasEditedMessage() && (update.getEditedMessage().isSuperGroupMessage() || update.getEditedMessage().isGroupMessage())) {
+    @Override
+    public String getBotUsername() {
+        return telegramBotProperties.getUsername();
+    }
 
-      var qqBotClient = context.getBean(QQBotClient.class);
-      if (update.hasMessage()) {
-        for (Handler handler : handlerHolder.getCurrentHandlerList()) {
-          try {
-            if (!handler.handleMessage(this, qqBotClient, update, update.getMessage())) break;
-          } catch (Exception e) {
-            log.error(e.getMessage(), e);
-          }
+    @Override
+    public String getBotToken() {
+        return telegramBotProperties.getToken();
+    }
+
+    @Override
+    public void onUpdateReceived(Update update) {
+        try {
+            log.debug("onUpdateReceived: {}", mapper.writeValueAsString(update));
+        } catch (JsonProcessingException e) {
+            log.debug("onUpdateReceived: {}", update);
         }
-      } else if (update.hasEditedMessage()) {
-        for (Handler handler : handlerHolder.getCurrentHandlerList()) {
-          try {
-            if (!handler.handleEditMessage(this, qqBotClient, update, update.getEditedMessage())) break;
-          } catch (Exception e) {
-            log.error(e.getMessage(), e);
-          }
+
+        if (update.hasMessage() && (update.getMessage().isGroupMessage() || update.getMessage().isSuperGroupMessage()) ||
+                update.hasEditedMessage() && (update.getEditedMessage().isSuperGroupMessage() || update.getEditedMessage().isGroupMessage())) {
+
+            var qqBotClient = context.getBean(QQBotClient.class);
+
+            Long       chatId   = update.getMessage().getChatId();
+            Long       senderId = update.getMessage().getFrom().getId();
+            List<Long> banGroup = banProperties.getGroup();
+            if (banGroup != null && !banGroup.isEmpty()) {
+                if (banGroup.contains(chatId)) {
+                    return;
+                }
+            }
+
+            List<Long> banMember = banProperties.getMember();
+            if (banMember != null && !banMember.isEmpty()) {
+                if (banMember.contains(senderId)) {
+                    return;
+                }
+            }
+
+            if (update.hasMessage()) {
+                for (Handler handler : handlerHolder.getCurrentHandlerList()) {
+                    try {
+                        if (!handler.handleMessage(this, qqBotClient, update, update.getMessage())) break;
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                    }
+                }
+            } else if (update.hasEditedMessage()) {
+                for (Handler handler : handlerHolder.getCurrentHandlerList()) {
+                    try {
+                        if (!handler.handleEditMessage(this, qqBotClient, update, update.getEditedMessage())) break;
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
+                    }
+                }
+            }
         }
-      }
     }
-  }
 
 
-  @Override
-  public void onRegister() {
-    try {
-      User me = getMe();
-      if (me != null) {
-        log.info("Started telegram-bot: {}({}, {}).", me.getFirstName().equalsIgnoreCase("null") ? me.getLastName() : me.getFirstName(), me.getUserName(), me.getId());
-      } else {
-        log.info("Started telegram-bot: {}.", getBotUsername());
-      }
-    } catch (TelegramApiException e) {
-      log.error(e.getMessage(), e);
+    @Override
+    public void onRegister() {
+        try {
+            User me = getMe();
+            if (me != null) {
+                log.info("Started telegram-bot: {}({}, {}).", me.getFirstName().equalsIgnoreCase("null") ? me.getLastName() : me.getFirstName(), me.getUserName(), me.getId());
+            } else {
+                log.info("Started telegram-bot: {}.", getBotUsername());
+            }
+        } catch (TelegramApiException e) {
+            log.error(e.getMessage(), e);
+        }
     }
-  }
 
 
 }

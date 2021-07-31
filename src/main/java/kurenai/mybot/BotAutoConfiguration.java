@@ -21,7 +21,7 @@ import java.util.Optional;
  */
 
 @Configuration
-@EnableConfigurationProperties({TelegramBotProperties.class, ProxyProperties.class, QQBotProperties.class})
+@EnableConfigurationProperties({BanProperties.class, TelegramBotProperties.class, ProxyProperties.class, QQBotProperties.class})
 public class BotAutoConfiguration {
 
   @Bean
@@ -41,13 +41,13 @@ public class BotAutoConfiguration {
   }
 
   @Bean
-  public TelegramBotClient telegramBot(DefaultBotOptions defaultBotOptions, TelegramBotProperties telegramBotProperties, @Lazy HandlerHolder handlerHolder, ApplicationContext context) {
-    return new TelegramBotClient(defaultBotOptions, telegramBotProperties, handlerHolder, context);
+  public TelegramBotClient telegramBot(DefaultBotOptions defaultBotOptions, BanProperties banProperties, TelegramBotProperties telegramBotProperties, @Lazy HandlerHolder handlerHolder, ApplicationContext context) {
+    return new TelegramBotClient(defaultBotOptions, telegramBotProperties, banProperties, handlerHolder, context);
   }
 
   @Bean
-  public QQBotClient qqBot(QQBotProperties properties, @Lazy HandlerHolder handlerHolder, ApplicationContext context) {
-    return new QQBotClient(properties, handlerHolder, context);
+  public QQBotClient qqBot(QQBotProperties properties, BanProperties banProperties, @Lazy HandlerHolder handlerHolder, ApplicationContext context) {
+    return new QQBotClient(properties, banProperties, handlerHolder, context);
   }
 
 }

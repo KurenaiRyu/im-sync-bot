@@ -423,7 +423,7 @@ public class ForwardHandler implements Handler {
 
     @Override
     public int order() {
-        return 100;
+        return 200;
     }
 
     @org.jetbrains.annotations.NotNull

@@ -1,6 +1,5 @@
 package kurenai.mybot.qq;
 
-import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
 import net.mamoe.mirai.utils.BotConfiguration.MiraiProtocol;
@@ -21,6 +20,7 @@ public class QQBotProperties {
     @Getter
     @Setter
     public static class Filter {
+        private List<Long> group;
         private List<Long> qq;
     }
 

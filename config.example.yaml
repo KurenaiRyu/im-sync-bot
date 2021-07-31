@@ -2,17 +2,27 @@ bot:
   telegram:
     token: 1234567:adgcgasdfadf # tg机器人token
     username: your_bot_name  # tg机器人用户名
-#    base-url: 'https://api.telegram.org/bot' # 默认不需要改，注意需要加上 /bot
+  #    base-url: 'https://api.telegram.org/bot' # 默认不需要改，注意需要加上 /bot
   #    proxy:
   #      host: 127.0.0.1    # tg代理地址
   #      port: 1080
   #      type: socks5   # socks5 | http
+  #    filter:   # 过滤qq群或qq号，注释掉不填则全部接受处理
+  #      group: 123456234，45678234234，1234234234
+  #      member: 1233456
+  #    ban: # 与过滤相反，即黑名单
+  #      group: 12345678
+  #      member: 12345678
   qq:
     account: 12354547  # qq账号
     password: your-qq-password # qq密码
     protocol: ANDROID_PAD #ANDROID_PAD | ANDROID_PHONE | ANDROID_WATCH
-  #    filter:   # 过滤qq群，注释掉不填则全部接受处理
-  #      qq: 123456234，45678234234，1234234234
+  #    filter:   # 过滤qq群或qq号，注释掉不填则全部接受处理
+  #      group: 123456234，45678234234，1234234234
+  #      member: 1233456
+  ban: # 黑名单 tg或qq
+    group: 12345678, 78901234
+    member: 12345678, 78901234
   handler:
     forward:
       enable: true  # 开启转发（就算删除也默认开启）
@@ -31,10 +41,11 @@ bot:
         binding-name:
           # id(qq) - 绑定名称
           -12345435646: your-binding-name
+        ban: 1234567, 7654321 # id(qq) ban的用户id或者qq
 
     anti-mini-app:
       enable: true  # 开启反小程序
-      ignore-group: 284466675
+      ignore-group: 1234567
     pic-source:
       enable: true  # 开启图片搜源
     pixiv:
