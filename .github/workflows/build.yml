@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: |
-            im-sync-bot/build/libs/
+            build/libs/
           key: ${{ runner.os }}-gradle-${{ hashFiles('src/*', 'bin/*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
