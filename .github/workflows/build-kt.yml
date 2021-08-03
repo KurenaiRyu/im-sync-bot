@@ -8,6 +8,7 @@ on:
     branches: [ kotlin ]
   pull_request:
     branches: [ kotlin ]
+  workflow_dispatch:
 
 jobs:
   build:
