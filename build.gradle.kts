@@ -22,7 +22,7 @@ repositories {
 
 dependencies {
 
-    val miraiVersion = "2.6.7"
+    val miraiVersion = "2.7-M2"
     implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {
         exclude("net.mamoe", "mirai-core-api")
         exclude("net.mamoe", "mirai-core-utils")
