@@ -26,8 +26,8 @@ jobs:
           distribution: 'adopt'
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-      - name: Cache
-        id: cache
+      - name: Cache Dependence
+        id: cache-dependence
         uses: actions/cache@v2
         with:
           path: |
@@ -36,5 +36,19 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
+      - name: Cache Jar
+        id: cache-jar
+        uses: actions/cache@v2
+        with:
+          path: |
+            im-sync-bot/build/libs/
+          key: ${{ runner.os }}-gradle-${{ hashFiles('src/*', 'bin/*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
       - name: Build with Gradle
+        if: steps.cache-jar.outputs.cache-hit != 'true'
         run: ./gradlew bootJar
+      - uses: actions/upload-artifact@v2
+        with:
+          name: im-sync-bot
+          path: build/libs/
