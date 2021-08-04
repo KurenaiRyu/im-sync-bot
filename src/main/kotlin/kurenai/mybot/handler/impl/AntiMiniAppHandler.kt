@@ -11,14 +11,12 @@ import kurenai.mybot.handler.config.ForwardHandlerProperties
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import org.apache.commons.lang3.StringUtils
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 
 @Component
-@ConditionalOnProperty(prefix = "bot.handler.anti-mini-app", name = ["enable"], havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties(
     AntiMiniAppHandlerProperties::class, ForwardHandlerProperties::class
 )
@@ -45,7 +43,7 @@ class AntiMiniAppHandler(private val properties: AntiMiniAppHandlerProperties, p
                 if (action == "web") {
                     title = (jsonNode["title"] ?: jsonNode["item"]?.get("summary"))?.asText() ?: ""
                     url = handleUrl(jsonNode["url"]?.asText() ?: "")
-                    event.subject.sendMessage("title: $title\nurl: $url")
+                    if (properties.enable) event.subject.sendMessage("title: $title\nurl: $url")
                     sendTg(telegramBotClient, chatId.toString(), url)
                     return false
                 }
@@ -66,7 +64,7 @@ class AntiMiniAppHandler(private val properties: AntiMiniAppHandlerProperties, p
                     url = item?.get("qqdocurl")?.asText() ?: ""
                 }
                 handleUrl(url)
-                event.subject.sendMessage("title: $title\nurl: $url")
+                if (properties.enable) event.subject.sendMessage("title: $title\nurl: $url")
                 sendTg(telegramBotClient, chatId.toString(), url)
             } catch (e: JsonProcessingException) {
                 log.error(e.message, e)
