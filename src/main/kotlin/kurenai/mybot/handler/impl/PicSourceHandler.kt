@@ -5,9 +5,6 @@ import kurenai.mybot.QQBotClient
 import kurenai.mybot.TelegramBotClient
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.ForwardHandlerProperties
-import kurenai.mybot.utils.HttpUtil
-import kurenai.mybot.utils.MarkdownUtil
-import kurenai.mybot.utils.MarkdownUtil.format2Markdown
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.message.data.Image
@@ -15,11 +12,11 @@ import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.message.data.MessageChainBuilder
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.QuoteReply
+import net.mamoe.mirai.message.data.RichMessage
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.ParseMode
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto
 import org.telegram.telegrambots.meta.api.objects.InputFile
 import java.net.URLEncoder
@@ -52,27 +49,26 @@ class PicSourceHandler(private val forwardProperties: ForwardHandlerProperties) 
         val encodeUrl = URLEncoder.encode(url, StandardCharsets.UTF_8)
         val sauce_nao = String.format(SAUCE_NAO, encodeUrl)
         val asscii2d = String.format(ASCII2D, encodeUrl)
-        when {
-            content.contains("source", true) -> {
-                if (overMaxQueryTimes(event)) return false
-                val builder = MessageChainBuilder()
-                builder.add(message.quote())
-                builder.add(sauce_nao)
-                event.subject.sendMessage(builder.build())
-            }
-            content.contains("url", true) -> {
-                if (overMaxQueryTimes(event)) return false
-                val builder = MessageChainBuilder()
-                builder.add(message.quote())
-                builder.add(url)
-                event.subject.sendMessage(builder.build())
-            }
-            else -> return true
+        var matched = false
+        if (content.contains("source", true)) {
+            matched = true
+            if (overMaxQueryTimes(event)) return false
+            event.subject.sendMessage(message.quote().plus(RichMessage.Key.share(asscii2d, "Asscii2d搜索结果", "", url)))
+            event.subject.sendMessage(message.quote().plus(RichMessage.Key.share(sauce_nao, "SauceNAO搜索结果", "", url)))
         }
+        if (content.contains("url", true)) {
+            matched = true
+            if (overMaxQueryTimes(event)) return false
+            val builder = MessageChainBuilder()
+            builder.add(message.quote())
+            builder.add(RichMessage.Key.share(url, "QQ图片URL", "", url))
+            event.subject.sendMessage(builder.build())
+        }
+        if (!matched) return true
         val chartId = forwardProperties.group.qqTelegram[event.subject.id] ?: forwardProperties.group.defaultTelegram
-        val caption = "[URL](${url.format2Markdown()}) \\- [SAUCE_NAO](${sauce_nao.format2Markdown()}) \\- [ASCII2D](${asscii2d.format2Markdown()})"
+        val caption = "[SAUCE\\_NAO](${sauce_nao})\n[ASCII2D](${asscii2d})"
         try {
-            telegramBotClient.execute(SendMessage.builder().chatId(chartId.toString()).text(sauce_nao).build())
+            telegramBotClient.execute(SendPhoto.builder().chatId(chartId.toString()).caption(caption).photo(InputFile(url)).parseMode(ParseMode.MARKDOWNV2).build())
         } catch (e: Exception) {
             log.debug("caption: $caption")
             log.error(e.message, e)
@@ -102,6 +98,6 @@ class PicSourceHandler(private val forwardProperties: ForwardHandlerProperties) 
     }
 
     override fun order(): Int {
-        return 50
+        return 150
     }
 }
