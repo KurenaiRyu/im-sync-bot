@@ -19,21 +19,8 @@ class ForwardHandlerProperties {
     class Group {
         var defaultQQ: Long = 0
         var defaultTelegram: Long = 0
-        var qqTelegram = HashMap<Long, Long>()
-        var telegramQq = HashMap<Long, Long>()
-
-        init {
-            if (qqTelegram.isNotEmpty()) {
-                qqTelegram.entries.forEach {
-                    telegramQq.putIfAbsent(it.value, it.key)
-                }
-            }
-            if (telegramQq.isNotEmpty()) {
-                telegramQq.entries.forEach {
-                    qqTelegram.putIfAbsent(it.value, it.key)
-                }
-            }
-        }
+        var qqTelegram: Map<Long, Long> = Collections.emptyMap()
+        var telegramQq: Map<Long, Long> = Collections.emptyMap()
     }
 
     class Member {

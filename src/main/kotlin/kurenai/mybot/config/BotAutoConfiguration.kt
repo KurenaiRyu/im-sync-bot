@@ -4,6 +4,7 @@ import kurenai.mybot.HandlerHolder
 import kurenai.mybot.QQBotClient
 import kurenai.mybot.TelegramBotClient
 import kurenai.mybot.handler.Handler
+import kurenai.mybot.handler.config.ForwardHandlerProperties
 import kurenai.mybot.qq.QQBotProperties
 import kurenai.mybot.telegram.ProxyProperties
 import kurenai.mybot.telegram.TelegramBotProperties
@@ -38,12 +39,18 @@ class BotAutoConfiguration {
     }
 
     @Bean
-    fun telegramBot(defaultBotOptions: DefaultBotOptions, telegramBotProperties: TelegramBotProperties, handlerHolder: HandlerHolder, context: ApplicationContext): TelegramBotClient {
-        return TelegramBotClient(defaultBotOptions, telegramBotProperties, handlerHolder, context)
+    fun telegramBot(
+        defaultBotOptions: DefaultBotOptions,
+        telegramBotProperties: TelegramBotProperties,
+        forwardProperties: ForwardHandlerProperties,
+        handlerHolder: HandlerHolder,
+        context: ApplicationContext,
+    ): TelegramBotClient {
+        return TelegramBotClient(defaultBotOptions, telegramBotProperties, forwardProperties, handlerHolder, context)
     }
 
     @Bean
-    fun qqBot(properties: QQBotProperties, handlerHolder: HandlerHolder, context: ApplicationContext): QQBotClient {
-        return QQBotClient(properties, handlerHolder, context)
+    fun qqBot(properties: QQBotProperties, forwardProperties: ForwardHandlerProperties, handlerHolder: HandlerHolder, context: ApplicationContext): QQBotClient {
+        return QQBotClient(properties, forwardProperties, handlerHolder, context)
     }
 }

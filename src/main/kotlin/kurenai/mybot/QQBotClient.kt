@@ -3,18 +3,23 @@ package kurenai.mybot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kurenai.mybot.handler.config.ForwardHandlerProperties
 import kurenai.mybot.qq.QQBotProperties
 import mu.KotlinLogging
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.BotFactory
+import net.mamoe.mirai.contact.Group
+import net.mamoe.mirai.contact.User
+import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.GroupMessageEvent
 import net.mamoe.mirai.event.events.GroupMessageSyncEvent
 import net.mamoe.mirai.event.events.MessageRecallEvent
+import net.mamoe.mirai.message.data.MessageChain
 import org.springframework.context.ApplicationContext
 import javax.annotation.PostConstruct
 
-class QQBotClient(private val properties: QQBotProperties, private val handlerHolder: HandlerHolder, private val context: ApplicationContext) {
+class QQBotClient(private val properties: QQBotProperties, private val forwardProperties: ForwardHandlerProperties, private val handlerHolder: HandlerHolder, private val context: ApplicationContext) {
 
     private val log = KotlinLogging.logger {}
 
@@ -54,6 +59,7 @@ class QQBotClient(private val properties: QQBotProperties, private val handlerHo
                         if (!handler.handleQQGroupMessage(this@QQBotClient, telegramBotClient, it)) break
                     } catch (e: Exception) {
                         log.error(e.message, e)
+                        reportError(it.message, it.group, it.sender, e.message)
                     }
                 }
             }
@@ -68,5 +74,11 @@ class QQBotClient(private val properties: QQBotProperties, private val handlerHo
             }
             bot.join()
         }
+    }
+
+    private suspend fun reportError(message: MessageChain, group: Group, sender: User, errorMsg: String?) {
+        val master = bot.getFriend(forwardProperties.masterOfQq)
+        master?.sendMessage(master.sendMessage(message).quote()
+            .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: $errorMsg"))
     }
 }

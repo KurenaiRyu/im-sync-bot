@@ -26,9 +26,9 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
 import org.telegram.telegrambots.meta.api.objects.*
 import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaAnimation
+import org.telegram.telegrambots.meta.api.objects.media.InputMediaDocument
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
-import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -52,6 +52,8 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
     private val bindingName: Map<Long, String>
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
+    private var qqTelegram = HashMap<Long, Long>()
+    private var telegramQq = HashMap<Long, Long>()
 
     // tg 2 qq
     @Throws(Exception::class)
@@ -62,7 +64,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
             message.replyToMessage?.messageId
                 ?.let(CacheHolder.TG_QQ_MSG_ID_CACHE::get)
                 ?.let(CacheHolder.QQ_MSG_CACHE::get)
-        val groupId = quoteMsgSource?.targetId ?: properties.group.telegramQq.getOrDefault(chatId, properties.group.defaultQQ)
+        val groupId = quoteMsgSource?.targetId ?: this.telegramQq.getOrDefault(chatId, properties.group.defaultQQ)
         if (groupId == 0L) return true
         val group = bot.getGroup(groupId)
         val senderId = message.from.id
@@ -203,7 +205,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         val messageChain = event.message
         val atAccount = AtomicLong(-100)
         val content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(client, group, atAccount, it) }
-        val chatId = properties.group.qqTelegram[group.id] ?: properties.group.defaultTelegram
+        val chatId = this.qqTelegram[group.id] ?: properties.group.defaultTelegram
 
         if (content.startsWith("<?xml version='1.0'") || content.contains("\"app\":")) return true
 
@@ -258,11 +260,16 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
             val medias = messageChain.filterIsInstance<Image>()
                 .map { image ->
                     val url = image.queryUrl()
-                    HttpUtil.download(url).inputStream().use { bais ->
-                        if (image.imageId.endsWith(".gif")) {
-                            InputMediaAnimation.builder().newMediaStream(bais).build()
+                    if (image.imageId.endsWith(".gif")) {
+                        InputMediaAnimation(url)
+                    } else {
+                        val download = HttpUtil.download(url)
+                        if (download.size > 300 * 1024) {
+                            download.inputStream().use {
+                                InputMediaDocument.builder().newMediaStream(it).mediaName(image.imageId).thumb(InputFile(url)).build()
+                            }
                         } else {
-                            InputMediaPhoto.builder().newMediaStream(bais).build()
+                            InputMediaPhoto(url)
                         }
                     }
                 }
@@ -285,18 +292,25 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 if (image.imageId.endsWith(".git")) {
                     val builder = SendAnimation.builder()
                     replyId?.let(builder::replyToMessageId)
-                    HttpUtil.download(url).inputStream().use { bais ->
-                        telegramBotClient.execute(builder
-                            .chatId(chatId)
-                            .caption(msg)
-                            .animation(InputFile(bais, getSuffix(url)))
-                            .build()
-                        )
-                    }
+                    telegramBotClient.execute(builder
+                        .chatId(chatId)
+                        .caption(msg)
+                        .animation(InputFile(url))
+                        .build()
+                    )
                 } else {
-                    val builder = SendPhoto.builder()
-                    replyId?.let(builder::replyToMessageId)
-                    telegramBotClient.execute(builder.caption(msg).chatId(chatId).photo(InputFile(url)).build())
+                    val download = HttpUtil.download(url)
+                    if (download.size > 300 * 1024) {
+                        val builder = SendDocument.builder()
+                        replyId?.let(builder::replyToMessageId)
+                        download.inputStream().use {
+                            telegramBotClient.execute(builder.caption(msg).chatId(chatId).document(InputFile(it, image.imageId)).thumb(InputFile(url)).build())
+                        }
+                    } else {
+                        val builder = SendPhoto.builder()
+                        replyId?.let(builder::replyToMessageId)
+                        telegramBotClient.execute(builder.caption(msg).chatId(chatId).photo(InputFile(url)).build())
+                    }
                 }?.let { m ->
                     source?.let { CacheHolder.cache(source, m) }
                 }
@@ -332,7 +346,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                     source?.let { CacheHolder.cache(source, m) }
                 }
         }
-        log.debug("{}({}) - {}({}): {}", group.name, group.id, senderName, senderId, content)
+        log.debug("{}({}) - {}({}): {}", group.name, group.id, senderName, senderId, messageChain.contentToString())
         return true
     }
 
@@ -498,5 +512,14 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         bindingName = properties.member.bindingName
         if (properties.tgMsgFormat.contains("\$msg")) tgMsgFormat = properties.tgMsgFormat
         if (properties.qqMsgFormat.contains("\$msg")) qqMsgFormat = properties.qqMsgFormat
+
+        properties.group.qqTelegram.takeIf { it.isNotEmpty() }?.map {
+            this.qqTelegram.putIfAbsent(it.key, it.value)
+            this.telegramQq.putIfAbsent(it.value, it.key)
+        }
+        properties.group.telegramQq.takeIf { it.isNotEmpty() }?.map {
+            this.telegramQq.putIfAbsent(it.key, it.value)
+            this.qqTelegram.putIfAbsent(it.value, it.key)
+        }
     }
 }
