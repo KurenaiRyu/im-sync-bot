@@ -263,11 +263,10 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                     if (image.imageId.endsWith(".gif")) {
                         InputMediaAnimation(url)
                     } else {
-                        val download = HttpUtil.download(url)
-                        if (download.size > 300 * 1024) {
-                            download.inputStream().use {
-                                InputMediaDocument.builder().newMediaStream(it).mediaName(image.imageId).thumb(InputFile(url)).build()
-                            }
+                        val file = File(getImagePath(image.imageId))
+                        if (!file.exists() || !file.isFile) FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+                        if (file.length() > 300 * 1024) {
+                            InputMediaDocument.builder().newMediaFile(file).mediaName(image.imageId).thumb(InputFile(url)).build()
                         } else {
                             InputMediaPhoto(url)
                         }
@@ -299,13 +298,12 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                         .build()
                     )
                 } else {
-                    val download = HttpUtil.download(url)
-                    if (download.size > 300 * 1024) {
+                    val file = File(getImagePath(image.imageId))
+                    if (!file.exists() || !file.isFile) FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+                    if (file.length() > 300 * 1024) {
                         val builder = SendDocument.builder()
                         replyId?.let(builder::replyToMessageId)
-                        download.inputStream().use {
-                            telegramBotClient.execute(builder.caption(msg).chatId(chatId).document(InputFile(it, image.imageId)).thumb(InputFile(url)).build())
-                        }
+                        telegramBotClient.execute(builder.caption(msg).chatId(chatId).document(InputFile(file)).thumb(InputFile(url)).build())
                     } else {
                         val builder = SendPhoto.builder()
                         replyId?.let(builder::replyToMessageId)
@@ -319,15 +317,15 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
             val downloadInfo = messageChain[FileMessage.Key]!!.toRemoteFile(group)?.getDownloadInfo() ?: return true
             val url: String = downloadInfo.url
             try {
-                HttpUtil.download(url).inputStream().use {
-                    val filename: String = downloadInfo.filename.lowercase()
-                    if (filename.endsWith(".mkv") || filename.endsWith(".mp4")) RetryUtil.retry(3) {
-                        telegramBotClient.execute(SendVideo.builder().video(InputFile(it, downloadInfo.filename)).chatId(chatId).caption(msg).build())
-                    } else if (filename.endsWith(".bmp") || filename.endsWith(".jpeg") || filename.endsWith(".jpg") || filename.endsWith(".png")) RetryUtil.retry(3) {
-                        telegramBotClient.execute(SendDocument.builder().document(InputFile(it, downloadInfo.filename)).thumb(InputFile(url)).chatId(chatId).caption(msg).build())
-                    } else {
-                        RetryUtil.retry(3) { telegramBotClient.execute(SendDocument.builder().document(InputFile(it, downloadInfo.filename)).chatId(chatId).caption(msg).build()) }
-                    }
+                val file = File(getDocumentPath(downloadInfo.filename))
+                if (!file.exists() || !file.isFile) FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+                val filename: String = downloadInfo.filename.lowercase()
+                if (filename.endsWith(".mkv") || filename.endsWith(".mp4")) RetryUtil.retry(3) {
+                    telegramBotClient.execute(SendVideo.builder().video(InputFile(file)).chatId(chatId).caption(msg).build())
+                } else if (filename.endsWith(".bmp") || filename.endsWith(".jpeg") || filename.endsWith(".jpg") || filename.endsWith(".png")) RetryUtil.retry(3) {
+                    telegramBotClient.execute(SendDocument.builder().document(InputFile(file)).thumb(InputFile(url)).chatId(chatId).caption(msg).build())
+                } else {
+                    RetryUtil.retry(3) { telegramBotClient.execute(SendDocument.builder().document(InputFile(file)).chatId(chatId).caption(msg).build()) }
                 }
             } catch (e: NoSuchAlgorithmException) {
                 log.error(e.message, e)
@@ -443,7 +441,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
     }
 
     private fun webp2png(id: String, webpFile: File): File? {
-        val pngFile = File("./cache/img/$id.png")
+        val pngFile = File(getImagePath("$id.png"))
         if (pngFile.exists()) return pngFile
         pngFile.parentFile.mkdirs()
         try {
@@ -492,6 +490,14 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 .replace(MSG_PATTNER, content)
             builder.add(handledMsg)
         }
+    }
+
+    private fun getImagePath(imageName: String): String {
+        return "./cache/img/$imageName"
+    }
+
+    private fun getDocumentPath(docName: String): String {
+        return "./cache/doc/$docName"
     }
 
     companion object {
