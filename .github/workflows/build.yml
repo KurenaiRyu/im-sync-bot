@@ -36,15 +36,6 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-      - name: Cache Jar
-        id: cache-jar
-        uses: actions/cache@v2
-        with:
-          path: |
-            build/libs/
-          key: ${{ runner.os }}-gradle-${{ hashFiles('src/**', 'bin/**') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
       - name: Build with Gradle
         if: steps.cache-jar.outputs.cache-hit != 'true'
         run: ./gradlew bootJar
