@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kurenai.mybot.handler.config.ForwardHandlerProperties
 import kurenai.mybot.qq.QQBotProperties
+import kurenai.mybot.utils.RetryUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.BotFactory
@@ -56,7 +57,7 @@ class QQBotClient(private val properties: QQBotProperties, private val forwardPr
             filter.subscribeAlways<GroupAwareMessageEvent> {
                 for (handler in handlerHolder.currentHandlerList) {
                     try {
-                        if (!handler.handleQQGroupMessage(this@QQBotClient, telegramBotClient, it)) break
+                        if (!RetryUtil.retry(3) { handler.handleQQGroupMessage(this@QQBotClient, telegramBotClient, it) }) break
                     } catch (e: Exception) {
                         log.error(e.message, e)
                         reportError(it.message, it.group, it.sender, e.message)
@@ -66,7 +67,7 @@ class QQBotClient(private val properties: QQBotProperties, private val forwardPr
             filter.subscribeAlways<MessageRecallEvent> {
                 for (handler in handlerHolder.currentHandlerList) {
                     try {
-                        if (!handler.handleRecall(this@QQBotClient, telegramBotClient, it)) break
+                        if (!RetryUtil.retry(3) { handler.handleRecall(this@QQBotClient, telegramBotClient, it) }) break
                     } catch (e: Exception) {
                         log.error(e.message, e)
                     }

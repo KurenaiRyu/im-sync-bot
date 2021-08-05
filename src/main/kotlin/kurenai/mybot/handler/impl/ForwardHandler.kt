@@ -6,7 +6,6 @@ import kurenai.mybot.TelegramBotClient
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.ForwardHandlerProperties
 import kurenai.mybot.utils.HttpUtil
-import kurenai.mybot.utils.RetryUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.*
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
@@ -320,12 +319,12 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 val file = File(getDocumentPath(downloadInfo.filename))
                 if (!file.exists() || !file.isFile) FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
                 val filename: String = downloadInfo.filename.lowercase()
-                if (filename.endsWith(".mkv") || filename.endsWith(".mp4")) RetryUtil.retry(3) {
+                if (filename.endsWith(".mkv") || filename.endsWith(".mp4")) {
                     telegramBotClient.execute(SendVideo.builder().video(InputFile(file)).chatId(chatId).caption(msg).build())
-                } else if (filename.endsWith(".bmp") || filename.endsWith(".jpeg") || filename.endsWith(".jpg") || filename.endsWith(".png")) RetryUtil.retry(3) {
+                } else if (filename.endsWith(".bmp") || filename.endsWith(".jpeg") || filename.endsWith(".jpg") || filename.endsWith(".png")) {
                     telegramBotClient.execute(SendDocument.builder().document(InputFile(file)).thumb(InputFile(url)).chatId(chatId).caption(msg).build())
                 } else {
-                    RetryUtil.retry(3) { telegramBotClient.execute(SendDocument.builder().document(InputFile(file)).chatId(chatId).caption(msg).build()) }
+                    telegramBotClient.execute(SendDocument.builder().document(InputFile(file)).chatId(chatId).caption(msg).build())
                 }
             } catch (e: NoSuchAlgorithmException) {
                 log.error(e.message, e)
