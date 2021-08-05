@@ -42,7 +42,7 @@ jobs:
         with:
           path: |
             build/libs/
-          key: ${{ runner.os }}-gradle-${{ hashFiles('src/*', 'bin/*') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('src/**', 'bin/**') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
       - name: Build with Gradle
