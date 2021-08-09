@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kurenai.mybot.ContextHolder
 import kurenai.mybot.HandlerHolder
-import kurenai.mybot.config.aspect.Retry
+import kurenai.mybot.config.BotProperties
 import kurenai.mybot.handler.config.ForwardHandlerProperties
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
@@ -20,6 +20,7 @@ import javax.annotation.PostConstruct
 class QQBotClient(
     private val properties: QQBotProperties,
     private val forwardProperties: ForwardHandlerProperties,
+    private val botProperties: BotProperties,
     private val handlerHolder: HandlerHolder
 ) {
 
@@ -38,17 +39,14 @@ class QQBotClient(
             bot.login()
             log.info("Started qq-bot {}({})", bot.bot.nick, bot.id)
             ContextHolder.qqBotClient = this@QQBotClient
-            val filter = bot.eventChannel.filter {
+            val filter = bot.eventChannel.filter { event ->
 
-                val filterList = properties.filter.group
-                // not filter if empty
-                if (filterList.isEmpty()) {
-                    return@filter true
-                }
-
-                if (it is GroupAwareMessageEvent) {
-                    return@filter filterList.contains(it.group.id)
-                } else if (it is MessageRecallEvent) {
+                if (event is GroupAwareMessageEvent) {
+                    val groupId = event.group.id
+                    return@filter properties.filter.group.takeIf { it.isNotEmpty() }?.contains(groupId) ?: true
+                            && !botProperties.ban.group.contains(groupId)
+                            && !botProperties.ban.member.contains(event.sender.id)
+                } else if (event is MessageRecallEvent) {
                     return@filter true
                 }
 
@@ -73,7 +71,6 @@ class QQBotClient(
         }
     }
 
-    @Retry(errorHandlerName = "reportError")
     suspend fun doHandleMessage(context: QQContext) {
         if (context.event is GroupAwareMessageEvent) {
             context.handler?.handleQQGroupMessage(context.qqBotClient, context.telegramBotClient, context.event)
@@ -89,7 +86,7 @@ class QQBotClient(
             val sender = event.sender
             val group = event.group
             val master = bot.getFriend(forwardProperties.masterOfQq)
-            master?.sendMessage(
+            master?.takeIf { it.id != 0L }?.sendMessage(
                 master.sendMessage(message).quote()
                     .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
             )

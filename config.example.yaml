@@ -12,6 +12,9 @@ bot:
     protocol: ANDROID_PAD #ANDROID_PAD | ANDROID_PHONE | ANDROID_WATCH
   #    filter:   # 过滤qq群，注释掉不填则全部接受处理
   #      qq: 123456234，45678234234，1234234234
+  ban: # 黑名单 tg或qq
+    group: 12345678, 78901234
+    member: 12345678, 78901234
   handler:
     forward:
       enable: true  # 开启转发（就算删除也默认开启）

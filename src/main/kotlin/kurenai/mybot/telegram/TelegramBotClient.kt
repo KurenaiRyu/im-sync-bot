@@ -7,7 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kurenai.mybot.ContextHolder
 import kurenai.mybot.HandlerHolder
-import kurenai.mybot.config.aspect.Retry
+import kurenai.mybot.config.BotProperties
 import kurenai.mybot.handler.config.ForwardHandlerProperties
 import kurenai.mybot.utils.RetryUtil
 import mu.KotlinLogging
@@ -29,6 +29,7 @@ class TelegramBotClient(
     options: DefaultBotOptions,
     private val telegramBotProperties: TelegramBotProperties, //初始化时处理器列表
     private val forwardProperties: ForwardHandlerProperties,
+    private val botProperties: BotProperties,
     private val handlerHolder: HandlerHolder,
 ) : TelegramLongPollingBot(options) {
 
@@ -55,13 +56,22 @@ class TelegramBotClient(
         }
     }
 
-    @Retry(errorHandlerName = "reportError")
     suspend fun onUpdateReceivedSuspend(update: Update) {
         try {
             log.debug("onUpdateReceived: {}", mapper.writeValueAsString(update))
         } catch (e: JsonProcessingException) {
             log.debug("onUpdateReceived: {}", update)
         }
+        if (botProperties.ban.member.contains(update.message.from.id)) {
+            log.debug("Ignore this message by ban member [${update.message.from.id}]")
+            return
+        }
+        if (botProperties.ban.group.contains(update.message.chatId)) {
+            log.debug("Ignore this message by ban group [${update.message.chatId}]")
+            return
+        }
+
+
         if (update.hasMessage() && (update.message.isGroupMessage || update.message.isSuperGroupMessage) ||
             update.hasEditedMessage() && (update.editedMessage.isSuperGroupMessage || update.editedMessage.isGroupMessage)
         ) {

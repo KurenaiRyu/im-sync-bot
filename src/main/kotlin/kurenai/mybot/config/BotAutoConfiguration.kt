@@ -16,7 +16,7 @@ import org.telegram.telegrambots.bots.DefaultBotOptions
  * @since 2021-06-30 14:08
  */
 @Configuration
-@EnableConfigurationProperties(TelegramBotProperties::class, ProxyProperties::class, QQBotProperties::class)
+@EnableConfigurationProperties(TelegramBotProperties::class, ProxyProperties::class, QQBotProperties::class, BotProperties::class)
 class BotAutoConfiguration {
     @Bean
     fun handlerHolder(@Lazy handlerList: List<Handler>): HandlerHolder {

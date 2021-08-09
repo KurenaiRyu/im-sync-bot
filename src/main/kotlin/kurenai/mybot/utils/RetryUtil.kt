@@ -9,7 +9,7 @@ private val log = KotlinLogging.logger {}
 
 object RetryUtil {
 
-    private const val MAX_TIMES = 3
+    private const val MAX_TIMES = 5
     private val id = AtomicLong()
 
     private val queue: DelayQueue<DelayItem<SuspendCallable<*>>> = DelayQueue()
