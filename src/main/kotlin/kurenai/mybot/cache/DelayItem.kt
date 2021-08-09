@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 import javax.validation.constraints.NotNull
 
-class DelayItem<T> : Delayed {
+open class DelayItem<T> : Delayed {
     /**
      * Sequence number to break ties FIFO
      */

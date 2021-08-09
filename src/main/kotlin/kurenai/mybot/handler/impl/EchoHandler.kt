@@ -65,7 +65,7 @@
 //import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 //import lombok.extern.slf4j.Slf4j
 //import kurenai.mybot.TelegramBotClient
-//import kurenai.mybot.QQBotClient
+//import kurenai.mybot.qq.QQBotClient
 //import org.telegram.telegrambots.meta.api.objects.Update
 //import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 //import org.telegram.telegrambots.meta.exceptions.TelegramApiException

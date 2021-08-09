@@ -7,12 +7,12 @@ import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.DelayQueue
 import java.util.concurrent.TimeUnit
 
-class Cache<K, V> @JvmOverloads constructor(name: String = "Cache") {
+class Cache<K, V> @JvmOverloads constructor(name: String = "no name") {
     private val log = KotlinLogging.logger {}
     private val cacheObjMap: ConcurrentMap<K, V> = ConcurrentHashMap()
     private val queue = DelayQueue<DelayItem<Pair<K, V>>>()
-    private fun daemonCheck() {
-        log.info("cache service started.")
+    private fun daemonCheck(name: String) {
+        log.info("$name cache service started.")
         while (true) {
             try {
                 val delayItem = queue.take()
@@ -55,7 +55,7 @@ class Cache<K, V> @JvmOverloads constructor(name: String = "Cache") {
     }
 
     init {
-        val daemonThread = Thread { daemonCheck() }
+        val daemonThread = Thread { daemonCheck(name) }
         daemonThread.isDaemon = true
         daemonThread.name = "$name Daemon"
         daemonThread.start()

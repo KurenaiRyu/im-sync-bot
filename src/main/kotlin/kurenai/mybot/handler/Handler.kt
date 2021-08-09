@@ -1,7 +1,7 @@
 package kurenai.mybot.handler
 
-import kurenai.mybot.QQBotClient
-import kurenai.mybot.TelegramBotClient
+import kurenai.mybot.qq.QQBotClient
+import kurenai.mybot.telegram.TelegramBotClient
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.MessageRecallEvent
 import org.telegram.telegrambots.meta.api.objects.Message

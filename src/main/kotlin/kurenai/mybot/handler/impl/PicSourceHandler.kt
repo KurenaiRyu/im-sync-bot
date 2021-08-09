@@ -1,10 +1,10 @@
 package kurenai.mybot.handler.impl
 
 import kurenai.mybot.CacheHolder
-import kurenai.mybot.QQBotClient
-import kurenai.mybot.TelegramBotClient
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.ForwardHandlerProperties
+import kurenai.mybot.qq.QQBotClient
+import kurenai.mybot.telegram.TelegramBotClient
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.message.data.Image

@@ -3,11 +3,11 @@ package kurenai.mybot.handler.impl
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
-import kurenai.mybot.QQBotClient
-import kurenai.mybot.TelegramBotClient
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.AntiMiniAppHandlerProperties
 import kurenai.mybot.handler.config.ForwardHandlerProperties
+import kurenai.mybot.qq.QQBotClient
+import kurenai.mybot.telegram.TelegramBotClient
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import org.apache.commons.lang3.StringUtils

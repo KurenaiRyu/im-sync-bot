@@ -1,15 +1,11 @@
 package kurenai.mybot.config
 
 import kurenai.mybot.HandlerHolder
-import kurenai.mybot.QQBotClient
-import kurenai.mybot.TelegramBotClient
 import kurenai.mybot.handler.Handler
-import kurenai.mybot.handler.config.ForwardHandlerProperties
 import kurenai.mybot.qq.QQBotProperties
 import kurenai.mybot.telegram.ProxyProperties
 import kurenai.mybot.telegram.TelegramBotProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Lazy
@@ -36,21 +32,5 @@ class BotAutoConfiguration {
         botOptions.proxyHost = proxyProperties.host
         botOptions.proxyPort = proxyProperties.port
         return botOptions
-    }
-
-    @Bean
-    fun telegramBot(
-        defaultBotOptions: DefaultBotOptions,
-        telegramBotProperties: TelegramBotProperties,
-        forwardProperties: ForwardHandlerProperties,
-        handlerHolder: HandlerHolder,
-        context: ApplicationContext,
-    ): TelegramBotClient {
-        return TelegramBotClient(defaultBotOptions, telegramBotProperties, forwardProperties, handlerHolder, context)
-    }
-
-    @Bean
-    fun qqBot(properties: QQBotProperties, forwardProperties: ForwardHandlerProperties, handlerHolder: HandlerHolder, context: ApplicationContext): QQBotClient {
-        return QQBotClient(properties, forwardProperties, handlerHolder, context)
     }
 }

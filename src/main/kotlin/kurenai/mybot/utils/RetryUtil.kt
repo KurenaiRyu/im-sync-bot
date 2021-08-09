@@ -1,60 +1,62 @@
 package kurenai.mybot.utils
 
+import kurenai.mybot.cache.DelayItem
 import mu.KotlinLogging
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.math.min
+import java.util.concurrent.DelayQueue
+import java.util.concurrent.atomic.AtomicLong
+
+private val log = KotlinLogging.logger {}
 
 object RetryUtil {
 
-    private val log = KotlinLogging.logger {}
-    private val threadNumber = AtomicInteger(1)
-    private val pool = Executors.newScheduledThreadPool(10) {
-        val t = Thread(Thread.currentThread().threadGroup, it,
-                "retry-thread-" + threadNumber.getAndIncrement(),
-                0)
-        if (t.isDaemon) t.isDaemon = false
-        if (t.priority != Thread.NORM_PRIORITY) t.priority = Thread.NORM_PRIORITY
-        t
-    }
+    private const val MAX_TIMES = 3
+    private val id = AtomicLong()
 
-    private const val DELAY = 200L
-    private const val DELAY_MAX = 3000L
+    private val queue: DelayQueue<DelayItem<SuspendCallable<*>>> = DelayQueue()
 
     @Throws(Exception::class)
-    suspend fun <T> retry(retryTimes: Int, supplier: RetrySupplier<T>): T {
-        val retryCount = 1
-
-        try {
-            return supplier.get()
+    suspend fun <T> retry(callable: SuspendCallable<T>): T {
+        return try {
+            callable.call()
         } catch (e: Exception) {
-            pool.schedule({
-                suspend {
-                    doRetry(retryCount + 1, retryTimes, supplier)
-                }
-            }, getDelay(retryCount), TimeUnit.MILLISECONDS)
+            queue.add(DelayItem(callable, getDelayTime(1)))
+            doRetry(callable, 1, id.getAndIncrement())
+        }
+    }
+
+    @Throws(Exception::class)
+    suspend fun <T> doRetry(callable: SuspendCallable<T>, times: Int, id: Long): T {
+        try {
+            log.warn("Retry for id[$id] $times time(s)")
+            return queue.take().item.call() as T
+        } catch (e: Exception) {
+            if (MAX_TIMES >= times) {
+                doRetry(callable, times + 1, id)
+            }
+            log.error("Retry over $times time(s)")
             throw e
         }
     }
 
-    private suspend fun <T> doRetry(retryCount: Int, retryTimes: Int, supplier: RetrySupplier<T>) {
-        try {
-            supplier.get()
-        } catch (e: Exception) {
-            if (retryCount >= retryTimes) throw e
-            log.warn("retry for exception: {}", e.message);
-            pool.schedule({ suspend { doRetry(retryCount + 1, retryTimes, supplier) } }, getDelay(retryCount), TimeUnit.MILLISECONDS)
+    private fun getDelayTime(times: Int): Long {
+        return when (times) {
+            1 -> 500L
+            2 -> 2000L
+            3 -> 10000L
+            else -> 30000L
         }
     }
 
-    private fun getDelay(retryCount: Int): Long {
-        if (retryCount < 1) return DELAY
-        return min(DELAY * retryCount * retryCount, DELAY_MAX)
+    @FunctionalInterface
+    fun interface SuspendCallable<V> {
+        /**
+         * Computes a result, or throws an exception if unable to do so.
+         *
+         * @return computed result
+         * @throws Exception if unable to compute a result
+         */
+        @Throws(Exception::class)
+        suspend fun call(): V
     }
 
-    fun interface RetrySupplier<T> {
-        @Throws(Exception::class)
-        suspend fun get(): T
-    }
 }

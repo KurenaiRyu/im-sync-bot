@@ -1,10 +1,10 @@
 package kurenai.mybot.handler.impl
 
 import kurenai.mybot.CacheHolder
-import kurenai.mybot.QQBotClient
-import kurenai.mybot.TelegramBotClient
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.ForwardHandlerProperties
+import kurenai.mybot.qq.QQBotClient
+import kurenai.mybot.telegram.TelegramBotClient
 import kurenai.mybot.utils.HttpUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.*
@@ -49,6 +49,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
 
     //TODO 最好将属性都提取出来，最少也要把第二层属性提取出来，不然每次判空
     private val bindingName: Map<Long, String>
+    private val picToFileSize = 500 * 1024
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
     private var qqTelegram = HashMap<Long, Long>()
@@ -236,10 +237,10 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         if (isMaster && handleChangeQQMsgFormatCmd(content)) {
             val demoContent = "demo msg."
             val demoMsg = qqMsgFormat
-                .replace(NEWLINE_PATTNER, "\n")
-                .replace(NAME_PATTNER, "demo username")
-                .replace(ID_PATTNER, "123456789")
-                .replace(MSG_PATTNER, demoContent)
+                .replace(NEWLINE_PATTERN, "\n")
+                .replace(NAME_PATTERN, "demo username")
+                .replace(ID_PATTERN, "123456789")
+                .replace(MSG_PATTERN, demoContent)
             group.sendMessage("changed msg format\ne.g.\n$demoMsg")
             return false
         }
@@ -248,10 +249,10 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
             content = content.substring(1)
         }
 
-        val msg = tgMsgFormat.replace(NEWLINE_PATTNER, "\n", true)
-            .replace(ID_PATTNER, senderId.toString(), true)
-            .replace(NAME_PATTNER, senderName.replace(" @", " "), true)
-            .replace(MSG_PATTNER, content, true)
+        val msg = tgMsgFormat.replace(NEWLINE_PATTERN, "\n", true)
+            .replace(ID_PATTERN, senderId.toString(), true)
+            .replace(NAME_PATTERN, senderName.replace(" @", " "), true)
+            .replace(MSG_PATTERN, content, true)
 
         if (chatId.isBlank() || chatId == "0") return true
         val count = messageChain.filterIsInstance<Image>().count()
@@ -264,8 +265,9 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                     } else {
                         val file = File(getImagePath(image.imageId))
                         if (!file.exists() || !file.isFile) FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
-                        if (file.length() > 300 * 1024) {
-                            InputMediaDocument.builder().newMediaFile(file).mediaName(image.imageId).thumb(InputFile(url)).build()
+                        if (file.length() > picToFileSize) {
+                            InputMediaDocument.builder().media(url).newMediaFile(file).isNewMedia(true).mediaName(image.imageId)
+                                .thumb(InputFile(url)).build()
                         } else {
                             InputMediaPhoto(url)
                         }
@@ -299,10 +301,12 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 } else {
                     val file = File(getImagePath(image.imageId))
                     if (!file.exists() || !file.isFile) FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
-                    if (file.length() > 300 * 1024) {
+                    if (file.length() > picToFileSize) {
                         val builder = SendDocument.builder()
                         replyId?.let(builder::replyToMessageId)
-                        telegramBotClient.execute(builder.caption(msg).chatId(chatId).document(InputFile(file)).thumb(InputFile(url)).build())
+                        telegramBotClient.execute(
+                            builder.caption(msg).chatId(chatId).document(InputFile(file)).thumb(InputFile(url)).build()
+                        )
                     } else {
                         val builder = SendPhoto.builder()
                         replyId?.let(builder::replyToMessageId)
@@ -483,10 +487,10 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
             builder.add(content)
         } else { //非空名称或是非主人则添加前缀
             val handledMsg = qqMsgFormat
-                .replace(NEWLINE_PATTNER, "\n")
-                .replace(NAME_PATTNER, username)
-                .replace(ID_PATTNER, id.toString())
-                .replace(MSG_PATTNER, content)
+                .replace(NEWLINE_PATTERN, "\n")
+                .replace(NAME_PATTERN, username)
+                .replace(ID_PATTERN, id.toString())
+                .replace(MSG_PATTERN, content)
             builder.add(handledMsg)
         }
     }
@@ -500,10 +504,10 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
     }
 
     companion object {
-        const val NAME_PATTNER = "\$name"
-        const val MSG_PATTNER = "\$msg"
-        const val ID_PATTNER = "\$id"
-        const val NEWLINE_PATTNER = "\$newline"
+        const val NAME_PATTERN = "\$name"
+        const val MSG_PATTERN = "\$msg"
+        const val ID_PATTERN = "\$id"
+        const val NEWLINE_PATTERN = "\$newline"
     }
 
     init {
