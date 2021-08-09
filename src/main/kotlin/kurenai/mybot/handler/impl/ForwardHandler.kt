@@ -1,5 +1,7 @@
 package kurenai.mybot.handler.impl
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kurenai.mybot.CacheHolder
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.ForwardHandlerProperties
@@ -45,7 +47,6 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
     private val log = KotlinLogging.logger {}
     private val webpCmdPattern: String
 
-    //TODO 最好将属性都提取出来，最少也要把第二层属性提取出来，不然每次判空
     private val bindingName: Map<Long, String>
     private val picToFileSize = 500 * 1024
     private var tgMsgFormat = "\$name: \$msg"
@@ -140,10 +141,16 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
 
     // qq 2 tg
     @Throws(Exception::class)
-    override suspend fun handleQQGroupMessage(client: QQBotClient, telegramBotClient: TelegramBotClient, event: GroupAwareMessageEvent): Boolean {
+    override suspend fun handleQQGroupMessage(
+        client: QQBotClient,
+        telegramBotClient: TelegramBotClient,
+        event: GroupAwareMessageEvent
+    ): Boolean {
         val group = event.group
         val sender = event.sender
-        val senderName = formatUsername(bindingName[sender.id] ?: client.bot.getFriend(sender.id)?.remarkOrNick ?: (sender as Member).remarkOrNameCardOrNick)
+        val senderName = formatUsername(
+            bindingName[sender.id] ?: client.bot.getFriend(sender.id)?.remarkOrNick ?: (sender as Member).remarkOrNameCardOrNick
+        )
         val messageChain = event.message
         val atAccount = AtomicLong(-100)
         val content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(client, group, atAccount, it) }
@@ -175,7 +182,9 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
     ) {
         val systemFile = File(file.filePath)
         if (systemFile.exists() && systemFile.isFile) {
-            builder.add(group.filesRoot.uploadAndSend(systemFile).quote())
+            builder.add(withContext(Dispatchers.IO) {
+                group.filesRoot.uploadAndSend(systemFile).quote()
+            })
             builder.add("upload from $username\n\n${message.caption}")
             CacheHolder.cache(group.sendMessage(builder.build()).source, message)
         } else {
@@ -193,8 +202,10 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
 
     private suspend fun uploadFileAndSend(file: File, group: Group, message: Message): Boolean {
         return if (file.exists() && file.isFile) {
-            file.toExternalResource().use {
-                CacheHolder.cache(group.filesRoot.uploadAndSend(it).source, message)
+            withContext(Dispatchers.IO) {
+                file.toExternalResource().use {
+                    CacheHolder.cache(group.filesRoot.uploadAndSend(it).source, message)
+                }
             }
             true
         } else
@@ -277,11 +288,12 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 if (image.imageId.endsWith(".git")) {
                     val builder = SendAnimation.builder()
                     replyId?.let(builder::replyToMessageId)
-                    telegramBotClient.execute(builder
-                        .chatId(chatId)
-                        .caption(msg)
-                        .animation(InputFile(url))
-                        .build()
+                    telegramBotClient.execute(
+                        builder
+                            .chatId(chatId)
+                            .caption(msg)
+                            .animation(InputFile(url))
+                            .build()
                     )
                 } else {
                     val file = File(getImagePath(image.imageId))
@@ -311,7 +323,9 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 if (filename.endsWith(".mkv") || filename.endsWith(".mp4")) {
                     telegramBotClient.execute(SendVideo.builder().video(InputFile(file)).chatId(chatId).caption(msg).build())
                 } else if (filename.endsWith(".bmp") || filename.endsWith(".jpeg") || filename.endsWith(".jpg") || filename.endsWith(".png")) {
-                    telegramBotClient.execute(SendDocument.builder().document(InputFile(file)).thumb(InputFile(url)).chatId(chatId).caption(msg).build())
+                    telegramBotClient.execute(
+                        SendDocument.builder().document(InputFile(file)).thumb(InputFile(url)).chatId(chatId).caption(msg).build()
+                    )
                 } else {
                     telegramBotClient.execute(SendDocument.builder().document(InputFile(file)).chatId(chatId).caption(msg).build())
                 }
@@ -347,7 +361,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
 
     @Throws(TelegramApiException::class)
     override suspend fun handleRecall(client: QQBotClient, telegramBotClient: TelegramBotClient, event: MessageRecallEvent): Boolean {
-        val message = CacheHolder.QQ_TG_MSG_ID_CACHE[event.messageIds[0]].let(CacheHolder.TG_MSG_CACHE::get)
+        val message = CacheHolder.QQ_TG_MSG_ID_CACHE[event.messageIds[0]]?.let(CacheHolder.TG_MSG_CACHE::get)
         message?.let {
             telegramBotClient.execute(
                 DeleteMessage.builder().chatId(it.chatId.toString())
@@ -359,10 +373,25 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
     }
 
     @Throws(java.lang.Exception::class)
-    private suspend fun handleQQGroupForwardMessage(client: QQBotClient, telegramBotClient: TelegramBotClient, msg: ForwardMessage, group: Group, chatId: String, senderName: String): Boolean {
+    private suspend fun handleQQGroupForwardMessage(
+        client: QQBotClient,
+        telegramBotClient: TelegramBotClient,
+        msg: ForwardMessage,
+        group: Group,
+        chatId: String,
+        senderName: String
+    ): Boolean {
         for ((senderId, _, forwardSenderName, messageChain) in msg.nodeList) {
             try {
-                handleQQGroupMessage(client, telegramBotClient, messageChain, group, chatId, senderId, "$senderName forward from $forwardSenderName")
+                handleQQGroupMessage(
+                    client,
+                    telegramBotClient,
+                    messageChain,
+                    group,
+                    chatId,
+                    senderId,
+                    "$senderName forward from $forwardSenderName"
+                )
             } catch (e: java.lang.Exception) {
                 log.error(e.message, e)
             }
@@ -478,7 +507,14 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         return path?.substring(path.lastIndexOf('.').plus(1)) ?: ""
     }
 
-    private fun formatMsgAndQuote(quoteMsgSource: OnlineMessageSource?, isMaster: Boolean, id: Long, username: String, content: String, builder: MessageChainBuilder) {
+    private fun formatMsgAndQuote(
+        quoteMsgSource: OnlineMessageSource?,
+        isMaster: Boolean,
+        id: Long,
+        username: String,
+        content: String,
+        builder: MessageChainBuilder
+    ) {
         quoteMsgSource?.quote()?.let(builder::add)
         if (isMaster || username.isBlank()) {
             builder.add(content)

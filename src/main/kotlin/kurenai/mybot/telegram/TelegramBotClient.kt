@@ -48,8 +48,9 @@ class TelegramBotClient(
         CoroutineScope(Dispatchers.Default).launch {
             updates.forEach {
                 try {
-                    RetryUtil.retry { onUpdateReceivedSuspend(it) }
+                    RetryUtil.retry(it.message.messageId) { onUpdateReceivedSuspend(it) }
                 } catch (e: Exception) {
+                    log.error(e.message, e)
                     reportError(it, e)
                 }
             }
@@ -124,7 +125,12 @@ class TelegramBotClient(
 
     override fun onUpdateReceived(update: Update) {
         CoroutineScope(Dispatchers.Default).launch {
-            RetryUtil.retry { onUpdateReceivedSuspend(update) }
+            try {
+                RetryUtil.retry(update.message.messageId) { onUpdateReceivedSuspend(update) }
+            } catch (e: Exception) {
+                log.error(e.message, e)
+                reportError(update, e)
+            }
         }
     }
 }

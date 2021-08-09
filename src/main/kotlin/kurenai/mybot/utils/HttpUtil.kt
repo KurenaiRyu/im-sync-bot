@@ -1,5 +1,7 @@
 package kurenai.mybot.utils
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.apache.http.client.config.RequestConfig
 import org.apache.http.client.methods.RequestBuilder
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory
@@ -23,8 +25,10 @@ object HttpUtil {
     @Throws(NoSuchAlgorithmException::class, KeyStoreException::class, KeyManagementException::class, IOException::class)
     suspend fun download(url: String): ByteArray {
         val client = buildClient()
-        val res = client.execute(RequestBuilder.get(url).build())
-        return EntityUtils.toByteArray(res.entity)
+        return withContext(Dispatchers.IO) {
+            val res = client.execute(RequestBuilder.get(url).build())
+            EntityUtils.toByteArray(res.entity)
+        }
     }
 
     // 创建SSL安全连接
@@ -36,7 +40,8 @@ object HttpUtil {
 
     @Throws(NoSuchAlgorithmException::class, KeyStoreException::class, KeyManagementException::class)
     private fun buildClient(): CloseableHttpClient {
-        return HttpClients.custom().setSSLSocketFactory(createSSLConnSocketFactory()).setConnectionManager(connMgr).setDefaultRequestConfig(requestConfig).build()
+        return HttpClients.custom().setSSLSocketFactory(createSSLConnSocketFactory()).setConnectionManager(connMgr)
+            .setDefaultRequestConfig(requestConfig).build()
     }
 
     init {

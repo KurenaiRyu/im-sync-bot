@@ -7,12 +7,14 @@ import kurenai.mybot.ContextHolder
 import kurenai.mybot.HandlerHolder
 import kurenai.mybot.config.BotProperties
 import kurenai.mybot.handler.config.ForwardHandlerProperties
+import kurenai.mybot.utils.RetryUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.MessageRecallEvent
+import net.mamoe.mirai.message.data.ids
 import org.springframework.stereotype.Component
 import javax.annotation.PostConstruct
 
@@ -66,16 +68,22 @@ class QQBotClient(
             try {
                 doHandleMessage(context)
             } catch (e: Exception) {
+                log.error(e.message, e)
                 reportError(context, e)
             }
         }
     }
 
+    @Throws(Exception::class)
     suspend fun doHandleMessage(context: QQContext) {
         if (context.event is GroupAwareMessageEvent) {
-            context.handler?.handleQQGroupMessage(context.qqBotClient, context.telegramBotClient, context.event)
+            RetryUtil.retry(context.event.message.ids[0]) {
+                context.handler?.handleQQGroupMessage(context.qqBotClient, context.telegramBotClient, context.event)
+            }
         } else if (context.event is MessageRecallEvent) {
-            context.handler?.handleRecall(context.qqBotClient, context.telegramBotClient, context.event)
+            RetryUtil.retry(context.event.messageIds[0]) {
+                context.handler?.handleRecall(context.qqBotClient, context.telegramBotClient, context.event)
+            }
         }
     }
 
