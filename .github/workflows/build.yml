@@ -5,9 +5,9 @@ name: Kotlin CI with Gradle
 
 on:
   push:
-    branches: [ mirai-2.7-M2 ]
+    branches: [ master ]
   pull_request:
-    branches: [ mirai-2.7-M2 ]
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
