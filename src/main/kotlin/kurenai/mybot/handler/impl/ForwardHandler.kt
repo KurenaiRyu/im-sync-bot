@@ -24,8 +24,6 @@ import org.telegram.telegrambots.meta.api.methods.send.*
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
 import org.telegram.telegrambots.meta.api.objects.*
 import org.telegram.telegrambots.meta.api.objects.Message
-import org.telegram.telegrambots.meta.api.objects.media.InputMediaAnimation
-import org.telegram.telegrambots.meta.api.objects.media.InputMediaDocument
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.File
@@ -139,16 +137,32 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         return handleMessage(client, qqClient, update, message)
     }
 
-    private fun getSenderName(message: Message): String {
-        val from = message.from
-        if (from.userName.equals("GroupAnonymousBot", true)) {
-            return message.authorSignature ?: ""    // 匿名用头衔作为前缀，空头衔将会不添加前缀
-        } else {
-            return bindingName[from.id] ?: let {
-                val username = "${from.firstName} ${from.lastName ?: ""}"
-                return username.ifBlank { from.userName ?: "none" }
-            }
+
+    // qq 2 tg
+    @Throws(Exception::class)
+    override suspend fun handleQQGroupMessage(client: QQBotClient, telegramBotClient: TelegramBotClient, event: GroupAwareMessageEvent): Boolean {
+        val group = event.group
+        val sender = event.sender
+        val senderName = formatUsername(bindingName[sender.id] ?: client.bot.getFriend(sender.id)?.remarkOrNick ?: (sender as Member).remarkOrNameCardOrNick)
+        val messageChain = event.message
+        val atAccount = AtomicLong(-100)
+        val content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(client, group, atAccount, it) }
+        val chatId = this.qqTelegram[group.id] ?: properties.group.defaultTelegram
+
+        if (content.startsWith("<?xml version='1.0'") || content.contains("\"app\":")) return true
+
+        if (messageChain.contains(ForwardMessage.Key)) {
+            return handleQQGroupForwardMessage(
+                client,
+                telegramBotClient,
+                messageChain[ForwardMessage.Key]!!,
+                group,
+                chatId.toString(),
+                senderName
+            )
         }
+
+        return handleQQGroupMessage(client, telegramBotClient, messageChain, event.group, chatId.toString(), sender.id, senderName)
     }
 
     private suspend fun uploadAndSend(
@@ -195,27 +209,6 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         }
     }
 
-
-    // qq 2 tg
-    @Throws(Exception::class)
-    override suspend fun handleQQGroupMessage(client: QQBotClient, telegramBotClient: TelegramBotClient, event: GroupAwareMessageEvent): Boolean {
-        val group = event.group
-        val sender = event.sender
-        val senderName = formatUsername(bindingName[sender.id] ?: client.bot.getFriend(sender.id)?.remarkOrNick ?: (sender as Member).remarkOrNameCardOrNick)
-        val messageChain = event.message
-        val atAccount = AtomicLong(-100)
-        val content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(client, group, atAccount, it) }
-        val chatId = this.qqTelegram[group.id] ?: properties.group.defaultTelegram
-
-        if (content.startsWith("<?xml version='1.0'") || content.contains("\"app\":")) return true
-
-        if (messageChain.contains(ForwardMessage.Key)) {
-            return handleQQGroupForwardMessage(client, telegramBotClient, messageChain[ForwardMessage.Key]!!, group, chatId.toString(), senderName)
-        }
-
-        return handleQQGroupMessage(client, telegramBotClient, messageChain, event.group, chatId.toString(), sender.id, senderName)
-    }
-
     private suspend fun handleQQGroupMessage(
         client: QQBotClient,
         telegramBotClient: TelegramBotClient,
@@ -225,6 +218,8 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         senderId: Long,
         senderName: String,
     ): Boolean {
+        log.debug("{}({}) - {}({}): {}", group.name, group.id, senderName, senderId, messageChain.contentToString())
+
         val source = messageChain[OnlineMessageSource.Key]
         val replyId = messageChain[QuoteReply.Key]?.source?.ids?.get(0)?.let(CacheHolder.QQ_TG_MSG_ID_CACHE::get)
         val atAccount = AtomicLong(-100)
@@ -260,18 +255,8 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
             val medias = messageChain.filterIsInstance<Image>()
                 .map { image ->
                     val url = image.queryUrl()
-                    if (image.imageId.endsWith(".gif")) {
-                        InputMediaAnimation(url)
-                    } else {
-                        val file = File(getImagePath(image.imageId))
-                        if (!file.exists() || !file.isFile) FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
-                        if (file.length() > picToFileSize) {
-                            InputMediaDocument.builder().media(url).newMediaFile(file).isNewMedia(true).mediaName(image.imageId)
-                                .thumb(InputFile(url)).build()
-                        } else {
-                            InputMediaPhoto(url)
-                        }
-                    }
+                    InputMediaPhoto.builder().media(url).mediaName(image.imageId)
+                        .build()
                 }
             if (medias.isNotEmpty()) {
                 medias[0].caption = msg
@@ -347,7 +332,6 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                     source?.let { CacheHolder.cache(source, m) }
                 }
         }
-        log.debug("{}({}) - {}({}): {}", group.name, group.id, senderName, senderId, messageChain.contentToString())
         return true
     }
 
@@ -443,12 +427,25 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         return ret
     }
 
+    private fun getSenderName(message: Message): String {
+        val from = message.from
+        if (from.userName.equals("GroupAnonymousBot", true)) {
+            return message.authorSignature ?: ""    // 匿名用头衔作为前缀，空头衔将会不添加前缀
+        } else {
+            return bindingName[from.id] ?: let {
+                val username = "${from.firstName} ${from.lastName ?: ""}"
+                return username.ifBlank { from.userName ?: "none" }
+            }
+        }
+    }
+
     private fun webp2png(id: String, webpFile: File): File? {
         val pngFile = File(getImagePath("$id.png"))
         if (pngFile.exists()) return pngFile
         pngFile.parentFile.mkdirs()
         try {
-            val future = Runtime.getRuntime().exec(String.format(webpCmdPattern, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
+            val future =
+                Runtime.getRuntime().exec(String.format(webpCmdPattern, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
             if (future.get().exitValue() >= 0 || pngFile.exists()) return pngFile
         } catch (e: IOException) {
             log.error(e.message, e)

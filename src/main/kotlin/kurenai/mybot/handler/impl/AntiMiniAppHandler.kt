@@ -82,7 +82,7 @@ class AntiMiniAppHandler(private val properties: AntiMiniAppHandlerProperties, p
             client.execute(
                 SendMessage.builder()
                     .chatId(chatId)
-                    .text(url)
+                    .text(url.takeIf { it.isNotEmpty() } ?: " ")
                     .build()
             )
         } catch (e: TelegramApiException) {
