@@ -45,7 +45,7 @@ im同步机器人，现主要同步（转发）tg跟qq群。
 - `docker-compose restart` 重启
 - `docker-compose up -d` 更新docker-compose配置后台运行
 
-## Development
+## Develop
 
 复制 `config.example.yaml` 到 `src/main/resources` 并更改名字为 `application.yaml` 。  
 本项目也采用了Lombok，所以也请注意安装对应插件。
