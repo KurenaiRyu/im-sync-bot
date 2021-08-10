@@ -93,8 +93,17 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 val builder = MessageChainBuilder()
                 formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 val document = message.document
-                val file = getFile(client, document.fileId, document.fileUniqueId)
-                uploadAndSend(client, message, group, senderName, builder, file)
+                if (document.fileName.endsWith("jpe") || document.fileName.endsWith("jpeg") || document.fileName.endsWith("png") || document.fileName.endsWith(
+                        "bmp"
+                    )
+                ) {
+                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
+                    getImage(client, group, document.fileId, document.fileUniqueId)?.let(builder::add)
+                    CacheHolder.cache(group.sendMessage(builder.build()).source, message)
+                } else {
+                    val file = getFile(client, document.fileId, document.fileUniqueId)
+                    uploadAndSend(client, message, group, senderName, builder, file)
+                }
             }
             message.hasAnimation() -> {
                 val builder = MessageChainBuilder()
@@ -110,8 +119,8 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, sticker.emoji, builder)
                     CacheHolder.cache(group.sendMessage(builder.build()).source, message)
                 } else {
-                    getImage(client, group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
+                    getImage(client, group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
                     CacheHolder.cache(group.sendMessage(builder.build()).source, message)
                 }
             }
