@@ -1,9 +1,8 @@
 package kurenai.mybot.handler.impl
 
+import kurenai.mybot.ContextHolder
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.ForwardHandlerProperties
-import kurenai.mybot.qq.QQBotClient
-import kurenai.mybot.telegram.TelegramBotClient
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -23,11 +22,12 @@ class PixivHandler(private val forwardProperties: ForwardHandlerProperties) : Ha
     var pattern: Pattern = Pattern.compile("^pixiv \\d+")
 
     @Throws(Exception::class)
-    override suspend fun handleQQGroupMessage(client: QQBotClient, telegramBotClient: TelegramBotClient, event: GroupAwareMessageEvent): Boolean {
+    override suspend fun handleQQGroupMessage(event: GroupAwareMessageEvent): Boolean {
+        val telegramBotClient = ContextHolder.telegramBotClient
         val content = event.message.serializeToMiraiCode()
         val matcher = pattern.matcher(content)
         if (matcher.find()) {
-            val chartId = forwardProperties.group.qqTelegram.getOrDefault(event.subject.id, forwardProperties.group.defaultTelegram).toString()
+            val chartId = forwardProperties.group.qqTelegram.getOrDefault(event.subject.id, ContextHolder.defaultTgGroup).toString()
             val id = content.substring(6)
             val artUrl = PIXIV_ART_PREFIX + id
             val userUrl = PIXIV_USER_PREFIX + id

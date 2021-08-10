@@ -3,11 +3,10 @@ package kurenai.mybot.handler.impl
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
+import kurenai.mybot.ContextHolder
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.AntiMiniAppHandlerProperties
 import kurenai.mybot.handler.config.ForwardHandlerProperties
-import kurenai.mybot.qq.QQBotClient
-import kurenai.mybot.telegram.TelegramBotClient
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import org.apache.commons.lang3.StringUtils
@@ -20,16 +19,16 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 @EnableConfigurationProperties(
     AntiMiniAppHandlerProperties::class, ForwardHandlerProperties::class
 )
-class AntiMiniAppHandler(private val properties: AntiMiniAppHandlerProperties, private val forwardProperties: ForwardHandlerProperties) : Handler {
+class AntiMiniAppHandler(private val properties: AntiMiniAppHandlerProperties) : Handler {
 
     private val log = KotlinLogging.logger {}
     private val jsonMapper = ObjectMapper()
     private val xmlMapper = XmlMapper()
 
     @Throws(Exception::class)
-    override suspend fun handleQQGroupMessage(client: QQBotClient, telegramBotClient: TelegramBotClient, event: GroupAwareMessageEvent): Boolean {
+    override suspend fun handleQQGroupMessage(event: GroupAwareMessageEvent): Boolean {
         val id = event.subject.id
-        val chatId = forwardProperties.group.qqTelegram.getOrDefault(id, forwardProperties.group.defaultTelegram)
+        val chatId = ContextHolder.qqTgBinding.getOrDefault(id, ContextHolder.defaultTgGroup)
         val ignoreGroup = properties.ignoreGroup
         if (ignoreGroup.isNotEmpty() && ignoreGroup.contains(id)) return true
         val content = event.message.contentToString()
@@ -44,7 +43,7 @@ class AntiMiniAppHandler(private val properties: AntiMiniAppHandlerProperties, p
                     title = (jsonNode["title"] ?: jsonNode["item"]?.get("summary"))?.asText() ?: ""
                     url = handleUrl(jsonNode["url"]?.asText() ?: "")
                     if (properties.enable) event.subject.sendMessage("title: $title\nurl: $url")
-                    sendTg(telegramBotClient, chatId.toString(), url)
+                    sendTg(chatId.toString(), url)
                     return false
                 }
             } catch (e: JsonProcessingException) {
@@ -65,7 +64,7 @@ class AntiMiniAppHandler(private val properties: AntiMiniAppHandlerProperties, p
                 }
                 handleUrl(url)
                 if (properties.enable) event.subject.sendMessage("title: $title\nurl: $url")
-                sendTg(telegramBotClient, chatId.toString(), url)
+                sendTg(chatId.toString(), url)
             } catch (e: JsonProcessingException) {
                 log.error(e.message, e)
             }
@@ -77,9 +76,9 @@ class AntiMiniAppHandler(private val properties: AntiMiniAppHandlerProperties, p
         return 50
     }
 
-    private fun sendTg(client: TelegramBotClient, chatId: String, url: String) {
+    private fun sendTg(chatId: String, url: String) {
         try {
-            client.execute(
+            ContextHolder.telegramBotClient.execute(
                 SendMessage.builder()
                     .chatId(chatId)
                     .text(url.takeIf { it.isNotEmpty() } ?: " ")

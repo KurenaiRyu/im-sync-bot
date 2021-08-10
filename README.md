@@ -6,7 +6,7 @@ im同步机器人，现主要同步（转发）tg跟qq群。
 
 首先需要准备 [docker](https://docs.docker.com/get-docker/) 以及 [docker-compose](https://docs.docker.com/compose/install/)
 
-把项目源码下载下来解压后，进入根目录
+把 [项目源码](https://github.com/KurenaiRyu/im-sync-bot/releases) 下载下来解压后，进入根目录
 
 1. 复制或修改`config.example.yaml`为`config.yaml`，并根据文件注释进行配置。  
    最简配置：

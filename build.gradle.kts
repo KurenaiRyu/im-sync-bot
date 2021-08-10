@@ -6,6 +6,7 @@ plugins {
     kotlin("jvm") version "1.5.21"
     kotlin("plugin.spring") version "1.5.21"
     kotlin("plugin.allopen") version "1.5.21"
+    kotlin("plugin.noarg") version "1.5.21"
     kotlin("kapt") version "1.5.21"
 
 }
@@ -34,6 +35,7 @@ dependencies {
 
 
     implementation("org.springframework.boot", "spring-boot-starter")
+    implementation("org.springframework.boot", "spring-boot-starter-data-jpa")
     implementation("org.springframework.boot", "spring-boot-gradle-plugin", "2.5.2")
     kapt("org.springframework.boot", "spring-boot-configuration-processor")
 

@@ -5,6 +5,7 @@ import kurenai.mybot.handler.Handler
 import kurenai.mybot.qq.QQBotProperties
 import kurenai.mybot.telegram.ProxyProperties
 import kurenai.mybot.telegram.TelegramBotProperties
+import kurenai.mybot.utils.SnowFlake
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -32,5 +33,10 @@ class BotAutoConfiguration {
         botOptions.proxyHost = proxyProperties.host
         botOptions.proxyPort = proxyProperties.port
         return botOptions
+    }
+
+    @Bean
+    fun snowFlake(): SnowFlake {
+        return SnowFlake(1, 1)
     }
 }

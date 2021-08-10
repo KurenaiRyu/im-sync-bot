@@ -7,8 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kurenai.mybot.ContextHolder
 import kurenai.mybot.HandlerHolder
+import kurenai.mybot.command.Command
 import kurenai.mybot.config.BotProperties
-import kurenai.mybot.handler.config.ForwardHandlerProperties
 import kurenai.mybot.utils.RetryUtil
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
@@ -28,9 +28,9 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 class TelegramBotClient(
     options: DefaultBotOptions,
     private val telegramBotProperties: TelegramBotProperties, //初始化时处理器列表
-    private val forwardProperties: ForwardHandlerProperties,
     private val botProperties: BotProperties,
     private val handlerHolder: HandlerHolder,
+    private val commands: List<Command>
 ) : TelegramLongPollingBot(options) {
 
     private val log = KotlinLogging.logger {}
@@ -63,6 +63,8 @@ class TelegramBotClient(
         } catch (e: JsonProcessingException) {
             log.debug("onUpdateReceived: {}", update)
         }
+
+
         if (botProperties.ban.member.contains(update.message.from.id)) {
             log.debug("Ignore this message by ban member [${update.message.from.id}]")
             return
@@ -72,6 +74,19 @@ class TelegramBotClient(
             return
         }
 
+        if (update.hasMessage()) {
+            val text = update.message.text
+            for (command in commands) {
+                if (command.match(text)) {
+                    if (command.execute(update)) {
+                        break
+                    } else {
+                        return
+                    }
+                }
+            }
+        }
+
 
         if (update.hasMessage() && (update.message.isGroupMessage || update.message.isSuperGroupMessage) ||
             update.hasEditedMessage() && (update.editedMessage.isSuperGroupMessage || update.editedMessage.isGroupMessage)
@@ -79,12 +94,12 @@ class TelegramBotClient(
             val qqBotClient = ContextHolder.qqBotClient!!
             if (update.hasMessage()) {
                 for (handler in handlerHolder.currentHandlerList) {
-                    if (!handler.handleMessage(this@TelegramBotClient, qqBotClient, update, update.message)) break
+                    if (!handler.handleTgMessage(update, update.message)) break
                 }
             } else if (update.hasEditedMessage()) {
                 for (handler in handlerHolder.currentHandlerList) {
                     try {
-                        if (!handler.handleEditMessage(this@TelegramBotClient, qqBotClient, update, update.editedMessage)) break
+                        if (!handler.handleTgEditMessage(update, update.editedMessage)) break
                     } catch (e: Exception) {
                         log.error(e.message, e)
                     }
@@ -94,7 +109,7 @@ class TelegramBotClient(
     }
 
     fun reportError(update: Update, e: Exception) {
-        val chatId = forwardProperties.group.defaultTelegram.toString()
+        val chatId = ContextHolder.defaultTgGroup.toString()
         val messageId = execute(
             ForwardMessage.builder()
                 .fromChatId(update.message.chatId.toString())

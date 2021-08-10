@@ -1,10 +1,9 @@
 package kurenai.mybot.handler.impl
 
 import kurenai.mybot.CacheHolder
+import kurenai.mybot.ContextHolder
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.ForwardHandlerProperties
-import kurenai.mybot.qq.QQBotClient
-import kurenai.mybot.telegram.TelegramBotClient
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.message.data.Image
@@ -32,7 +31,7 @@ class PicSourceHandler(private val forwardProperties: ForwardHandlerProperties) 
     private val cache = kurenai.mybot.cache.Cache<Long, Int>("pic-source")
 
     @Throws(Exception::class)
-    override suspend fun handleQQGroupMessage(client: QQBotClient, telegramBotClient: TelegramBotClient, event: GroupAwareMessageEvent): Boolean {
+    override suspend fun handleQQGroupMessage(event: GroupAwareMessageEvent): Boolean {
         val message = event.message
         val image = when {
             message.contains(Image.Key) -> {
@@ -65,10 +64,13 @@ class PicSourceHandler(private val forwardProperties: ForwardHandlerProperties) 
             event.subject.sendMessage(builder.build())
         }
         if (!matched) return true
-        val chartId = forwardProperties.group.qqTelegram[event.subject.id] ?: forwardProperties.group.defaultTelegram
+        val chartId = forwardProperties.group.qqTelegram[event.subject.id] ?: ContextHolder.defaultTgGroup
         val caption = "[SAUCE\\_NAO](${sauce_nao})\n[ASCII2D](${asscii2d})"
         try {
-            telegramBotClient.execute(SendPhoto.builder().chatId(chartId.toString()).caption(caption).photo(InputFile(url)).parseMode(ParseMode.MARKDOWNV2).build())
+            ContextHolder.telegramBotClient.execute(
+                SendPhoto.builder().chatId(chartId.toString()).caption(caption).photo(InputFile(url)).parseMode(ParseMode.MARKDOWNV2)
+                    .build()
+            )
         } catch (e: Exception) {
             log.debug("caption: $caption")
             log.error(e.message, e)

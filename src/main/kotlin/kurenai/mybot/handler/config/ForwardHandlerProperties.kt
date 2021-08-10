@@ -19,11 +19,11 @@ class ForwardHandlerProperties {
     class Group {
         var defaultQQ: Long = 0
         var defaultTelegram: Long = 0
-        var qqTelegram: Map<Long, Long> = Collections.emptyMap()
-        var telegramQq: Map<Long, Long> = Collections.emptyMap()
+        var qqTelegram: MutableMap<Long, Long> = Collections.emptyMap()
+        var telegramQq: MutableMap<Long, Long> = Collections.emptyMap()
     }
 
     class Member {
-        var bindingName: Map<Long, String> = Collections.emptyMap()
+        var bindingName: MutableMap<Long, String> = Collections.emptyMap()
     }
 }

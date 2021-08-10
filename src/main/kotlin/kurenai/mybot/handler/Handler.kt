@@ -1,6 +1,5 @@
 package kurenai.mybot.handler
 
-import kurenai.mybot.qq.QQBotClient
 import kurenai.mybot.telegram.TelegramBotClient
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.MessageRecallEvent
@@ -14,32 +13,30 @@ interface Handler : Comparable<Handler> {
     }
 
     /**
-     * @param client
-     * @param qqClient
      * @param update
      * @return true 为继续执行，false中断
      */
     @Throws(Exception::class)
-    suspend fun handleMessage(client: TelegramBotClient, qqClient: QQBotClient, update: Update, message: Message): Boolean {
+    suspend fun handleTgMessage(update: Update, message: Message): Boolean {
         return true
     }
 
     @Throws(Exception::class)
-    suspend fun handleEditMessage(client: TelegramBotClient, qqClient: QQBotClient, update: Update, message: Message): Boolean {
+    suspend fun handleTgEditMessage(update: Update, message: Message): Boolean {
         return true
     }
 
-    suspend fun postHandle(client: TelegramBotClient, update: Update, message: Message): Boolean {
+    suspend fun postHandle(update: Update, message: Message): Boolean {
         return true
     }
 
     @Throws(Exception::class)
-    suspend fun handleQQGroupMessage(client: QQBotClient, telegramBotClient: TelegramBotClient, event: GroupAwareMessageEvent): Boolean {
+    suspend fun handleQQGroupMessage(event: GroupAwareMessageEvent): Boolean {
         return true
     }
 
     @Throws(TelegramApiException::class)
-    suspend fun handleRecall(client: QQBotClient, telegramBotClient: TelegramBotClient, event: MessageRecallEvent): Boolean {
+    suspend fun handleQQRecall(event: MessageRecallEvent): Boolean {
         return true
     }
 

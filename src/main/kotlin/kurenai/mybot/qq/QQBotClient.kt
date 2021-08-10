@@ -6,7 +6,6 @@ import kotlinx.coroutines.launch
 import kurenai.mybot.ContextHolder
 import kurenai.mybot.HandlerHolder
 import kurenai.mybot.config.BotProperties
-import kurenai.mybot.handler.config.ForwardHandlerProperties
 import kurenai.mybot.utils.RetryUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
@@ -21,7 +20,6 @@ import javax.annotation.PostConstruct
 @Component
 class QQBotClient(
     private val properties: QQBotProperties,
-    private val forwardProperties: ForwardHandlerProperties,
     private val botProperties: BotProperties,
     private val handlerHolder: HandlerHolder
 ) {
@@ -78,11 +76,11 @@ class QQBotClient(
     suspend fun doHandleMessage(context: QQContext) {
         if (context.event is GroupAwareMessageEvent) {
             RetryUtil.retry(context.event.message.ids[0]) {
-                context.handler?.handleQQGroupMessage(context.qqBotClient, context.telegramBotClient, context.event)
+                context.handler?.handleQQGroupMessage(context.event)
             }
         } else if (context.event is MessageRecallEvent) {
             RetryUtil.retry(context.event.messageIds[0]) {
-                context.handler?.handleRecall(context.qqBotClient, context.telegramBotClient, context.event)
+                context.handler?.handleQQRecall(context.event)
             }
         }
     }
@@ -93,7 +91,7 @@ class QQBotClient(
             val message = event.message
             val sender = event.sender
             val group = event.group
-            val master = bot.getFriend(forwardProperties.masterOfQq)
+            val master = bot.getFriend(ContextHolder.masterOfQQ)
             master?.takeIf { it.id != 0L }?.sendMessage(
                 master.sendMessage(message).quote()
                     .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
