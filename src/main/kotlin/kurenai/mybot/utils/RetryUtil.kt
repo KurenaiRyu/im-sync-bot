@@ -15,6 +15,7 @@ object RetryUtil {
         return try {
             callable.call()
         } catch (e: Exception) {
+            log.error(e.message, e)
             doRetry(callable, 1, id)
         }
     }
@@ -29,6 +30,7 @@ object RetryUtil {
             return callable.call()
         } catch (e: Exception) {
             if (MAX_TIMES >= times) {
+                log.error(e.message, e)
                 doRetry(callable, times + 1, id)
             } else {
                 log.error("Retry over $times time(s)")

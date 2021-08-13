@@ -74,14 +74,27 @@ class TelegramBotClient(
             return
         }
 
-        if (update.hasMessage()) {
+        if (update.hasMessage() && update.message.isCommand) {
             val text = update.message.text
-            for (command in commands) {
-                if (command.match(text)) {
-                    if (command.execute(update)) {
-                        break
-                    } else {
-                        return
+            if (text.startsWith("/help") && update.message.isUserMessage) {
+                val sb = StringBuilder("Command list")
+                for (command in commands) {
+                    sb.append("\n----------------\n")
+                    sb.append("${command.getName()}\n")
+                    sb.append(command.getHelp())
+                }
+                execute(
+                    SendMessage.builder().chatId(update.message.chatId.toString()).replyToMessageId(update.message.messageId)
+                        .text(sb.toString()).build()
+                )
+            } else {
+                for (command in commands) {
+                    if (command.match(text)) {
+                        if (command.execute(update)) {
+                            break
+                        } else {
+                            return
+                        }
                     }
                 }
             }

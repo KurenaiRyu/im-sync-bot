@@ -13,4 +13,9 @@ interface Command {
 
     fun getHelp(): String
 
+    fun getName(): String {
+        return this.javaClass.simpleName
+    }
+
+
 }

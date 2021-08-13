@@ -20,7 +20,7 @@ open class DelayItem<T> : Delayed {
     val item: T
 
     constructor(submit: T, timeout: Long) {
-        time = now() + timeout
+        time = now() + timeout * 1000000
         item = submit
         sequenceNumber = sequencer.getAndIncrement()
     }

@@ -4,7 +4,6 @@ import kurenai.mybot.ContextHolder
 import kurenai.mybot.command.Command
 import kurenai.mybot.domain.BindingGroup
 import kurenai.mybot.repository.BindingGroupRepository
-import kurenai.mybot.utils.TelegramUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.MessageEvent
 import org.springframework.stereotype.Component
@@ -12,19 +11,25 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import org.telegram.telegrambots.meta.api.objects.Update
 
 @Component
-class BindingGroupCommand(
+class BindGroupCommand(
     private val repository: BindingGroupRepository,
 ) : Command {
 
     private val log = KotlinLogging.logger {}
 
     override fun execute(update: Update): Boolean {
+        if (update.message.from.id != ContextHolder.masterOfTg) {
+            ContextHolder.telegramBotClient.execute(
+                SendMessage.builder().chatId(update.message.chatId.toString()).text("Only for master.")
+                    .replyToMessageId(update.message.messageId).build()
+            )
+        }
+
         val rec = doExec(update.message.text)
         if (rec.isNotEmpty()) {
             val msg = ContextHolder.telegramBotClient.execute(
                 SendMessage.builder().chatId(update.message.chatId.toString()).text(rec).replyToMessageId(update.message.messageId).build()
             )
-            TelegramUtil.deleteMsg(msg.chatId, msg.messageId, 5000L)
         }
         return false
     }
@@ -35,11 +40,11 @@ class BindingGroupCommand(
     }
 
     override fun match(text: String): Boolean {
-        return text.startsWith("/bindingGroup", true)
+        return text.startsWith("/bindGroup", true)
     }
 
     override fun getHelp(): String {
-        TODO("Not yet implemented")
+        return "/bindGroup 显示当前绑定列表\n/bindGroup <qqGroupId>:<tgGroupId(chatId)> 增加一对绑定关系\n/bindGroup rm <qqGroupId(tgGroupId)> 移除该id关联绑定(可以是qq或者tg)"
     }
 
     private fun doExec(text: String): String {
@@ -67,7 +72,7 @@ class BindingGroupCommand(
                 if (removed != null) "Remove success."
                 else "Not found group."
             } catch (e: Exception) {
-                "Command error.\nexample command: /bindingGroup rm 123456"
+                "Command error.\nexample command: /bindGroup rm 123456"
             }
         } else {
             val split = content.split(":")
@@ -82,7 +87,7 @@ class BindingGroupCommand(
                 }
             }
         }
-        return "Command error.\nexample command: /bindingGroup 123456:654321"
+        return "Command error.\nexample command: /bindGroup 123456:654321"
     }
 
 

@@ -3,7 +3,6 @@ package kurenai.mybot.command.impl
 import kurenai.mybot.ContextHolder
 import kurenai.mybot.command.Command
 import kurenai.mybot.repository.BindingGroupRepository
-import kurenai.mybot.utils.TelegramUtil
 import net.mamoe.mirai.event.events.MessageEvent
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.groupadministration.GetChat
@@ -21,7 +20,6 @@ class GroupCommand(
             val client = ContextHolder.telegramBotClient
             val msg =
                 client.execute(SendMessage.builder().chatId(update.message.chatId.toString()).text(rec).build())
-            TelegramUtil.deleteMsg(msg.chatId, msg.messageId, 5000L)
         }
         return false
     }
@@ -36,7 +34,7 @@ class GroupCommand(
     }
 
     override fun getHelp(): String {
-        TODO("Not yet implemented")
+        return "/group <id> 显示qq或者tg群信息(该bot已加入的)"
     }
 
     private fun doExec(text: String): String {

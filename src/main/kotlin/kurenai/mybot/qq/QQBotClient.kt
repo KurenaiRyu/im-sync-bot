@@ -6,15 +6,19 @@ import kotlinx.coroutines.launch
 import kurenai.mybot.ContextHolder
 import kurenai.mybot.HandlerHolder
 import kurenai.mybot.config.BotProperties
+import kurenai.mybot.utils.BotUtil
 import kurenai.mybot.utils.RetryUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
+import net.mamoe.mirai.event.events.BotEvent
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
+import net.mamoe.mirai.event.events.GroupEvent
 import net.mamoe.mirai.event.events.MessageRecallEvent
 import net.mamoe.mirai.message.data.ids
 import org.springframework.stereotype.Component
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import javax.annotation.PostConstruct
 
 @Component
@@ -41,20 +45,25 @@ class QQBotClient(
             ContextHolder.qqBotClient = this@QQBotClient
             val filter = bot.eventChannel.filter { event ->
 
-                if (event is GroupAwareMessageEvent) {
-                    val groupId = event.group.id
-                    return@filter properties.filter.group.takeIf { it.isNotEmpty() }?.contains(groupId) ?: true
-                            && !botProperties.ban.group.contains(groupId)
-                            && !botProperties.ban.member.contains(event.sender.id)
-                } else if (event is MessageRecallEvent) {
-                    return@filter true
+                return@filter when (event) {
+                    is GroupAwareMessageEvent -> {
+                        val groupId = event.group.id
+                        properties.filter.group.takeIf { it.isNotEmpty() }?.contains(groupId) != false
+                                && !botProperties.ban.group.contains(groupId)
+                                && !botProperties.ban.member.contains(event.sender.id)
+                    }
+                    is MessageRecallEvent -> {
+                        true
+                    }
+                    else -> {
+                        sendTgMsgString(event)
+                        false
+                    }
                 }
-
-                return@filter false
             }
 
             filter.subscribeAlways<Event> {
-                doHandle(QQContext(this@QQBotClient, ContextHolder.telegramBotClient!!, it))
+                doHandle(QQContext(this@QQBotClient, ContextHolder.telegramBotClient, it))
             }
             bot.join()
         }
@@ -95,6 +104,19 @@ class QQBotClient(
             master?.takeIf { it.id != 0L }?.sendMessage(
                 master.sendMessage(message).quote()
                     .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
+            )
+            ContextHolder.telegramBotClient.execute(
+                SendMessage.builder().chatId(BotUtil.getQQGroupByTg(event.group.id).toString()).text(event.message.contentToString())
+                    .build()
+            )
+        }
+    }
+
+    private fun sendTgMsgString(event: BotEvent) {
+        if (event is GroupEvent) {
+            ContextHolder.telegramBotClient.execute(
+                SendMessage.builder().text(event.toString())
+                    .chatId(BotUtil.getQQGroupByTg(event.group.id).toString()).build()
             )
         }
     }
