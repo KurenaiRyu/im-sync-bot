@@ -1,9 +1,11 @@
 package kurenai.mybot.utils
 
-import kotlinx.coroutines.runBlocking
 import kurenai.mybot.cache.DelayItem
 import mu.KotlinLogging
 import java.util.concurrent.DelayQueue
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.Condition
+import java.util.concurrent.locks.ReentrantLock
 
 private val log = KotlinLogging.logger {}
 
@@ -17,8 +19,8 @@ object RetryUtil {
         daemonThread.start()
     }
 
-    private const val MAX_TIMES = 5
-    private val delayQueue = DelayQueue<DelayItem<RetryItem<*>>>()
+    private const val MAX_TIMES = 4
+    private val delayQueue = DelayQueue<DelayItem<Condition>>()
 
     @Throws(Exception::class)
     suspend fun <T> aware(callable: SuspendCallable<T>, consumer: SuspendConsumer<T?, Throwable?>) {
@@ -26,45 +28,49 @@ object RetryUtil {
             val result = callable.call()
             consumer.accept(result, null)
         } catch (e: Exception) {
-            delayQueue.add(DelayItem(RetryItem(callable, consumer), getDelayTime(1)))
+            val lock = ReentrantLock()
+            val cond = lock.newCondition()
+            delayQueue.add(DelayItem(cond, getDelayTime(1)))
+            doRetry(callable, consumer, lock, cond)
             log.error(e.message, e)
+        }
+    }
+
+    private suspend fun <T> doRetry(
+        callable: SuspendCallable<T>,
+        consumer: SuspendConsumer<T?, Throwable?>,
+        lock: ReentrantLock,
+        cond: Condition,
+        count: Int = 0
+    ) {
+        lock.lock()
+        try {
+            cond.await(getDelayTime(10) + 5000L, TimeUnit.MILLISECONDS)
+            val result = callable.call()
+            consumer.accept(result, null)
+        } catch (e: Exception) {
+            log.error("retry fail.", e)
+            val nextCount = count + 1
+            if (MAX_TIMES >= nextCount) {
+                delayQueue.add(DelayItem(cond, getDelayTime(nextCount)))
+                doRetry(callable, consumer, lock, cond, nextCount)
+            } else {
+                log.error("Retry over $MAX_TIMES times. Discard.", e)
+                consumer.accept(null, e)
+            }
+        } finally {
+            lock.unlock()
         }
     }
 
     private fun retryDaemon() {
         log.info("Retry daemon started.")
-        var item: RetryItem<*>? = null
         while (true) {
             try {
-                item = delayQueue.take().item
-                runBlocking {
-                    try {
-                        item.callable.call()
-                    } catch (e: Exception) {
-                        if (item.count <= MAX_TIMES) {
-                            item.count++
-                            delayQueue.add(DelayItem(item, getDelayTime(item.count)))
-                        } else {
-                            runBlocking {
-                                item.consumer.accept(null, e)
-                            }
-                        }
-                    }
-                }
+                delayQueue.take().item.signal()
             } catch (e: InterruptedException) {
-                log.error("retry fail.", e)
-                if (item != null) {
-                    if (item.count <= MAX_TIMES) {
-                        item.count++
-                        delayQueue.add(DelayItem(item, getDelayTime(item.count)))
-                    } else {
-                        runBlocking {
-                            item.consumer.accept(null, e)
-                        }
-                    }
-                } else {
-                    break
-                }
+                log.error("Retry fail.", e)
+                break
             }
         }
         log.info("Retry daemon stopped.")
@@ -94,9 +100,5 @@ object RetryUtil {
     @FunctionalInterface
     fun interface SuspendConsumer<T, U> {
         suspend fun accept(t: T, u: U)
-    }
-
-    class RetryItem<T>(val callable: SuspendCallable<T>, val consumer: SuspendConsumer<T?, Throwable?>) {
-        var count: Int = 0
     }
 }
