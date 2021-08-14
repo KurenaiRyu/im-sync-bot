@@ -48,6 +48,7 @@ dependencies {
     implementation("com.fasterxml.jackson.dataformat", "jackson-dataformat-xml")
     implementation("org.apache.commons", "commons-lang3")
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
+    runtimeOnly("com.h2database:h2")
 
 //    testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
