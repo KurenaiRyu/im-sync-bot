@@ -3,6 +3,7 @@ package kurenai.mybot.qq
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kurenai.mybot.BotConstant
 import kurenai.mybot.ContextHolder
 import kurenai.mybot.HandlerHolder
 import kurenai.mybot.config.BotProperties
@@ -16,9 +17,9 @@ import net.mamoe.mirai.event.events.BotEvent
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.GroupEvent
 import net.mamoe.mirai.event.events.MessageRecallEvent
-import net.mamoe.mirai.message.data.ids
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
+import java.io.File
 import javax.annotation.PostConstruct
 
 @Component
@@ -33,7 +34,8 @@ class QQBotClient(
     val bot = BotFactory.newBot(properties.account, properties.password) {
         fileBasedDeviceInfo() // 使用 device.json 存储设备信息
         protocol = properties.protocol // 切换协议
-        redirectBotLogToDirectory()
+        highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
+        redirectNetworkLogToFile(File(BotConstant.LOG_FILE_PATH))
     }
 
 
@@ -72,29 +74,22 @@ class QQBotClient(
     private suspend fun doHandle(context: QQContext) {
         for (handler in handlerHolder.currentHandlerList) {
             context.handler = handler
-            try {
-                doHandleMessage(context)
-            } catch (e: Exception) {
-                log.error(e.message, e)
-                reportError(context, e)
-            }
+            RetryUtil.aware({ doHandleMessage(context) }, { _, e ->
+                e?.let { reportError(context, it) }
+            })
         }
     }
 
     @Throws(Exception::class)
     suspend fun doHandleMessage(context: QQContext) {
         if (context.event is GroupAwareMessageEvent) {
-            RetryUtil.retry(context.event.message.ids[0]) {
-                context.handler?.handleQQGroupMessage(context.event)
-            }
+            context.handler?.handleQQGroupMessage(context.event)
         } else if (context.event is MessageRecallEvent) {
-            RetryUtil.retry(context.event.messageIds[0]) {
-                context.handler?.handleQQRecall(context.event)
-            }
+            context.handler?.handleQQRecall(context.event)
         }
     }
 
-    suspend fun reportError(context: QQContext, e: Exception) {
+    suspend fun reportError(context: QQContext, e: Throwable) {
         val event = context.event
         if (event is GroupAwareMessageEvent) {
             val message = event.message

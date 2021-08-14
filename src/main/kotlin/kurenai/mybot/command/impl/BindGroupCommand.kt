@@ -27,7 +27,7 @@ class BindGroupCommand(
 
         val rec = doExec(update.message.text)
         if (rec.isNotEmpty()) {
-            val msg = ContextHolder.telegramBotClient.execute(
+            ContextHolder.telegramBotClient.execute(
                 SendMessage.builder().chatId(update.message.chatId.toString()).text(rec).replyToMessageId(update.message.messageId).build()
             )
         }

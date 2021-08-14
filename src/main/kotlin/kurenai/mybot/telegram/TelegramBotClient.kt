@@ -46,13 +46,12 @@ class TelegramBotClient(
 
     override fun onUpdatesReceived(updates: MutableList<Update>) {
         CoroutineScope(Dispatchers.Default).launch {
-            updates.forEach {
-                try {
-                    RetryUtil.retry(it.message.messageId) { onUpdateReceivedSuspend(it) }
-                } catch (e: Exception) {
-                    log.error(e.message, e)
-                    reportError(it, e)
-                }
+            updates.forEach { update ->
+                RetryUtil.aware({ onUpdateReceivedSuspend(update) }, { _, e ->
+                    e?.let {
+                        reportError(update, e)
+                    }
+                })
             }
         }
     }
@@ -104,7 +103,6 @@ class TelegramBotClient(
         if (update.hasMessage() && (update.message.isGroupMessage || update.message.isSuperGroupMessage) ||
             update.hasEditedMessage() && (update.editedMessage.isSuperGroupMessage || update.editedMessage.isGroupMessage)
         ) {
-            val qqBotClient = ContextHolder.qqBotClient!!
             if (update.hasMessage()) {
                 for (handler in handlerHolder.currentHandlerList) {
                     if (!handler.handleTgMessage(update, update.message)) break
@@ -121,7 +119,7 @@ class TelegramBotClient(
         }
     }
 
-    fun reportError(update: Update, e: Exception) {
+    fun reportError(update: Update, e: Throwable) {
         val chatId = ContextHolder.defaultTgGroup.toString()
         val messageId = execute(
             ForwardMessage.builder()
@@ -153,12 +151,11 @@ class TelegramBotClient(
 
     override fun onUpdateReceived(update: Update) {
         CoroutineScope(Dispatchers.Default).launch {
-            try {
-                RetryUtil.retry(update.message.messageId) { onUpdateReceivedSuspend(update) }
-            } catch (e: Exception) {
-                log.error(e.message, e)
-                reportError(update, e)
-            }
+            RetryUtil.aware({ onUpdateReceivedSuspend(update) }, { _, e ->
+                e?.let {
+                    reportError(update, e)
+                }
+            })
         }
     }
 }

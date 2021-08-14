@@ -18,8 +18,7 @@ class GroupCommand(
         val rec = doExec(update.message.text)
         if (rec.isNotEmpty()) {
             val client = ContextHolder.telegramBotClient
-            val msg =
-                client.execute(SendMessage.builder().chatId(update.message.chatId.toString()).text(rec).build())
+            client.execute(SendMessage.builder().chatId(update.message.chatId.toString()).text(rec).build())
         }
         return false
     }

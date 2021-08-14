@@ -23,6 +23,5 @@ object CacheHolder {
         TG_QQ_MSG_ID_CACHE.put(tgMsgId, qqMsgId, 7, TimeUnit.DAYS)
         QQ_MSG_CACHE.put(qqMsgId, source, 7, TimeUnit.DAYS)
         TG_MSG_CACHE.put(tgMsgId, message, 7, TimeUnit.DAYS)
-        log.debug("cache $qqMsgId - $tgMsgId")
     }
 }
