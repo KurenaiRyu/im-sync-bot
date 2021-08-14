@@ -120,7 +120,7 @@ class TelegramBotClient(
     }
 
     fun reportError(update: Update, e: Throwable) {
-        val chatId = ContextHolder.defaultTgGroup.toString()
+        val chatId = ContextHolder.masterChatId.takeIf { it != 0L }?.toString() ?: ContextHolder.defaultTgGroup.toString()
         val messageId = execute(
             ForwardMessage.builder()
                 .fromChatId(update.message.chatId.toString())
