@@ -2,6 +2,6 @@ package kurenai.mybot
 
 object BotConstant {
 
-    const val LOG_FILE_PATH = "./logs/im-sync.log"
+    const val LOG_FILE_PATH = "./logs/im-sync-bot.log"
 
 }

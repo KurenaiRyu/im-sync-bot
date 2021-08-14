@@ -48,7 +48,7 @@ class BindGroupCommand(
     }
 
     private fun doExec(text: String): String {
-        val content = text.substring(13).trim()
+        val content = text.substring(10).trim()
         if (content.isEmpty()) {
             val sb = StringBuilder("qq-telegram group binding list\n----------------------")
             ContextHolder.qqTgBinding.forEach {
