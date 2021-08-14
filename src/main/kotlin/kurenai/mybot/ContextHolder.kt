@@ -12,4 +12,5 @@ object ContextHolder {
     var defaultTgGroup: Long = 0L
     var masterOfQQ: Long = 0L
     var masterOfTg: Long = 0L
+    var masterChatId: Long = 0L
 }
