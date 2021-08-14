@@ -6,7 +6,6 @@ import kurenai.mybot.CacheHolder
 import kurenai.mybot.ContextHolder
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.ForwardHandlerProperties
-import kurenai.mybot.telegram.TelegramBotClient
 import kurenai.mybot.utils.HttpUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.*
@@ -78,14 +77,14 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 val builder = MessageChainBuilder()
                 formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 val voice = message.voice
-                val file = getFile(client, voice.fileId, voice.fileUniqueId)
+                val file = getFile(voice.fileId, voice.fileUniqueId)
                 uploadAndSend(message, group, senderName, builder, file)
             }
             message.hasVideo() -> {
                 val builder = MessageChainBuilder()
                 formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 val video = message.video
-                val file = getFile(client, video.fileId, video.fileUniqueId)
+                val file = getFile(video.fileId, video.fileUniqueId)
                 uploadAndSend(message, group, senderName, builder, file)
             }
             message.hasDocument() -> {
@@ -97,10 +96,10 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                     )
                 ) {
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
-                    getImage(client, group, document.fileId, document.fileUniqueId)?.let(builder::add)
+                    getImage(group, document.fileId, document.fileUniqueId)?.let(builder::add)
                     CacheHolder.cache(group.sendMessage(builder.build()).source, message)
                 } else {
-                    val file = getFile(client, document.fileId, document.fileUniqueId)
+                    val file = getFile(document.fileId, document.fileUniqueId)
                     uploadAndSend(message, group, senderName, builder, file)
                 }
             }
@@ -108,7 +107,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 val builder = MessageChainBuilder()
                 formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 val animation = message.animation
-                val file = getFile(client, animation.fileId, animation.fileUniqueId)
+                val file = getFile(animation.fileId, animation.fileUniqueId)
                 uploadAndSend(message, group, senderName, builder, file)
             }
             message.hasSticker() -> {
@@ -119,7 +118,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                     CacheHolder.cache(group.sendMessage(builder.build()).source, message)
                 } else {
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
-                    getImage(client, group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
+                    getImage(group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
                     CacheHolder.cache(group.sendMessage(builder.build()).source, message)
                 }
             }
@@ -127,7 +126,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 val builder = MessageChainBuilder()
                 message.photo.groupBy { it.fileId.substring(0, 40) }
                     .mapNotNull { (_: String, photoSizes: List<PhotoSize>) -> photoSizes.maxByOrNull { it.fileSize } }
-                    .mapNotNull { getImage(client, group, it.fileId, it.fileUniqueId) }.forEach(builder::add)
+                    .mapNotNull { getImage(group, it.fileId, it.fileUniqueId) }.forEach(builder::add)
                 formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 CacheHolder.cache(group.sendMessage(builder.build()).source, message)
             }
@@ -269,7 +268,13 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
             val medias = messageChain.filterIsInstance<Image>()
                 .map { image ->
                     val url = image.queryUrl()
-                    InputMediaPhoto.builder().media(url).mediaName(image.imageId)
+                    val file = File(getImagePath(image.imageId))
+                    if (!file.exists() || !file.isFile) {
+                        withContext(Dispatchers.IO) {
+                            FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+                        }
+                    }
+                    InputMediaPhoto.builder().media(url).newMediaFile(file).isNewMedia(true).mediaName(image.imageId)
                         .build()
                 }
             if (medias.isNotEmpty()) {
@@ -288,6 +293,13 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         } else if (count == 1) {
             messageChain[Image.Key]?.let { image ->
                 val url: String = image.queryUrl()
+                val file = File(getImagePath(image.imageId))
+                if (!file.exists() || !file.isFile) {
+                    withContext(Dispatchers.IO) {
+                        FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+                    }
+                }
+                val inputFile = InputFile(file)
                 if (image.imageId.endsWith(".gif")) {
                     val builder = SendAnimation.builder()
                     replyId?.let(builder::replyToMessageId)
@@ -295,21 +307,15 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                         builder
                             .chatId(chatId)
                             .caption(msg)
-                            .animation(InputFile(url))
+                            .animation(inputFile)
                             .build()
                     )
                 } else {
-                    val file = File(getImagePath(image.imageId))
-                    if (!file.exists() || !file.isFile) {
-                        withContext(Dispatchers.IO) {
-                            FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
-                        }
-                    }
                     if (file.length() > picToFileSize) {
                         val builder = SendDocument.builder()
                         replyId?.let(builder::replyToMessageId)
                         client.execute(
-                            builder.caption(msg).chatId(chatId).document(InputFile(file)).thumb(InputFile(url)).build()
+                            builder.caption(msg).chatId(chatId).document(inputFile).thumb(inputFile).build()
                         )
                     } else {
                         val builder = SendPhoto.builder()
@@ -425,9 +431,9 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         return 100
     }
 
-    private fun getFile(client: TelegramBotClient, fileId: String, fileUniqueId: String): org.telegram.telegrambots.meta.api.objects.File {
+    private fun getFile(fileId: String, fileUniqueId: String): org.telegram.telegrambots.meta.api.objects.File {
         try {
-            return client.execute(GetFile.builder().fileId(fileId).build())
+            return ContextHolder.telegramBotClient.execute(GetFile.builder().fileId(fileId).build())
         } catch (e: TelegramApiException) {
             log.error(e.message, e)
         }
@@ -438,8 +444,9 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
     }
 
     @Throws(TelegramApiException::class, IOException::class)
-    private suspend fun getImage(client: TelegramBotClient, group: Group, fileId: String, fileUniqueId: String): Image? {
-        val file = getFile(client, fileId, fileUniqueId)
+    private suspend fun getImage(group: Group, fileId: String, fileUniqueId: String): Image? {
+        val client = ContextHolder.telegramBotClient
+        val file = getFile(fileId, fileUniqueId)
         val suffix = getSuffix(file.filePath)
         var image = File(file.filePath)
         if (!image.exists() || !image.isFile) {

@@ -8,4 +8,8 @@ object BotUtil {
         return ContextHolder.tgQQBinding[id] ?: ContextHolder.defaultQQGroup
     }
 
+    fun getTgChatByQQ(id: Long): Long {
+        return ContextHolder.qqTgBinding[id] ?: ContextHolder.defaultTgGroup
+    }
+
 }

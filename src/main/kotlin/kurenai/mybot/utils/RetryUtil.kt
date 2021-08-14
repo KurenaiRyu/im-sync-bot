@@ -49,7 +49,7 @@ object RetryUtil {
             val result = callable.call()
             consumer.accept(result, null)
         } catch (e: Exception) {
-            log.error("retry fail.", e)
+            log.error("Retry fail $count time(s).", e)
             val nextCount = count + 1
             if (MAX_TIMES >= nextCount) {
                 delayQueue.add(DelayItem(cond, getDelayTime(nextCount)))
@@ -69,7 +69,7 @@ object RetryUtil {
             try {
                 delayQueue.take().item.signal()
             } catch (e: InterruptedException) {
-                log.error("Retry fail.", e)
+                log.error("Retry daemon run fail.", e)
                 break
             }
         }

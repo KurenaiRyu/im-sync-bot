@@ -101,7 +101,7 @@ class QQBotClient(
                     .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
             )
             ContextHolder.telegramBotClient.execute(
-                SendMessage.builder().chatId(BotUtil.getQQGroupByTg(event.group.id).toString()).text(event.message.contentToString())
+                SendMessage.builder().chatId(BotUtil.getTgChatByQQ(event.group.id).toString()).text(event.message.contentToString())
                     .build()
             )
         }
@@ -111,7 +111,7 @@ class QQBotClient(
         if (event is GroupEvent) {
             ContextHolder.telegramBotClient.execute(
                 SendMessage.builder().text(event.toString())
-                    .chatId(BotUtil.getQQGroupByTg(event.group.id).toString()).build()
+                    .chatId(BotUtil.getTgChatByQQ(event.group.id).toString()).build()
             )
         }
     }
