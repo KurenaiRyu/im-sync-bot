@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.stereotype.Repository
 
 @Repository
-interface BotConfigRepository : JpaRepository<BotConfig, Long> {
+interface BotConfigRepository : JpaRepository<BotConfig, String> {
 
     fun getByKey(key: String): BotConfig
 

@@ -6,6 +6,7 @@ import kurenai.mybot.command.Command
 import kurenai.mybot.domain.BotConfig
 import kurenai.mybot.repository.BotConfigRepository
 import org.springframework.stereotype.Component
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import org.telegram.telegrambots.meta.api.objects.Update
 
 @Component
@@ -15,7 +16,13 @@ class StartCommand(val botConfigRepository: BotConfigRepository) : Command {
         if (update.hasMessage()) {
             val message = update.message
             if (message.isUserMessage && message.from.id == ContextHolder.masterOfTg) {
-                botConfigRepository.save(BotConfig(BotConfigConstant.MASTER_CHAT_ID, message.chatId.toString()))
+                val chatId = message.chatId.toString()
+                botConfigRepository.save(BotConfig(BotConfigConstant.MASTER_CHAT_ID, chatId))
+                ContextHolder.masterChatId = message.chatId
+                ContextHolder.telegramBotClient.execute(
+                    SendMessage.builder().chatId(chatId)
+                        .text("Hello, my master! \n\n现已记录主人的聊天id，之后tg上的错误将会转发至这个私聊当中。\n另外可以使用 /help 查看各个命令的帮助。").build()
+                )
             }
         }
         return false

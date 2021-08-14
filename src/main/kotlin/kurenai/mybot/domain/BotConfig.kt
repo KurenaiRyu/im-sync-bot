@@ -1,12 +1,13 @@
 package kurenai.mybot.domain
 
-import javax.persistence.*
+import javax.persistence.Column
+import javax.persistence.Entity
+import javax.persistence.Id
 
 @Entity
 class BotConfig {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
     var key: String = ""
         set(value) {
             assert(value.isNotBlank())
