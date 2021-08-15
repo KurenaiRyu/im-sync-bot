@@ -7,6 +7,4 @@ import org.springframework.stereotype.Repository
 @Repository
 interface BotConfigRepository : JpaRepository<BotConfig, String> {
 
-    fun getByKey(key: String): BotConfig
-
 }

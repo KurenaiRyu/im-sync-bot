@@ -10,8 +10,10 @@ class BotInitializer(
 ) : InitializingBean {
 
     override fun afterPropertiesSet() {
-        botConfigRepository.getByKey(BotConfigConstant.MASTER_CHAT_ID).value.takeIf { it.isNotBlank() }?.let {
-            ContextHolder.masterChatId = it.toLong()
+        if (botConfigRepository.existsById(BotConfigConstant.MASTER_CHAT_ID)) {
+            botConfigRepository.getById(BotConfigConstant.MASTER_CHAT_ID).value.takeIf { it.isNotBlank() }?.let {
+                ContextHolder.masterChatId = it.toLong()
+            }
         }
     }
 }

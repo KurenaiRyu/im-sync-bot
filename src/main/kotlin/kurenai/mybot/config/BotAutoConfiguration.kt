@@ -3,6 +3,7 @@ package kurenai.mybot.config
 import kurenai.mybot.HandlerHolder
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.qq.QQBotProperties
+import kurenai.mybot.repository.BotConfigRepository
 import kurenai.mybot.telegram.ProxyProperties
 import kurenai.mybot.telegram.TelegramBotProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -33,4 +34,10 @@ class BotAutoConfiguration {
         botOptions.proxyPort = proxyProperties.port
         return botOptions
     }
+
+    @Bean
+    fun botInitializer(botConfigRepository: BotConfigRepository): BotInitializer {
+        return BotInitializer(botConfigRepository)
+    }
+
 }
