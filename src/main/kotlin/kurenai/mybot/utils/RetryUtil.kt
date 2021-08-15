@@ -41,7 +41,7 @@ object RetryUtil {
         consumer: SuspendConsumer<T?, Throwable?>,
         lock: ReentrantLock,
         cond: Condition,
-        count: Int = 0
+        count: Int = 1
     ) {
         lock.lock()
         try {
