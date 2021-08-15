@@ -1,6 +1,5 @@
 package kurenai.mybot.telegram
 
-import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,12 +56,7 @@ class TelegramBotClient(
     }
 
     suspend fun onUpdateReceivedSuspend(update: Update) {
-        try {
-            log.debug("onUpdateReceived: {}", mapper.writeValueAsString(update))
-        } catch (e: JsonProcessingException) {
-            log.debug("onUpdateReceived: {}", update)
-        }
-
+        log.debug("onUpdateReceived: {}", update)
 
         if (botProperties.ban.member.contains(update.message.from.id)) {
             log.debug("Ignore this message by ban member [${update.message.from.id}]")
@@ -120,15 +114,20 @@ class TelegramBotClient(
     }
 
     fun reportError(update: Update, e: Throwable) {
-        val chatId = ContextHolder.masterChatId.takeIf { it != 0L }?.toString() ?: ContextHolder.defaultTgGroup.toString()
-        val messageId = execute(
-            ForwardMessage.builder()
-                .fromChatId(update.message.chatId.toString())
-                .messageId(update.message.messageId)
-                .chatId(chatId)
-                .build()
-        ).messageId
-        execute(SendMessage.builder().chatId(chatId).text("#ForwardError 转发失败: ${e.message}").replyToMessageId(messageId).build())
+        ContextHolder.masterChatId.takeIf { it != 0L }?.let {
+            val chatId = it.toString()
+            val messageId = execute(
+                ForwardMessage.builder()
+                    .fromChatId(update.message.chatId.toString())
+                    .messageId(update.message.messageId)
+                    .chatId(chatId)
+                    .build()
+            ).messageId
+            execute(
+                SendMessage.builder().chatId(chatId).text("#ForwardError 转发失败: ${e.message} \n\n$update").replyToMessageId(messageId)
+                    .build()
+            )
+        }
     }
 
     override fun onRegister() {
