@@ -51,8 +51,12 @@ class BindGroupCommand(
         val content = text.substring(10).trim()
         if (content.isEmpty()) {
             val sb = StringBuilder("qq-telegram group binding list\n----------------------")
+            val qqBot = ContextHolder.qqBotClient.bot
             ContextHolder.qqTgBinding.forEach {
-                sb.append("\n[${it.key}]\t-\t[${it.value}]")
+                sb.append("\n${it.key} <=> ${it.value}")
+                qqBot.getGroup(it.key)?.let { group ->
+                    sb.append(" #${group.name}")
+                }
             }
             return sb.toString()
         } else if (content.startsWith("rm", true)) {
