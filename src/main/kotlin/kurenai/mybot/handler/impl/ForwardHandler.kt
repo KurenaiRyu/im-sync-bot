@@ -15,6 +15,7 @@ import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
+import net.mamoe.mirai.message.data.Voice
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import org.apache.commons.io.FileUtils
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -320,13 +321,13 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                     } else {
                         val builder = SendPhoto.builder()
                         replyId?.let(builder::replyToMessageId)
-                        client.execute(builder.caption(msg).chatId(chatId).photo(InputFile(url)).build())
+                        client.execute(builder.caption(msg).chatId(chatId).photo(inputFile).build())
                     }
                 }?.let { m ->
                     source?.let { CacheHolder.cache(source, m) }
                 }
             }
-        } else if (messageChain.contains(FileMessage)) {
+        } else if (messageChain.contains(FileMessage.Key)) {
             val downloadInfo = messageChain[FileMessage.Key]!!.toRemoteFile(group)?.getDownloadInfo() ?: return true
             val url: String = downloadInfo.url
             try {
@@ -352,6 +353,17 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 log.error(e.message, e)
             } catch (e: IOException) {
                 log.error(e.message, e)
+            }
+        } else if (messageChain.contains(Voice.Key)) {
+            val voice = messageChain.get(Voice.Key)
+            voice?.url?.let { url ->
+                val file = File(url)
+                if (!file.exists() || !file.isFile) {
+                    withContext(Dispatchers.IO) {
+                        FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+                    }
+                }
+                client.execute(SendVoice.builder().chatId(chatId).voice(InputFile(file)).build())
             }
         } else {
             val builder = SendMessage.builder()
