@@ -17,6 +17,7 @@ import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.message.data.Voice
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
+import net.mamoe.mirai.utils.RemoteFile.Companion.sendFile
 import org.apache.commons.io.FileUtils
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -30,7 +31,6 @@ import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.File
 import java.io.IOException
-import java.io.InputStream
 import java.security.KeyManagementException
 import java.security.KeyStoreException
 import java.security.NoSuchAlgorithmException
@@ -45,7 +45,8 @@ import java.util.concurrent.atomic.AtomicLong
 class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler {
 
     private val log = KotlinLogging.logger {}
-    private val webpCmdPattern: String
+    private val webp2pngCmdPattern: String
+    private val mp42gifCmdPattern: String
 
     private val bindingName: Map<Long, String>
     private val picToFileSize = 500 * 1024
@@ -78,15 +79,32 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 val builder = MessageChainBuilder()
                 formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 val voice = message.voice
-                val file = getFile(voice.fileId, voice.fileUniqueId)
+                val file = getTgFile(voice.fileId, voice.fileUniqueId)
                 uploadAndSend(message, group, senderName, builder, file)
             }
             message.hasVideo() -> {
                 val builder = MessageChainBuilder()
                 formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 val video = message.video
-                val file = getFile(video.fileId, video.fileUniqueId)
-                uploadAndSend(message, group, senderName, builder, file)
+                val file = getTgFile(video.fileId, video.fileUniqueId)
+                uploadAndSend(message, group, senderName, builder, file, video.fileName)
+            }
+            message.hasAnimation() -> {
+                val builder = MessageChainBuilder()
+                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
+                val animation = message.animation
+                val tgFile = getTgFile(animation.fileId, animation.fileUniqueId)
+                mp42gif(animation.fileId, tgFile)?.let { gifFile ->
+                    var ret: Image? = null
+                    try {
+                        gifFile.toExternalResource().use {
+                            builder.add(group.uploadImage(it))
+                            CacheHolder.cache(group.sendMessage(builder.build()).source, message)
+                        }
+                    } catch (e: IOException) {
+                        log.error(e.message, e)
+                    }
+                }
             }
             message.hasDocument() -> {
                 val builder = MessageChainBuilder()
@@ -100,16 +118,9 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                     getImage(group, document.fileId, document.fileUniqueId)?.let(builder::add)
                     CacheHolder.cache(group.sendMessage(builder.build()).source, message)
                 } else {
-                    val file = getFile(document.fileId, document.fileUniqueId)
-                    uploadAndSend(message, group, senderName, builder, file)
+                    val file = getTgFile(document.fileId, document.fileUniqueId)
+                    uploadAndSend(message, group, senderName, builder, file, document.fileName)
                 }
-            }
-            message.hasAnimation() -> {
-                val builder = MessageChainBuilder()
-                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
-                val animation = message.animation
-                val file = getFile(animation.fileId, animation.fileUniqueId)
-                uploadAndSend(message, group, senderName, builder, file)
             }
             message.hasSticker() -> {
                 val builder = MessageChainBuilder()
@@ -183,45 +194,22 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         username: String,
         builder: MessageChainBuilder,
         file: org.telegram.telegrambots.meta.api.objects.File,
+        fileName: String = "${file.fileId.substring(0, 40)}.${getSuffix(file.filePath)}"
     ) {
-        val systemFile = File(file.filePath)
-        if (systemFile.exists() && systemFile.isFile) {
-            builder.add(withContext(Dispatchers.IO) {
-                group.filesRoot.uploadAndSend(systemFile).quote()
-            })
-            builder.add("upload from $username\n\n${message.caption}")
-            CacheHolder.cache(group.sendMessage(builder.build()).source, message)
-        } else {
-            val cacheFile = File("./cache/file/${file.fileId.substring(0, 40)}.${getSuffix(file.filePath)}")
-            if (!uploadFileAndSend(cacheFile, group, message)) {
-                ContextHolder.telegramBotClient.downloadFileAsStream(file).use { inputStream ->
-                    FileUtils.copyInputStreamToFile(inputStream, cacheFile)
-                    if (!uploadFileAndSend(cacheFile, group, message)) {
-                        uploadStreamAndSend(inputStream, group, message)
-                    }
-                }
+        var cacheFile = File(file.filePath)
+        if (!cacheFile.exists() || !cacheFile.isFile) {
+            cacheFile = File("./cache/file/$fileName")
+            if (!cacheFile.exists() || !cacheFile.isFile) {
+                ContextHolder.telegramBotClient.downloadFile(file, cacheFile)
             }
         }
-    }
 
-    private suspend fun uploadFileAndSend(file: File, group: Group, message: Message): Boolean {
-        return if (file.exists() && file.isFile) {
-            withContext(Dispatchers.IO) {
-                file.toExternalResource().use {
-                    CacheHolder.cache(group.filesRoot.uploadAndSend(it).source, message)
-                }
-            }
-            true
-        } else
-            false
-    }
-
-    private suspend fun uploadStreamAndSend(inputStream: InputStream, group: Group, message: Message) {
-        inputStream.use { stream ->
-            stream.toExternalResource().use { resource ->
-                CacheHolder.cache(group.filesRoot.uploadAndSend(resource).source, message)
-            }
-        }
+        builder.add(withContext(Dispatchers.IO) {
+            group.sendFile("/$fileName", cacheFile).quote()
+        })
+        val caption = message.caption?.let { "\n\n$it" } ?: ""
+        builder.add("upload from $username$caption")
+        CacheHolder.cache(group.sendMessage(builder.build()).source, message)
     }
 
     private suspend fun doHandleQQGroupMessage(
@@ -443,7 +431,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         return 100
     }
 
-    private fun getFile(fileId: String, fileUniqueId: String): org.telegram.telegrambots.meta.api.objects.File {
+    private fun getTgFile(fileId: String, fileUniqueId: String): org.telegram.telegrambots.meta.api.objects.File {
         try {
             return ContextHolder.telegramBotClient.execute(GetFile.builder().fileId(fileId).build())
         } catch (e: TelegramApiException) {
@@ -458,7 +446,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
     @Throws(TelegramApiException::class, IOException::class)
     private suspend fun getImage(group: Group, fileId: String, fileUniqueId: String): Image? {
         val client = ContextHolder.telegramBotClient
-        val file = getFile(fileId, fileUniqueId)
+        val file = getTgFile(fileId, fileUniqueId)
         val suffix = getSuffix(file.filePath)
         var image = File(file.filePath)
         if (!image.exists() || !image.isFile) {
@@ -498,7 +486,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         pngFile.parentFile.mkdirs()
         try {
             val future =
-                Runtime.getRuntime().exec(String.format(webpCmdPattern, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
+                Runtime.getRuntime().exec(String.format(webp2pngCmdPattern, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
             if (future.get().exitValue() >= 0 || pngFile.exists()) return pngFile
         } catch (e: IOException) {
             log.error(e.message, e)
@@ -510,8 +498,24 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         return null
     }
 
-    private fun formatContent(msg: String): String {
-        return msg.replace("\\n", "\r\n")
+    private fun mp42gif(id: String, tgFile: org.telegram.telegrambots.meta.api.objects.File): File? {
+        val gifFile = File(getImagePath("$id.gif"))
+        if (gifFile.exists()) return gifFile
+        var mp4File = File(tgFile.filePath)
+        if (!mp4File.exists()) mp4File = ContextHolder.telegramBotClient.downloadFile(tgFile)
+        gifFile.parentFile.mkdirs()
+        try {
+            val future =
+                Runtime.getRuntime().exec(String.format(mp42gifCmdPattern, mp4File.path, gifFile.path).replace("\\", "\\\\")).onExit()
+            if (future.get().exitValue() >= 0 || gifFile.exists()) return gifFile
+        } catch (e: IOException) {
+            log.error(e.message, e)
+        } catch (e: ExecutionException) {
+            log.error(e.message, e)
+        } catch (e: InterruptedException) {
+            log.error(e.message, e)
+        }
+        return null
     }
 
     private fun formatUsername(username: String): String {
@@ -519,12 +523,6 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
             .replace("http://", "", true)
             .replace(".", " .")
             .replace("/", "-")
-    }
-
-    private fun handleLongString(target: String, maxLength: Int): String {
-        return if (target.length > maxLength) {
-            target.substring(0, maxLength) + "..."
-        } else target
     }
 
     private fun getSuffix(path: String?): String {
@@ -568,13 +566,8 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
     }
 
     init {
-        val encoderPath: String =
-            if (System.getProperties().getProperty("os.name").equals("Linux", ignoreCase = true)) {
-                File("./bin/dwebp").path
-            } else {
-                File("./bin/dwebp.exe").path
-            }
-        webpCmdPattern = "$encoderPath %s -o %s"
+        webp2pngCmdPattern = "dwebp %s -o %s"
+        mp42gifCmdPattern = "ffmpeg -i %s %s"
         bindingName = properties.member.bindingName
         if (properties.tgMsgFormat.contains("\$msg")) tgMsgFormat = properties.tgMsgFormat
         if (properties.qqMsgFormat.contains("\$msg")) qqMsgFormat = properties.qqMsgFormat
