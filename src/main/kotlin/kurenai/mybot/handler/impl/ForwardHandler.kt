@@ -56,7 +56,6 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
     // tg 2 qq
     @Throws(Exception::class)
     override suspend fun handleTgMessage(update: Update, message: Message): Boolean {
-        val client = ContextHolder.telegramBotClient
         val chatId = message.chatId
         val bot = ContextHolder.qqBotClient.bot
         val quoteMsgSource =

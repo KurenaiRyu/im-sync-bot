@@ -13,8 +13,8 @@ import mu.KotlinLogging
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.bots.DefaultBotOptions
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
-import org.telegram.telegrambots.meta.api.methods.ForwardMessage
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText
 import org.telegram.telegrambots.meta.api.objects.Update
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 
@@ -56,20 +56,23 @@ class TelegramBotClient(
     }
 
     suspend fun onUpdateReceivedSuspend(update: Update) {
-        log.debug("onUpdateReceived: {}", update)
+        CoroutineScope(Dispatchers.IO).launch {
+            log.debug("onUpdateReceived: {}", mapper.writeValueAsString(update))
+        }
+        val message = update.message ?: update.editedMessage
 
-        if (botProperties.ban.member.contains(update.message.from.id)) {
-            log.debug("Ignore this message by ban member [${update.message.from.id}]")
+        if (botProperties.ban.member.contains(message.from.id)) {
+            log.debug("Ignore this message by ban member [${message.from.id}]")
             return
         }
-        if (botProperties.ban.group.contains(update.message.chatId)) {
-            log.debug("Ignore this message by ban group [${update.message.chatId}]")
+        if (botProperties.ban.group.contains(message.chatId)) {
+            log.debug("Ignore this message by ban group [${message.chatId}]")
             return
         }
 
-        if (update.hasMessage() && update.message.isCommand) {
-            val text = update.message.text
-            if (text.startsWith("/help") && update.message.isUserMessage) {
+        if (update.hasMessage() && message.isCommand) {
+            val text = message.text
+            if (text.startsWith("/help") && message.isUserMessage) {
                 val sb = StringBuilder("Command list")
                 for (command in commands) {
                     sb.append("\n----------------\n")
@@ -77,7 +80,7 @@ class TelegramBotClient(
                     sb.append(command.getHelp())
                 }
                 execute(
-                    SendMessage.builder().chatId(update.message.chatId.toString()).replyToMessageId(update.message.messageId)
+                    SendMessage.builder().chatId(message.chatId.toString()).replyToMessageId(message.messageId)
                         .text(sb.toString()).build()
                 )
             } else {
@@ -94,12 +97,12 @@ class TelegramBotClient(
         }
 
 
-        if (update.hasMessage() && (update.message.isGroupMessage || update.message.isSuperGroupMessage) ||
+        if (update.hasMessage() && (message.isGroupMessage || message.isSuperGroupMessage) ||
             update.hasEditedMessage() && (update.editedMessage.isSuperGroupMessage || update.editedMessage.isGroupMessage)
         ) {
             if (update.hasMessage()) {
                 for (handler in handlerHolder.currentHandlerList) {
-                    if (!handler.handleTgMessage(update, update.message)) break
+                    if (!handler.handleTgMessage(update, message)) break
                 }
             } else if (update.hasEditedMessage()) {
                 for (handler in handlerHolder.currentHandlerList) {
@@ -116,17 +119,11 @@ class TelegramBotClient(
     fun reportError(update: Update, e: Throwable) {
         ContextHolder.masterChatId.takeIf { it != 0L }?.let {
             val chatId = it.toString()
-            val messageId = execute(
-                ForwardMessage.builder()
-                    .fromChatId(update.message.chatId.toString())
-                    .messageId(update.message.messageId)
-                    .chatId(chatId)
-                    .build()
-            ).messageId
-            execute(
-                SendMessage.builder().chatId(chatId).text("#ForwardError 转发失败: ${e.message} \n\n$update").replyToMessageId(messageId)
-                    .build()
-            )
+            val msgChatId = (update.message?.chatId ?: update.editedMessage.chatId).toString().substring(4)
+            val msgId = update.message?.messageId ?: update.editedMessage.messageId
+            val simpleMsg = "#ForwardError 转发失败: ${e.message}\n\nhttps://t.me/c/$msgChatId/$msgId"
+            val recMsgId = execute(SendMessage(chatId, simpleMsg)).messageId
+            execute(EditMessageText.builder().chatId(chatId).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
         }
     }
 
