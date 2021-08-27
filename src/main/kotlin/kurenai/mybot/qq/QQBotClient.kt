@@ -17,34 +17,34 @@ import net.mamoe.mirai.event.events.BotEvent
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.GroupEvent
 import net.mamoe.mirai.event.events.MessageRecallEvent
+import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import java.io.File
-import javax.annotation.PostConstruct
 
 @Component
 class QQBotClient(
     private val properties: QQBotProperties,
     private val botProperties: BotProperties,
-    private val handlerHolder: HandlerHolder
-) {
+    private val handlerHolder: HandlerHolder,
+) : InitializingBean {
 
     private val log = KotlinLogging.logger {}
-
     val bot = BotFactory.newBot(properties.account, properties.password) {
         fileBasedDeviceInfo() // 使用 device.json 存储设备信息
         protocol = properties.protocol // 切换协议
         highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
-        redirectNetworkLogToFile(File(BotConstant.LOG_FILE_PATH))
+        val file = File(BotConstant.LOG_FILE_PATH)
+        redirectBotLogToFile(file)
+        redirectNetworkLogToFile(file)
     }
 
-
-    @PostConstruct
-    fun run() {
+    override fun afterPropertiesSet() {
         CoroutineScope(Dispatchers.Default).launch {
+            log.info("Login qq bot...")
             bot.login()
             log.info("Started qq-bot {}({})", bot.bot.nick, bot.id)
-            ContextHolder.qqBotClient = this@QQBotClient
+            ContextHolder.qqBot = bot
             val filter = bot.eventChannel.filter { event ->
 
                 return@filter when (event) {
@@ -95,7 +95,7 @@ class QQBotClient(
             val message = event.message
             val sender = event.sender
             val group = event.group
-            val master = bot.getFriend(ContextHolder.masterOfQQ)
+            val master = ContextHolder.qqBot.getFriend(ContextHolder.masterOfQQ)
             master?.takeIf { it.id != 0L }?.sendMessage(
                 master.sendMessage(message).quote()
                     .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")

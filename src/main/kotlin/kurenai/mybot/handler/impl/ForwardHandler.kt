@@ -2,10 +2,10 @@ package kurenai.mybot.handler.impl
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kurenai.mybot.CacheHolder
 import kurenai.mybot.ContextHolder
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.ForwardHandlerProperties
+import kurenai.mybot.service.CacheService
 import kurenai.mybot.utils.HttpUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.*
@@ -42,7 +42,7 @@ import java.util.concurrent.atomic.AtomicLong
 @EnableConfigurationProperties(
     ForwardHandlerProperties::class
 )
-class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler {
+class ForwardHandler(properties: ForwardHandlerProperties, private val cacheService: CacheService) : Handler {
 
     private val log = KotlinLogging.logger {}
     private val webp2pngCmdPattern: String
@@ -55,23 +55,22 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
 
     // tg 2 qq
     @Throws(Exception::class)
-    override suspend fun handleTgMessage(update: Update, message: Message): Boolean {
+    override suspend fun handleTgMessage(message: Message): Boolean {
         val chatId = message.chatId
-        val bot = ContextHolder.qqBotClient.bot
+        val bot = ContextHolder.qqBot
         val quoteMsgSource =
             message.replyToMessage?.messageId
-                ?.let(CacheHolder.TG_QQ_MSG_ID_CACHE::get)
-                ?.let(CacheHolder.QQ_MSG_CACHE::get)
+                ?.let { cacheService.getByTg(it) }
         val groupId = quoteMsgSource?.targetId ?: ContextHolder.tgQQBinding.getOrDefault(chatId, ContextHolder.defaultQQGroup)
         if (groupId == 0L) return true
         val group = bot.getGroup(groupId)
-        val senderId = message.from.id
-        val isMaster = senderId == ContextHolder.masterOfTg
-        val senderName = getSenderName(message)
         if (group == null) {
             log.error("QQ group[$groupId] not found.")
             return true
         }
+        val senderId = message.from.id
+        val isMaster = senderId == ContextHolder.masterOfTg
+        val senderName = getSenderName(message)
         val caption = message.caption ?: ""
         when {
             message.hasVoice() -> {
@@ -98,7 +97,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                     try {
                         gifFile.toExternalResource().use {
                             builder.add(group.uploadImage(it))
-                            CacheHolder.cache(group.sendMessage(builder.build()).source, message)
+                            cacheService.cache(group.sendMessage(builder.build()).source, message)
                         }
                     } catch (e: IOException) {
                         log.error(e.message, e)
@@ -115,7 +114,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 ) {
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                     getImage(group, document.fileId, document.fileUniqueId)?.let(builder::add)
-                    CacheHolder.cache(group.sendMessage(builder.build()).source, message)
+                    cacheService.cache(group.sendMessage(builder.build()).source, message)
                 } else {
                     val file = getTgFile(document.fileId, document.fileUniqueId)
                     uploadAndSend(message, group, senderName, builder, file, document.fileName)
@@ -126,11 +125,11 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                 val sticker = message.sticker
                 if (sticker.isAnimated) {
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, sticker.emoji, builder)
-                    CacheHolder.cache(group.sendMessage(builder.build()).source, message)
+                    cacheService.cache(group.sendMessage(builder.build()).source, message)
                 } else {
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                     getImage(group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
-                    CacheHolder.cache(group.sendMessage(builder.build()).source, message)
+                    cacheService.cache(group.sendMessage(builder.build()).source, message)
                 }
             }
             message.hasPhoto() -> {
@@ -139,33 +138,33 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                     .mapNotNull { (_: String, photoSizes: List<PhotoSize>) -> photoSizes.maxByOrNull { it.fileSize } }
                     .mapNotNull { getImage(group, it.fileId, it.fileUniqueId) }.forEach(builder::add)
                 formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
-                CacheHolder.cache(group.sendMessage(builder.build()).source, message)
+                cacheService.cache(group.sendMessage(builder.build()).source, message)
             }
             message.hasText() -> {
                 val builder = MessageChainBuilder()
                 formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, message.text, builder)
-                CacheHolder.cache(group.sendMessage(builder.build()).source, message)
+                cacheService.cache(group.sendMessage(builder.build()).source, message)
             }
         }
         return true
     }
 
     @Throws(Exception::class)
-    override suspend fun handleTgEditMessage(update: Update, message: Message): Boolean {
-        message.messageId?.let(CacheHolder.TG_QQ_MSG_ID_CACHE::get)?.let(CacheHolder.QQ_MSG_CACHE::get)?.recall()
-        return handleTgMessage(update, message)
+    override suspend fun handleTgEditMessage(message: Message): Boolean {
+        message.messageId?.let { cacheService.getByTg(it) ?: cacheService.getOfflineQQ(it) }?.recall()
+        return handleTgMessage(message)
     }
 
 
     // qq 2 tg
     @Throws(Exception::class)
     override suspend fun handleQQGroupMessage(
-        event: GroupAwareMessageEvent
+        event: GroupAwareMessageEvent,
     ): Boolean {
         val group = event.group
         val sender = event.sender
         val senderName = formatUsername(
-            bindingName[sender.id] ?: ContextHolder.qqBotClient.bot.getFriend(sender.id)?.remarkOrNick
+            bindingName[sender.id] ?: ContextHolder.qqBot.getFriend(sender.id)?.remarkOrNick
             ?: (sender as Member).remarkOrNameCardOrNick
         )
         val messageChain = event.message
@@ -193,7 +192,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         username: String,
         builder: MessageChainBuilder,
         file: org.telegram.telegrambots.meta.api.objects.File,
-        fileName: String = "${file.fileId.substring(0, 40)}.${getSuffix(file.filePath)}"
+        fileName: String = "${file.fileId.substring(0, 40)}.${getSuffix(file.filePath)}",
     ) {
         var cacheFile = File(file.filePath)
         if (!cacheFile.exists() || !cacheFile.isFile) {
@@ -208,7 +207,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         })
         val caption = message.caption?.let { "\n\n$it" } ?: ""
         builder.add("upload from $username$caption")
-        CacheHolder.cache(group.sendMessage(builder.build()).source, message)
+        cacheService.cache(group.sendMessage(builder.build()).source, message)
     }
 
     private suspend fun doHandleQQGroupMessage(
@@ -222,13 +221,13 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
 
         val client = ContextHolder.telegramBotClient
         val source = messageChain[OnlineMessageSource.Key]
-        val replyId = messageChain[QuoteReply.Key]?.source?.ids?.get(0)?.let(CacheHolder.QQ_TG_MSG_ID_CACHE::get)
+        val replyId = messageChain[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
         val atAccount = AtomicLong(-100)
         var content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
 
         if (content.startsWith("<?xml version='1.0'") || content.contains("\"app\":")) return true
 
-        val isMaster = ContextHolder.qqBotClient.bot.id == senderId || ContextHolder.masterOfQQ == senderId
+        val isMaster = ContextHolder.qqBot.id == senderId || ContextHolder.masterOfQQ == senderId
 
         if (isMaster && handleChangeQQMsgFormatCmd(content)) {
             val demoContent = "demo msg."
@@ -275,7 +274,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                         .chatId(chatId)
                         .build()
                 ).let { result ->
-                    source?.let { source -> CacheHolder.cache(source, result[0]) }
+                    source?.let { source -> cacheService.cache(source, result[0]) }
                 }
             }
         } else if (count == 1) {
@@ -311,7 +310,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
                         client.execute(builder.caption(msg).chatId(chatId).photo(inputFile).build())
                     }
                 }?.let { m ->
-                    source?.let { CacheHolder.cache(source, m) }
+                    source?.let { cacheService.cache(source, m) }
                 }
             }
         } else if (messageChain.contains(FileMessage.Key)) {
@@ -357,7 +356,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
             replyId?.let(builder::replyToMessageId)
             client.execute(builder.chatId(chatId).text(msg).build())
                 .let { m ->
-                    source?.let { CacheHolder.cache(source, m) }
+                    source?.let { cacheService.cache(source, m) }
                 }
         }
         return true
@@ -375,7 +374,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
 
     @Throws(TelegramApiException::class)
     override suspend fun handleQQRecall(event: MessageRecallEvent): Boolean {
-        val message = CacheHolder.QQ_TG_MSG_ID_CACHE[event.messageIds[0]]?.let(CacheHolder.TG_MSG_CACHE::get)
+        val message = cacheService.getByQQ(event.messageIds[0])
         message?.let {
             ContextHolder.telegramBotClient.execute(
                 DeleteMessage.builder().chatId(it.chatId.toString())
@@ -391,7 +390,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
         msg: ForwardMessage,
         group: Group,
         chatId: String,
-        senderName: String
+        senderName: String,
     ): Boolean {
         for ((senderId, _, forwardSenderName, messageChain) in msg.nodeList) {
             try {
@@ -414,7 +413,7 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
             val target = msg.target
             if (target == atAccount.get()) return "" else atAccount.set(target)
             var name = bindingName[target]
-                ?: ContextHolder.qqBotClient.bot.getFriend(target)?.remarkOrNick
+                ?: ContextHolder.qqBot.getFriend(target)?.remarkOrNick
                 ?: group.getMember(target)?.remarkOrNameCardOrNick?.let { formatUsername(it) }
                 ?: target.toString()
             if (!name.startsWith("@")) {
@@ -529,12 +528,12 @@ class ForwardHandler(private val properties: ForwardHandlerProperties) : Handler
     }
 
     private fun formatMsgAndQuote(
-        quoteMsgSource: OnlineMessageSource?,
+        quoteMsgSource: MessageSource?,
         isMaster: Boolean,
         id: Long,
         username: String,
         content: String,
-        builder: MessageChainBuilder
+        builder: MessageChainBuilder,
     ) {
         quoteMsgSource?.quote()?.let(builder::add)
         if (isMaster || username.isBlank()) {

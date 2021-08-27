@@ -1,7 +1,5 @@
 package kurenai.mybot.cache
 
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import mu.KotlinLogging
 import java.time.LocalDateTime
 import java.util.concurrent.ConcurrentHashMap
@@ -9,15 +7,15 @@ import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.DelayQueue
 import java.util.concurrent.TimeUnit
 
-class Cache<K, V> @JvmOverloads constructor(name: String = "no name", size: Int = 0) {
+class Cache<K, V> @JvmOverloads constructor(name: String = "no name", size: Long = 0L) {
     private val log = KotlinLogging.logger {}
     private val cacheObjMap: ConcurrentMap<K, V> = ConcurrentHashMap()
     private val queue = DelayQueue<DelayItem<Pair<K, V>>>()
-    private fun daemonCheck(name: String, size: Int) {
+    private fun daemonCheck(name: String, size: Long) {
         log.info("$name cache service started.")
         while (true) {
             try {
-                if (size != 0 && queue.size > size) {
+                if (size != 0L && queue.size > size) {
                     val poll = queue.poll()
                     log.debug("$name cache over $size size. poll: ${poll.item.first} - ${poll.item.second}")
                 } else {
@@ -62,8 +60,9 @@ class Cache<K, V> @JvmOverloads constructor(name: String = "no name", size: Int 
     }
 
     init {
-        GlobalScope.launch {
-            daemonCheck(name, size)
-        }
+        val daemonThread = Thread { daemonCheck(name, size) }
+        daemonThread.isDaemon = true
+        daemonThread.name = "$name Daemon"
+        daemonThread.start()
     }
 }

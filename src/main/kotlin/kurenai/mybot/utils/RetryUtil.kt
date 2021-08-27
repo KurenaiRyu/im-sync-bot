@@ -7,7 +7,7 @@ private val log = KotlinLogging.logger {}
 
 object RetryUtil {
 
-    private const val MAX_TIMES = 3
+    private const val MAX_TIMES = 1
 
     @Throws(Exception::class)
     suspend fun <T> aware(callable: SuspendCallable<T>, consumer: SuspendConsumer<T?, Throwable?>) {
@@ -16,7 +16,9 @@ object RetryUtil {
             consumer.accept(result, null)
         } catch (e: Exception) {
             doRetry(callable, consumer)
-            log.error(e.message, e)
+            log.error(e) {
+                e.message
+            }
         }
     }
 
@@ -33,10 +35,10 @@ object RetryUtil {
                 consumer.accept(result, null)
                 isDone = true
             } catch (e: Exception) {
-                log.error("Retry fail $count times. ${e.message}")
+                log.error { "Retry fail $count times. ${e.message}" }
                 count++
                 if (MAX_TIMES < count) {
-                    log.error("Retry over $MAX_TIMES times. Discard.")
+                    log.error { "Retry over $MAX_TIMES times. Discard." }
                     consumer.accept(null, e)
                     isDone = true
                 }

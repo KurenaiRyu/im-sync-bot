@@ -49,7 +49,7 @@ class GroupCommand(
                     "Group not found."
                 }
             } catch (e: Exception) {
-                val group = ContextHolder.qqBotClient.bot.getGroup(content.toLong())
+                val group = ContextHolder.qqBot.getGroup(content.toLong())
                 if (group == null) "Group not found."
                 else "id: ${group.id}\ntitle: ${group.name}"
             }

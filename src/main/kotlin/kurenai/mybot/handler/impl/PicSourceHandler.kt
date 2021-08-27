@@ -1,9 +1,9 @@
 package kurenai.mybot.handler.impl
 
-import kurenai.mybot.CacheHolder
 import kurenai.mybot.ContextHolder
 import kurenai.mybot.handler.Handler
 import kurenai.mybot.handler.config.ForwardHandlerProperties
+import kurenai.mybot.service.CacheService
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.message.data.Image
@@ -25,7 +25,10 @@ import java.util.concurrent.TimeUnit
 @Component
 @EnableConfigurationProperties(ForwardHandlerProperties::class)
 @ConditionalOnProperty(prefix = "bot.handler.pic-source", name = ["enable"], havingValue = "true")
-class PicSourceHandler(private val forwardProperties: ForwardHandlerProperties) : Handler {
+class PicSourceHandler(
+    private val forwardProperties: ForwardHandlerProperties,
+    private val cacheService: CacheService,
+) : Handler {
 
     private val log = KotlinLogging.logger {}
     private val cache = kurenai.mybot.cache.Cache<Long, Int>("pic-source")
@@ -39,7 +42,9 @@ class PicSourceHandler(private val forwardProperties: ForwardHandlerProperties) 
             }
             message.contains(QuoteReply.Key) -> {
                 val quoteReply = message[QuoteReply.Key]!!
-                quoteReply.source.ids[0].let(CacheHolder.QQ_MSG_CACHE::get)?.originalMessage?.get(Image.Key)
+                quoteReply.source.ids[0].let {
+                    cacheService.getQQ(it)
+                }?.originalMessage?.get(Image.Key)
             }
             else -> null
         } ?: return true

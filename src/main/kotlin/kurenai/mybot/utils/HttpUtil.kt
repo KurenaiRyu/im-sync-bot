@@ -11,7 +11,9 @@ import org.apache.http.impl.client.HttpClients
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager
 import org.apache.http.ssl.SSLContextBuilder
 import org.apache.http.util.EntityUtils
+import org.springframework.util.StreamUtils
 import java.io.IOException
+import java.nio.charset.StandardCharsets
 import java.security.KeyManagementException
 import java.security.KeyStoreException
 import java.security.NoSuchAlgorithmException
@@ -28,6 +30,14 @@ object HttpUtil {
         return withContext(Dispatchers.IO) {
             val res = client.execute(RequestBuilder.get(url).build())
             EntityUtils.toByteArray(res.entity)
+        }
+    }
+
+    @Throws(NoSuchAlgorithmException::class, KeyStoreException::class, KeyManagementException::class, IOException::class)
+    suspend fun get(url: String): String {
+        val client = buildClient()
+        return withContext(Dispatchers.IO) {
+            StreamUtils.copyToString(client.execute(RequestBuilder.get(url).build()).entity.content, StandardCharsets.UTF_8)
         }
     }
 

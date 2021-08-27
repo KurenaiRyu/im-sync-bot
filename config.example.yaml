@@ -1,3 +1,16 @@
+spring:
+  jpa:
+    database: h2
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:file:./h2db
+    hikari:
+      auto-commit: true
+  redis:
+    host: ${RDIS_HOST:localhost}
 bot:
   telegram:
     token: 1234567:adgcgasdfadf # tg机器人token
@@ -18,9 +31,13 @@ bot:
   handler:
     forward:
       enable: true  # 开启转发（就算删除也默认开启）
+      master-of-tg: 12345678 #主人 tg id
+      master-of-qq: 87654321 #主人 qq 账号
+      tgMsgFormat: "$name$newline$newline$msg"  #tg消息格式化
+      qqMsgFormat: "$name: $msg" # qq消息格式化
       group:
-        default-qq: 622032041   # 若找不到对应关系默认转发的qq群
-        default-telegram: -529721195 # 若找不到对应关系默认转发的tg组
+        default-qq: 1234567   # 若找不到对应关系默认转发的qq群
+        default-telegram: -9876543 # 若找不到对应关系默认转发的tg组
         qq-telegram:
           # qq-tg对应关系（一对一）
           1234546768: -12345435646
@@ -31,7 +48,7 @@ bot:
           -12345435646: your-binding-name
     anti-mini-app:
       enable: true  # 开启反小程序
-      ignore-group: 284466675
+      ignore-group: 1234567
     pic-source:
       enable: true  # 开启图片搜源
     pixiv:

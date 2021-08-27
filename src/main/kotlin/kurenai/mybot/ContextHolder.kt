@@ -1,10 +1,10 @@
 package kurenai.mybot
 
-import kurenai.mybot.qq.QQBotClient
 import kurenai.mybot.telegram.TelegramBotClient
+import net.mamoe.mirai.Bot
 
 object ContextHolder {
-    lateinit var qqBotClient: QQBotClient
+    lateinit var qqBot: Bot
     lateinit var telegramBotClient: TelegramBotClient
     val qqTgBinding = HashMap<Long, Long>()
     val tgQQBinding = HashMap<Long, Long>()

@@ -6,8 +6,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kurenai.mybot.ContextHolder
 import kurenai.mybot.HandlerHolder
+import kurenai.mybot.callback.Callback
 import kurenai.mybot.command.Command
 import kurenai.mybot.config.BotProperties
+import kurenai.mybot.service.CacheService
 import kurenai.mybot.utils.RetryUtil
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
@@ -16,6 +18,8 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText
 import org.telegram.telegrambots.meta.api.objects.Update
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 
 /**
@@ -29,7 +33,9 @@ class TelegramBotClient(
     private val telegramBotProperties: TelegramBotProperties, //初始化时处理器列表
     private val botProperties: BotProperties,
     private val handlerHolder: HandlerHolder,
-    private val commands: List<Command>
+    private val commands: List<Command>,
+    private val callbacks: List<Callback>,
+    private val cacheService: CacheService,
 ) : TelegramLongPollingBot(options) {
 
     private val log = KotlinLogging.logger {}
@@ -59,7 +65,7 @@ class TelegramBotClient(
         CoroutineScope(Dispatchers.IO).launch {
             log.debug("onUpdateReceived: {}", mapper.writeValueAsString(update))
         }
-        val message = update.message ?: update.editedMessage
+        val message = update.message ?: update.editedMessage ?: update.callbackQuery.message
 
         if (botProperties.ban.member.contains(message.from.id)) {
             log.debug("Ignore this message by ban member [${message.from.id}]")
@@ -68,6 +74,14 @@ class TelegramBotClient(
         if (botProperties.ban.group.contains(message.chatId)) {
             log.debug("Ignore this message by ban group [${message.chatId}]")
             return
+        }
+
+        if (update.hasCallbackQuery()) {
+            for (callback in callbacks) {
+                if (callback.handle(update, message)) {
+                    return
+                }
+            }
         }
 
         if (update.hasMessage() && message.isCommand) {
@@ -102,12 +116,12 @@ class TelegramBotClient(
         ) {
             if (update.hasMessage()) {
                 for (handler in handlerHolder.currentHandlerList) {
-                    if (!handler.handleTgMessage(update, message)) break
+                    if (!handler.handleTgMessage(message)) break
                 }
             } else if (update.hasEditedMessage()) {
                 for (handler in handlerHolder.currentHandlerList) {
                     try {
-                        if (!handler.handleTgEditMessage(update, update.editedMessage)) break
+                        if (!handler.handleTgEditMessage(update.editedMessage)) break
                     } catch (e: Exception) {
                         log.error(e.message, e)
                     }
@@ -118,12 +132,28 @@ class TelegramBotClient(
 
     fun reportError(update: Update, e: Throwable) {
         ContextHolder.masterChatId.takeIf { it != 0L }?.let {
-            val chatId = it.toString()
-            val msgChatId = (update.message?.chatId ?: update.editedMessage.chatId).toString().substring(4)
-            val msgId = update.message?.messageId ?: update.editedMessage.messageId
-            val simpleMsg = "#ForwardError 转发失败: ${e.message}\n\nhttps://t.me/c/$msgChatId/$msgId"
-            val recMsgId = execute(SendMessage(chatId, simpleMsg)).messageId
-            execute(EditMessageText.builder().chatId(chatId).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
+            val message = update.message ?: update.editedMessage ?: update.callbackQuery.message
+            val masterChatId = it.toString()
+            val msgChatId = message.chatId.toString()
+            val msgId = message.messageId
+            val simpleMsg = "#转发失败\n${e.message}\n\nhttps://t.me/c/${
+                msgChatId.let { id ->
+                    if (id.startsWith("-100")) {
+                        id.substring(4)
+                    } else id
+                }
+            }/$msgId"
+            val recMsgId = execute(SendMessage(masterChatId, simpleMsg)).messageId
+            execute(EditMessageText.builder().chatId(masterChatId).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
+
+            execute(SendMessage(msgChatId, "#转发失败\n${e.message}").apply {
+                this.replyToMessageId = msgId
+                this.replyMarkup =
+                    InlineKeyboardMarkup().apply {
+                        this.keyboard = listOf(listOf(InlineKeyboardButton("重试").apply { this.callbackData = "retry" }))
+                    }
+            })
+            cacheService.cache(message)
         }
     }
 

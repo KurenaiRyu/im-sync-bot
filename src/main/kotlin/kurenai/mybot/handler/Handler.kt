@@ -17,16 +17,16 @@ interface Handler : Comparable<Handler> {
      * @return true 为继续执行，false中断
      */
     @Throws(Exception::class)
-    suspend fun handleTgMessage(update: Update, message: Message): Boolean {
+    suspend fun handleTgMessage(message: Message): Boolean {
         return true
     }
 
     @Throws(Exception::class)
-    suspend fun handleTgEditMessage(update: Update, message: Message): Boolean {
+    suspend fun handleTgEditMessage(message: Message): Boolean {
         return true
     }
 
-    suspend fun postHandle(update: Update, message: Message): Boolean {
+    suspend fun postHandle(message: Message): Boolean {
         return true
     }
 

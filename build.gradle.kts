@@ -8,7 +8,6 @@ plugins {
     kotlin("plugin.allopen") version "1.5.21"
     kotlin("plugin.noarg") version "1.5.21"
     kotlin("kapt") version "1.5.21"
-
 }
 
 group = "kurenai.mybot"
@@ -36,6 +35,8 @@ dependencies {
 
     implementation("org.springframework.boot", "spring-boot-starter")
     implementation("org.springframework.boot", "spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("org.springframework.boot:spring-boot-starter-json")
     implementation("org.springframework.boot", "spring-boot-gradle-plugin", "2.5.2")
     kapt("org.springframework.boot", "spring-boot-configuration-processor")
 
@@ -47,6 +48,7 @@ dependencies {
     implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")
     implementation("com.fasterxml.jackson.dataformat", "jackson-dataformat-xml")
     implementation("org.apache.commons", "commons-lang3")
+    implementation("com.esotericsoftware", "kryo", "5.1.1")
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
     runtimeOnly("com.h2database:h2")
 
@@ -64,9 +66,9 @@ tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
 }
 
-//tasks.withType<Test> {
-//    useJUnitPlatform()
-//}
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
 
 //allOpen {
 //    annotation("javax.persistence.Entity")
