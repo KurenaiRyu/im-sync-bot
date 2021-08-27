@@ -59,13 +59,14 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
         val chatId = message.chatId
         val bot = ContextHolder.qqBot
         val quoteMsgSource =
-            message.replyToMessage?.messageId
-                ?.let { cacheService.getByTg(it) }
+            message.replyToMessage?.messageId?.let {
+                cacheService.getByTg(it)
+            }
         val groupId = quoteMsgSource?.targetId ?: ContextHolder.tgQQBinding.getOrDefault(chatId, ContextHolder.defaultQQGroup)
         if (groupId == 0L) return true
         val group = bot.getGroup(groupId)
-        if (group == null) {
-            log.error("QQ group[$groupId] not found.")
+        if (null == group) {
+            log.error { "QQ group[$groupId] not found." }
             return true
         }
         val senderId = message.from.id
@@ -78,14 +79,14 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
                 formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 val voice = message.voice
                 val file = getTgFile(voice.fileId, voice.fileUniqueId)
-                uploadAndSend(message, group, senderName, builder, file)
+                uploadAndSend(message, group, isMaster, senderId, senderName, builder, file)
             }
             message.hasVideo() -> {
                 val builder = MessageChainBuilder()
                 formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 val video = message.video
                 val file = getTgFile(video.fileId, video.fileUniqueId)
-                uploadAndSend(message, group, senderName, builder, file, video.fileName)
+                uploadAndSend(message, group, isMaster, senderId, senderName, builder, file, video.fileName)
             }
             message.hasAnimation() -> {
                 val builder = MessageChainBuilder()
@@ -100,7 +101,7 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
                             cacheService.cache(group.sendMessage(builder.build()).source, message)
                         }
                     } catch (e: IOException) {
-                        log.error(e.message, e)
+                        log.error(e) { e.message }
                     }
                 }
             }
@@ -117,7 +118,7 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
                     cacheService.cache(group.sendMessage(builder.build()).source, message)
                 } else {
                     val file = getTgFile(document.fileId, document.fileUniqueId)
-                    uploadAndSend(message, group, senderName, builder, file, document.fileName)
+                    uploadAndSend(message, group, isMaster, senderId, senderName, builder, file, document.fileName)
                 }
             }
             message.hasSticker() -> {
@@ -189,6 +190,8 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
     private suspend fun uploadAndSend(
         message: Message,
         group: Group,
+        isMaster: Boolean,
+        id: Long,
         username: String,
         builder: MessageChainBuilder,
         file: org.telegram.telegrambots.meta.api.objects.File,
@@ -202,11 +205,12 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
             }
         }
 
-        builder.add(withContext(Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
             group.sendFile("/$fileName", cacheFile).quote()
-        })
-        val caption = message.caption?.let { "\n\n$it" } ?: ""
-        builder.add("upload from $username$caption")
+        }
+        message.caption?.let {
+            builder.add(formatMsg(isMaster, id, username, it))
+        }
         cacheService.cache(group.sendMessage(builder.build()).source, message)
     }
 
@@ -217,7 +221,7 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
         senderId: Long,
         senderName: String,
     ): Boolean {
-        log.debug("{}({}) - {}({}): {}", group.name, group.id, senderName, senderId, messageChain.contentToString())
+        log.debug { "${group.name}(${group.id}) - $senderName($senderId): ${messageChain.contentToString()}" }
 
         val client = ContextHolder.telegramBotClient
         val source = messageChain[OnlineMessageSource.Key]
@@ -332,13 +336,13 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
                     client.execute(SendDocument.builder().document(InputFile(file)).chatId(chatId).caption(msg).build())
                 }
             } catch (e: NoSuchAlgorithmException) {
-                log.error(e.message, e)
+                log.error(e) { e.message }
             } catch (e: KeyStoreException) {
-                log.error(e.message, e)
+                log.error(e) { e.message }
             } catch (e: KeyManagementException) {
-                log.error(e.message, e)
+                log.error(e) { e.message }
             } catch (e: IOException) {
-                log.error(e.message, e)
+                log.error(e) { e.message }
             }
         } else if (messageChain.contains(Voice.Key)) {
             val voice = messageChain.get(Voice.Key)
@@ -366,7 +370,7 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
         return if (text.startsWith("/msg") && text.length > 4) {
             text.substring(5).takeIf { it.isNotBlank() }?.let {
                 qqMsgFormat = it
-                log.info("Change qq message format: $qqMsgFormat")
+                log.info { "Change qq message format: $qqMsgFormat" }
                 true
             } ?: false
         } else false
@@ -402,7 +406,7 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
                     "$senderName forward from $forwardSenderName"
                 )
             } catch (e: java.lang.Exception) {
-                log.error(e.message, e)
+                log.error(e) { e.message }
             }
         }
         return true
@@ -433,7 +437,7 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
         try {
             return ContextHolder.telegramBotClient.execute(GetFile.builder().fileId(fileId).build())
         } catch (e: TelegramApiException) {
-            log.error(e.message, e)
+            log.error(e) { e.message }
         }
         return File().apply {
             this.fileId = fileId
@@ -461,7 +465,7 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
                 ret = group.uploadImage(it)
             }
         } catch (e: IOException) {
-            log.error(e.message, e)
+            log.error(e) { e.message }
         }
         return ret
     }
@@ -487,11 +491,11 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
                 Runtime.getRuntime().exec(String.format(webp2pngCmdPattern, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
             if (future.get().exitValue() >= 0 || pngFile.exists()) return pngFile
         } catch (e: IOException) {
-            log.error(e.message, e)
+            log.error(e) { e.message }
         } catch (e: ExecutionException) {
-            log.error(e.message, e)
+            log.error(e) { e.message }
         } catch (e: InterruptedException) {
-            log.error(e.message, e)
+            log.error(e) { e.message }
         }
         return null
     }
@@ -507,11 +511,11 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
                 Runtime.getRuntime().exec(String.format(mp42gifCmdPattern, mp4File.path, gifFile.path).replace("\\", "\\\\")).onExit()
             if (future.get().exitValue() >= 0 || gifFile.exists()) return gifFile
         } catch (e: IOException) {
-            log.error(e.message, e)
+            log.error(e) { e.message }
         } catch (e: ExecutionException) {
-            log.error(e.message, e)
+            log.error(e) { e.message }
         } catch (e: InterruptedException) {
-            log.error(e.message, e)
+            log.error(e) { e.message }
         }
         return null
     }
@@ -536,15 +540,23 @@ class ForwardHandler(properties: ForwardHandlerProperties, private val cacheServ
         builder: MessageChainBuilder,
     ) {
         quoteMsgSource?.quote()?.let(builder::add)
-        if (isMaster || username.isBlank()) {
-            builder.add(content)
+        builder.add(formatMsg(isMaster, id, username, content))
+    }
+
+    private fun formatMsg(
+        isMaster: Boolean,
+        id: Long,
+        username: String,
+        content: String,
+    ): String {
+        return if (isMaster || username.isBlank()) {
+            content
         } else { //非空名称或是非主人则添加前缀
-            val handledMsg = qqMsgFormat
+            qqMsgFormat
                 .replace(NEWLINE_PATTERN, "\n")
                 .replace(NAME_PATTERN, username)
                 .replace(ID_PATTERN, id.toString())
                 .replace(MSG_PATTERN, content)
-            builder.add(handledMsg)
         }
     }
 

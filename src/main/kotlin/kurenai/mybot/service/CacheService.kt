@@ -2,6 +2,7 @@ package kurenai.mybot.service
 
 import kurenai.mybot.cache.Cache
 import kurenai.mybot.domain.MessageSourceCache
+import mu.KotlinLogging
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceBuilder
 import net.mamoe.mirai.message.data.OnlineMessageSource
@@ -22,6 +23,8 @@ class CacheService(
         const val QQ_TG_MSG_ID_CACHE_KEY = "QQ_TG_MSG_ID_CACHE"
     }
 
+    private val log = KotlinLogging.logger {}
+
     val qqMsgCache = Cache<Int, OnlineMessageSource>("QQ_MSG_CACHE", 40000)
     private val ops = redisTemplate.opsForValue()
 
@@ -34,6 +37,10 @@ class CacheService(
 
         "$QQ_TG_MSG_ID_CACHE_KEY:$qqMsgId".let {
             ops.set(it, tgMsgId)
+            redisTemplate.expire(it, 7, TimeUnit.DAYS)
+        }
+        "${TG_QQ_MSG_ID_CACHE_KEY}:$tgMsgId".let {
+            ops.set(it, qqMsgId)
             redisTemplate.expire(it, 7, TimeUnit.DAYS)
         }
         "$QQ_MSG_CACHE_KEY:$qqMsgId".let {
@@ -64,22 +71,30 @@ class CacheService(
     }
 
     fun getOfflineQQ(id: Int): MessageSource? {
-        return ops.get("$QQ_MSG_CACHE_KEY:$id")?.let {
-            it as MessageSourceCache
+        val source = ops.get("$QQ_MSG_CACHE_KEY:$id")
+        return if (source == null) {
+            log.debug { "QQ source not found by $id" }
+            null
+        } else {
+            source as MessageSourceCache
             MessageSourceBuilder().apply {
-                this.ids = it.ids
-                this.time = it.time
-                this.fromId = it.fromId
-                this.targetId = it.targetId
-                this.internalIds = it.internalIds
-                this.messages { this.add(it.content) }
-            }.build(it.botId, it.kind)
+                this.ids = source.ids
+                this.time = source.time
+                this.fromId = source.fromId
+                this.targetId = source.targetId
+                this.internalIds = source.internalIds
+                this.messages { this.add(source.content) }
+            }.build(source.botId, source.kind)
         }
     }
 
     fun getByTg(id: Int): MessageSource? {
-        return getIdByTg(id)?.let {
-            getQQ(it)
+        val msgId = getIdByTg(id)
+        return if (msgId == null) {
+            log.debug { "QQ msg id not found by $id" }
+            null
+        } else {
+            getQQ(msgId)
         }
     }
 
