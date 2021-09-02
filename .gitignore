@@ -42,6 +42,6 @@ device.json.*
 
 ## config ##
 config.yaml
+device.json
 src/main/resources/application*
-
-cache
+*.db

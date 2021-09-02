@@ -1,13 +1,13 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.springframework.boot") version "2.5.2"
+    id("org.springframework.boot") version "2.5.4"
     id("io.spring.dependency-management") version "1.0.11.RELEASE"
-    kotlin("jvm") version "1.5.21"
-    kotlin("plugin.spring") version "1.5.21"
-    kotlin("plugin.allopen") version "1.5.21"
-    kotlin("plugin.noarg") version "1.5.21"
-    kotlin("kapt") version "1.5.21"
+    kotlin("jvm") version "1.5.10"
+    kotlin("plugin.spring") version "1.5.10"
+    kotlin("plugin.allopen") version "1.5.10"
+    kotlin("plugin.noarg") version "1.5.10"
+    kotlin("kapt") version "1.5.10"
 }
 
 group = "kurenai.mybot"
@@ -17,12 +17,15 @@ java.sourceCompatibility = JavaVersion.VERSION_11
 repositories {
     mavenLocal()
     mavenCentral()
-    mavenLocal()
+    maven("https://m2.dv8tion.net/releases")
 }
+
+kotlin.target.attributes.attribute(org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType.attribute, org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType.jvm)
 
 dependencies {
 
-    val miraiVersion = "2.7-M2"
+    val miraiVersion = "2.7.0"
+
     implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {
         exclude("net.mamoe", "mirai-core-api")
         exclude("net.mamoe", "mirai-core-utils")
@@ -37,7 +40,7 @@ dependencies {
     implementation("org.springframework.boot", "spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-json")
-    implementation("org.springframework.boot", "spring-boot-gradle-plugin", "2.5.2")
+    implementation("org.springframework.boot", "spring-boot-gradle-plugin", "2.5.4")
     kapt("org.springframework.boot", "spring-boot-configuration-processor")
 
     implementation("org.jetbrains.kotlin", "kotlin-reflect")

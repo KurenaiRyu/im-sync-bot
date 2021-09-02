@@ -2,8 +2,7 @@ version: '3.5'
 services:
   bot:
 #    build: .
-    #    image: kurenai9/im-sync-bot:nightly
-    image: kurenai9/im-sync-bot
+    image: kurenai9/im-sync-bot:nightly
     restart: always
     environment:
       #      BASE_URL: "http://api:8081/bot"
