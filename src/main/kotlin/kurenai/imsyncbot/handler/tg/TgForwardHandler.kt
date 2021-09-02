@@ -49,6 +49,10 @@ class TgForwardHandler(
 
     @Throws(Exception::class)
     override suspend fun onMessage(message: Message): Int {
+        if (message.isCommand) {
+            return CONTINUE
+        }
+
         val chatId = message.chatId
         val bot = ContextHolder.qqBot
         val quoteMsgSource =
