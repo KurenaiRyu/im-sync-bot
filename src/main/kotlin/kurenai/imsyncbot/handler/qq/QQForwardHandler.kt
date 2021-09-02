@@ -287,4 +287,8 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         } else false
     }
 
+    override fun order(): Int {
+        return 150
+    }
+
 }

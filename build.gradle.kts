@@ -18,9 +18,15 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven("https://m2.dv8tion.net/releases")
+    maven {
+        name = "GitHubPackages"
+        url = uri("https://maven.pkg.github.com/KurenaiRyu/maven-repo")
+        credentials {
+            username = "KurenaiRyu"
+            password = "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"
+        }
+    }
 }
-
-kotlin.target.attributes.attribute(org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType.attribute, org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType.jvm)
 
 dependencies {
 
@@ -38,7 +44,6 @@ dependencies {
 
     implementation("org.springframework.boot", "spring-boot-starter")
     implementation("org.springframework.boot", "spring-boot-starter-data-jpa")
-    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-json")
     implementation("org.springframework.boot", "spring-boot-gradle-plugin", "2.5.4")
     kapt("org.springframework.boot", "spring-boot-configuration-processor")
@@ -53,6 +58,7 @@ dependencies {
     implementation("org.apache.commons", "commons-lang3")
     implementation("com.esotericsoftware", "kryo", "5.1.1")
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
+    implementation("io.github.kurenairyu", "simple-cache", "1.1.0")
     runtimeOnly("com.h2database:h2")
 
 //    testImplementation("org.springframework.boot:spring-boot-starter-test")

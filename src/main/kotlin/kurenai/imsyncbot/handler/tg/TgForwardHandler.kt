@@ -248,6 +248,6 @@ class TgForwardHandler(
     }
 
     override fun order(): Int {
-        return 100
+        return 150
     }
 }

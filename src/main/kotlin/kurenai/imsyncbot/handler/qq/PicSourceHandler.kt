@@ -81,7 +81,7 @@ class PicSourceHandler(
             log.debug("caption: $caption")
             log.error(e.message, e)
         }
-        return CONTINUE
+        return BREAK
     }
 
     private fun overMaxQueryTimes(event: GroupAwareMessageEvent): Boolean {
@@ -99,9 +99,5 @@ class PicSourceHandler(
     companion object {
         private const val ASCII2D = "https://ascii2d.net/search/url/%s?type=color";
         private const val SAUCE_NAO = "https://saucenao.com/search.php?db=999&dbmaski=32768&url=%s"
-    }
-
-    override fun order(): Int {
-        return 150
     }
 }
