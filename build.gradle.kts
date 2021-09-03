@@ -43,9 +43,6 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
-    //discord
-    implementation("net.dv8tion:JDA:4.3.0_277")
-
     implementation("org.telegram", "telegrambots-spring-boot-starter", "5.3.0")
     implementation("org.apache.httpcomponents", "httpclient")
     implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")
