@@ -48,7 +48,9 @@ im同步机器人，现主要同步（转发）tg跟qq群。
 
 ## Contributing
 
-其实也就是一个练手项目，需要自行改动的话 复制 `config.example.yaml` 到 `src/main/resources` 并更改名字为 `application.yaml` 。  
+其实也就是一个练手项目，需要自行改动的话需要如下操作：  
+复制 `config.example.yaml` 到 `src/main/resources` 并更改名字为 `application.yaml` 。  
+由于我使用了自己写的缓存工具，所以请到[这里](https://github.com/KurenaiRyu/simple-cache.git)下载源码编译安装
 本项目也采用了Lombok，所以也请注意安装对应插件。
 
 ## Thanks

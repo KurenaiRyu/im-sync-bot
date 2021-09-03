@@ -18,14 +18,6 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven("https://m2.dv8tion.net/releases")
-    maven {
-        name = "GitHubPackages"
-        url = uri("https://maven.pkg.github.com/KurenaiRyu/maven-repo")
-        credentials {
-            username = "KurenaiRyu"
-            password = "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"
-        }
-    }
 }
 
 dependencies {
