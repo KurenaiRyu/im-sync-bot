@@ -32,7 +32,7 @@ im同步机器人，现主要同步（转发）tg跟qq群。
               1176542133: -9484733652578
     logging:
       file:
-        name: ./log/im-sync.log
+        name: ./logs/im-sync-bot.log
     ```
 2. 如果你有之前qq机器人生成过得 `device.json`，则只需要把他放入项目根目录下然后进行下面的第3步即可。没有则如下操作：  
    输入命令 `docker-compose up bot` 等待运行。如果碰到登录验证问题按照提示输入， 查看到生成device.json文件后，即可ctrl + C中断运行。  
