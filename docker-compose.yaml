@@ -3,6 +3,7 @@ services:
   bot:
 #    build: .
     image: kurenai9/im-sync-bot:nightly
+    container_name: bot
     restart: always
     environment:
       #      BASE_URL: "http://api:8081/bot"
@@ -12,23 +13,26 @@ services:
       - ./device.json:/im-sync-bot/device.json
       - ./cache:/im-sync-bot/cache
       - ./config.yaml:/im-sync-bot/config.yaml
+      - ./logs:/im-sync-bot/logs
 
   redis:
     image: redis:alpine
+    container_name: redis
     restart: always
     volumes:
       - ./redis-data:/usr/local/etc/redis
 
-#  api:
-#    image: aiogram/telegram-bot-api
-#    restart: always
-#    environment:
-#      TELEGRAM_API_ID: YOUR_API_ID
-#      TELEGRAM_API_HASH: YOUR_API_HASH
-#      TELEGRAM_STAT: 1
-#      TELEGRAM_LOCAL: 1
-#      TELEGRAM_VERBOSITY: 4
-#    ports:
-#      - 8081-8082:8081-8082
-#    volumes:
-#      - ./api-data:/var/lib/telegram-bot-api
+  api:
+    image: aiogram/telegram-bot-api
+    container_name: tg-api
+    restart: always
+    environment:
+      TELEGRAM_API_ID: YOUR_API_ID
+      TELEGRAM_API_HASH: YOUR_API_HASH
+      TELEGRAM_STAT: 1
+      TELEGRAM_LOCAL: 1
+      TELEGRAM_VERBOSITY: 4
+    ports:
+      - 8081-8082:8081-8082
+    volumes:
+      - ./api-data:/var/lib/telegram-bot-api

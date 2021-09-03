@@ -34,20 +34,21 @@ im同步机器人，现主要同步（转发）tg跟qq群。
       file:
         name: ./log/im-sync.log
     ```
-2. 输入命令 `docker-compose up --build` 等待编译并运行。如果碰到登录验证问题按照提示输入， 查看到生成device.json文件后，即可ctrl + C中断运行。  
+2. 如果你有之前qq机器人生成过得 `device.json`，则只需要把他放入项目根目录下然后进行下面的第3步即可。没有则如下操作：  
+   输入命令 `docker-compose up bot` 等待运行。如果碰到登录验证问题按照提示输入， 查看到生成device.json文件后，即可ctrl + C中断运行。  
    想要跳过则需要把 [Mirai](https://github.com/mamoe/mirai) 生成的device.json文件放入根目录下。
 3. 输入命令 `docker-compose up -d` 后台运行程序
 
 其他会用到的命令
 
-- `docker-compose logs -f` 看日志
+- `docker-compose logs -f --tail 500 bot` 看机器人500行日志
 - `docker-compose stop` 停止
 - `docker-compose restart` 重启
 - `docker-compose up -d` 更新docker-compose配置后台运行
 
-## Develop
+## Contributing
 
-复制 `config.example.yaml` 到 `src/main/resources` 并更改名字为 `application.yaml` 。  
+其实也就是一个练手项目，需要自行改动的话 复制 `config.example.yaml` 到 `src/main/resources` 并更改名字为 `application.yaml` 。  
 本项目也采用了Lombok，所以也请注意安装对应插件。
 
 ## Thanks

@@ -39,12 +39,12 @@ class BotInitializer(
 
             if (filesToDelete.isNotEmpty()) {
                 //if deleting subdirs, replace null above with TrueFileFilter.INSTANCE
-                log.debug { "Clearing cache files..." }
+                log.info { "Clearing cache files..." }
                 filesToDelete.forEach {
                     log.debug { "${it.name} deleted." }
                     FileUtils.deleteQuietly(it)
                 } //I don't want an exception if a file is not deleted. Otherwise use filesToDelete.next().delete() in a try/catch
-                log.debug { "Clear ${filesToDelete.size} cache files." }
+                log.info { "Clear ${filesToDelete.size} cache files." }
             }
         }, 5000L, 24 * 60 * 60 * 1000L)
     }
