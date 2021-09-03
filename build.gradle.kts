@@ -51,6 +51,9 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
+    //discord
+    implementation("net.dv8tion:JDA:4.3.0_277")
+
     implementation("org.telegram", "telegrambots-spring-boot-starter", "5.3.0")
     implementation("org.apache.httpcomponents", "httpclient")
     implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")
@@ -61,7 +64,7 @@ dependencies {
     implementation("io.github.kurenairyu", "simple-cache", "1.1.0")
     runtimeOnly("com.h2database:h2")
 
-//    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
 tasks.withType<KotlinCompile> {
