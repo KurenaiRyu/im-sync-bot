@@ -58,8 +58,8 @@ class PicSourceHandler(
         if (content.contains("source", true)) {
             matched = true
             if (overMaxQueryTimes(event)) return BREAK
-            event.subject.sendMessage(message.quote().plus(RichMessage.Key.share(asscii2d, "Asscii2d搜索结果", "", url)))
-            event.subject.sendMessage(message.quote().plus(RichMessage.Key.share(sauce_nao, "SauceNAO搜索结果", "", url)))
+            event.subject.sendMessage(RichMessage.Key.share(asscii2d, "Asscii2d搜索结果", "", url))
+            event.subject.sendMessage(RichMessage.Key.share(sauce_nao, "SauceNAO搜索结果", "", url))
         }
         if (content.contains("url", true)) {
             matched = true
