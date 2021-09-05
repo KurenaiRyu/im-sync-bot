@@ -1,5 +1,6 @@
 package kurenai.imsyncbot.service
 
+import kurenai.imsyncbot.domain.FileCache
 import kurenai.imsyncbot.domain.MessageSourceCache
 import mu.KotlinLogging
 import net.mamoe.mirai.message.data.MessageSource
@@ -19,12 +20,13 @@ class CacheService(
         const val QQ_MSG_CACHE_KEY = "QQ_MSG_CACHE"
         const val TG_QQ_MSG_ID_CACHE_KEY = "TG_QQ_MSG_ID_CACHE"
         const val QQ_TG_MSG_ID_CACHE_KEY = "QQ_TG_MSG_ID_CACHE"
+        const val TG_FILE_CACHE_KEY = "TG_FILE_CACHE"
         val TTL = TimeUnit.DAYS.toMillis(7)
     }
 
     private val log = KotlinLogging.logger {}
 
-    suspend fun cache(source: OnlineMessageSource, message: Message) {
+    fun cache(source: OnlineMessageSource, message: Message) {
         val qqMsgId: Int = source.ids[0]
         val tgMsgId: Int = message.messageId
 
@@ -33,6 +35,14 @@ class CacheService(
         cache.put(QQ_MSG_CACHE_KEY, qqMsgId, MessageSourceCache(source), TTL)
 
         cache(message)
+    }
+
+    fun cacheFile(qqId: String, fileCache: FileCache) {
+        cache.put(TG_FILE_CACHE_KEY, qqId, fileCache, TTL)
+    }
+
+    fun getFile(qqId: String): FileCache? {
+        return cache.get(TG_FILE_CACHE_KEY, qqId)
     }
 
     fun cache(message: Message) {
