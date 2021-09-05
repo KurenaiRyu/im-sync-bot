@@ -127,10 +127,10 @@ class TgForwardHandler(
             }
             message.hasPhoto() -> {
                 val builder = MessageChainBuilder()
+                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 message.photo.groupBy { it.fileId.substring(0, 40) }
                     .mapNotNull { (_: String, photoSizes: List<PhotoSize>) -> photoSizes.maxByOrNull { it.fileSize } }
                     .mapNotNull { getImage(group, it.fileId, it.fileUniqueId) }.forEach(builder::add)
-                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 cacheService.cache(group.sendMessage(builder.build()).source, message)
             }
             message.hasText() -> {
