@@ -4,6 +4,7 @@ import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.handler.tg.TgForwardHandler
 import kurenai.imsyncbot.service.CacheService
+import mu.KotlinLogging
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText
@@ -14,6 +15,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 
 @Component
 class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwardHandler) : Callback {
+
+    private val log = KotlinLogging.logger {}
 
     override suspend fun handle(update: Update, message: Message): Boolean {
         if ("retry" != update.callbackQuery.data) {
@@ -42,6 +45,7 @@ class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwar
             forwardHandler.onMessage(originMessage)
             client.execute(DeleteMessage(chatId, messageId))
         } catch (e: Exception) {
+            log.error(e) { e.message }
             client.execute(EditMessageText("#转发失败\n${e.message}").apply {
                 this.chatId = chatId
                 this.messageId = messageId

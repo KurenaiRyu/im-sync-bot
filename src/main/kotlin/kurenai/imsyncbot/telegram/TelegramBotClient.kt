@@ -11,7 +11,6 @@ import kurenai.imsyncbot.command.Command
 import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.handler.Handler.Companion.BREAK
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.utils.RetryUtil
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.bots.DefaultBotOptions
@@ -53,11 +52,11 @@ class TelegramBotClient(
     override fun onUpdatesReceived(updates: MutableList<Update>) {
         CoroutineScope(Dispatchers.Default).launch {
             updates.forEach { update ->
-                RetryUtil.aware({ onUpdateReceivedSuspend(update) }, { _, e ->
-                    e?.let {
-                        reportError(update, e)
-                    }
-                })
+                try {
+                    onUpdateReceivedSuspend(update)
+                } catch (e: Exception) {
+                    reportError(update, e)
+                }
             }
         }
     }
@@ -171,9 +170,6 @@ class TelegramBotClient(
                 log.info("Started telegram-bot: {}.", botUsername)
             }
             ContextHolder.telegramBotClient = this
-            ContextHolder.masterChatId.takeIf { it != 0L }?.let {
-                execute(SendMessage(it.toString(), "Telegram bot startup."))
-            }
         } catch (e: TelegramApiException) {
             log.error(e.message, e)
         }
@@ -181,11 +177,11 @@ class TelegramBotClient(
 
     override fun onUpdateReceived(update: Update) {
         CoroutineScope(Dispatchers.Default).launch {
-            RetryUtil.aware({ onUpdateReceivedSuspend(update) }, { _, e ->
-                e?.let {
-                    reportError(update, e)
-                }
-            })
+            try {
+                onUpdateReceivedSuspend(update)
+            } catch (e: Exception) {
+                reportError(update, e)
+            }
         }
     }
 

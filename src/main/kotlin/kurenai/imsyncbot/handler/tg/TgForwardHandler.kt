@@ -122,7 +122,9 @@ class TgForwardHandler(
                 } else {
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                     getImage(group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
-                    cacheService.cache(group.sendMessage(builder.build()).source, message)
+                    group.sendMessage(builder.build()).let {
+                        cacheService.cache(it.source, message)
+                    }
                 }
             }
             message.hasPhoto() -> {

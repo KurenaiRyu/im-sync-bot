@@ -100,7 +100,10 @@ object KryoUtil {
         try {
             ByteArrayInputStream(byteArray).use { byteArrayInputStream ->
                 Input(byteArrayInputStream).use { input ->
-                    return kryo.readClassAndObject(input)?.let { it as T }
+                    return kryo.readClassAndObject(input)?.let {
+                        @Suppress("UNCHECKED_CAST")
+                        it as T
+                    }
                 }
             }
         } catch (e: IOException) {

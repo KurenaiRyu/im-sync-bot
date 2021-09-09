@@ -23,10 +23,10 @@ object HttpUtil {
     private const val MAX_TIMEOUT = 7000
     private val connMgr: PoolingHttpClientConnectionManager = PoolingHttpClientConnectionManager()
     private val requestConfig: RequestConfig
+    private val client = buildClient()
 
     @Throws(NoSuchAlgorithmException::class, KeyStoreException::class, KeyManagementException::class, IOException::class)
     suspend fun download(url: String): ByteArray {
-        val client = buildClient()
         return withContext(Dispatchers.IO) {
             val res = client.execute(RequestBuilder.get(url).build())
             EntityUtils.toByteArray(res.entity)

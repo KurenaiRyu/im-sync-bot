@@ -3,12 +3,10 @@ package kurenai.imsyncbot.qq
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kurenai.imsyncbot.BotConstant
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.utils.BotUtil
-import kurenai.imsyncbot.utils.RetryUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
 import net.mamoe.mirai.contact.nameCardOrNick
@@ -20,7 +18,6 @@ import net.mamoe.mirai.event.events.MessageRecallEvent
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
-import java.io.File
 
 @Component
 class QQBotClient(
@@ -41,7 +38,7 @@ class QQBotClient(
 
     override fun afterPropertiesSet() {
         CoroutineScope(Dispatchers.Default).launch {
-            log.info("Login qq bot...")
+            log.info { "Login qq bot..." }
             bot.login()
             log.info("Started qq-bot {}({})", bot.bot.nick, bot.id)
             ContextHolder.qqBot = bot
@@ -74,9 +71,11 @@ class QQBotClient(
     private suspend fun handle(context: QQContext) {
         for (handler in handlerHolder.currentQQHandlerList) {
             context.handler = handler
-            RetryUtil.aware({ handleMessage(context) }, { _, e ->
-                e?.let { reportError(context, it) }
-            })
+            try {
+                handleMessage(context)
+            } catch (e: Exception) {
+                reportError(context, e)
+            }
         }
     }
 

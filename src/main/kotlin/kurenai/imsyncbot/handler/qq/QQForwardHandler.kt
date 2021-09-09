@@ -10,6 +10,7 @@ import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
+import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.*
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
@@ -18,6 +19,7 @@ import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import org.apache.commons.io.FileUtils
 import org.springframework.stereotype.Component
+import org.telegram.telegrambots.meta.api.methods.ParseMode
 import org.telegram.telegrambots.meta.api.methods.send.*
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
 import org.telegram.telegrambots.meta.api.objects.InputFile
@@ -137,27 +139,30 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                     }
 
                     val url = image.queryUrl()
-                    val file = File(BotUtil.getImagePath(image.imageId))
-                    if (!file.exists()) {
-                        withContext(Dispatchers.IO) {
-                            FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
-                        }
-                    }
-                    InputMediaPhoto.builder().media(url).newMediaFile(file).isNewMedia(true).mediaName(image.imageId)
-                        .build()
+//                    val file = File(BotUtil.getImagePath(image.imageId))
+//                    if (!file.exists()) {
+//                        withContext(Dispatchers.IO) {
+//                            FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+//                        }
+//                    }
+                    InputMediaPhoto.builder().media(url).mediaName(image.imageId).build()
                 }.let { ArrayList(it) }
             if (medias.isNotEmpty()) {
                 medias[0].caption = msg
 
-                val gitMedias = ArrayList<InputMediaPhoto>()
-                medias.listIterator()
+                val gifMedias = ArrayList<InputMediaPhoto>()
                 for (i in 0 until medias.size) {
-                    medias[i].mediaName.endsWith(".git")
-                    gitMedias.add(medias.removeAt(i))
+                    if (medias[i].mediaName.endsWith(".git")) {
+                        gifMedias.add(medias.removeAt(i))
+                    }
                 }
-
-                sendGroupMedias(medias, replyId, chatId, source)
-                sendGroupMedias(gitMedias, replyId, chatId, source)
+                try {
+                    sendGroupMedias(chatId, replyId, medias, source)
+                    sendGroupMedias(chatId, replyId, gifMedias, source)
+                } catch (e: Exception) {
+                    log.error(e) { e.message }
+                    sendSimpleImg(chatId, replyId, medias.map { it.media }, msg, source)
+                }
             }
         } else if (count == 1) {
             messageChain[Image.Key]?.let { image ->
@@ -166,9 +171,9 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                 val inputFile = cacheService.getFile(image.imageId).let {
                     if (it == null) {
 
-                        val url: String = image.queryUrl()
                         val file = File(BotUtil.getImagePath(image.imageId))
                         if (!file.exists() || !file.isFile) {
+                            val url: String = image.queryUrl()
                             withContext(Dispatchers.IO) {
                                 FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
                             }
@@ -181,30 +186,35 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                     }
                 }
 
-                if (image.imageId.endsWith(".gif")) {
-                    val builder = SendAnimation.builder()
-                    replyId?.let(builder::replyToMessageId)
-                    client.execute(
-                        builder
-                            .chatId(chatId)
-                            .caption(msg)
-                            .animation(inputFile)
-                            .build()
-                    )
-                } else {
-                    if (imageSize > picToFileSize) {
-                        val builder = SendDocument.builder()
+                try {
+                    if (image.imageId.endsWith(".gif")) {
+                        val builder = SendAnimation.builder()
                         replyId?.let(builder::replyToMessageId)
                         client.execute(
-                            builder.caption(msg).chatId(chatId).document(inputFile).thumb(inputFile).build()
+                            builder
+                                .chatId(chatId)
+                                .caption(msg)
+                                .animation(inputFile)
+                                .build()
                         )
                     } else {
-                        val builder = SendPhoto.builder()
-                        replyId?.let(builder::replyToMessageId)
-                        client.execute(builder.caption(msg).chatId(chatId).photo(inputFile).build())
+                        if (imageSize > picToFileSize) {
+                            val builder = SendDocument.builder()
+                            replyId?.let(builder::replyToMessageId)
+                            client.execute(
+                                builder.caption(msg).chatId(chatId).document(inputFile).thumb(inputFile).build()
+                            )
+                        } else {
+                            val builder = SendPhoto.builder()
+                            replyId?.let(builder::replyToMessageId)
+                            client.execute(builder.caption(msg).chatId(chatId).photo(inputFile).build())
+                        }
+                    }?.let { m ->
+                        cacheMsg(source, m, inputFile, image.imageId, imageSize)
                     }
-                }?.let { m ->
-                    cacheMsg(source, m, inputFile, image.imageId, imageSize)
+                } catch (e: Exception) {
+                    log.error(e) { e.message }
+                    sendSimpleImg(chatId, replyId, listOf(image.queryUrl()), msg, source)
                 }
             }
         } else if (messageChain.contains(FileMessage.Key)) {
@@ -297,10 +307,11 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         }
     }
 
-    private fun sendGroupMedias(medias: List<InputMediaPhoto>, replyId: Int?, chatId: String, source: OnlineMessageSource?) {
+    private fun sendGroupMedias(chatId: String, replyId: Int?, medias: List<InputMediaPhoto>, source: OnlineMessageSource?) {
+        if (medias.isEmpty()) return
         val mediaGroups = ArrayList<List<InputMediaPhoto>>()
         var offset = 0
-        while (offset >= medias.size) {
+        while (offset < medias.size) {
             val value = ArrayList<InputMediaPhoto>()
             for (n in offset until min(offset + 10, medias.size)) {
                 value.add(medias[n])
@@ -320,6 +331,47 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
             ).let { result ->
                 source?.let { source -> cacheService.cache(source, result[0]) }
             }
+        }
+    }
+
+//    private fun sendGroupMedias(chatId: String, replyId: Int?, medias: List<InputMediaPhoto>, source: OnlineMessageSource?) {
+//        if (medias.isEmpty()) return
+//        val mediaGroups = ArrayList<List<InputMediaPhoto>>()
+//        var offset = 0
+//        while (offset < medias.size) {
+//            val value = ArrayList<InputMediaPhoto>()
+//            for (n in offset until min(offset + 10, medias.size)) {
+//                value.add(medias[n])
+//            }
+//            mediaGroups.add(value)
+//            offset += 10
+//        }
+//
+//        mediaGroups.forEach { list ->
+//            val builder = EditMessageMedia.builder()
+//            replyId?.let(builder::replyToMessageId)
+//            ContextHolder.telegramBotClient.execute(
+//                builder
+//                    .medias(list)
+//                    .chatId(chatId)
+//                    .build()
+//            ).let { result ->
+//                source?.let { source -> cacheService.cache(source, result[0]) }
+//            }
+//        }
+//    }
+
+    private fun sendSimpleImg(chatId: String, replyId: Int?, urls: List<String>, msg: String, source: OnlineMessageSource?): Message {
+        var urlStr = ""
+        for (url in urls) {
+            urlStr += "[图片]($url)\n"
+        }
+        return ContextHolder.telegramBotClient.execute(SendMessage(chatId, "$urlStr${msg.format2Markdown()}").apply {
+            this.replyToMessageId = replyId
+            this.parseMode = ParseMode.MARKDOWNV2
+        }).let { rec ->
+            source?.let { source -> cacheService.cache(source, rec) }
+            rec
         }
     }
 
