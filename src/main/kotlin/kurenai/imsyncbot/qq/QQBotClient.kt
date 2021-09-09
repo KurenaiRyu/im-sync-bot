@@ -18,6 +18,7 @@ import net.mamoe.mirai.event.events.MessageRecallEvent
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
+import java.util.concurrent.LinkedBlockingQueue
 
 @Component
 class QQBotClient(
@@ -35,6 +36,7 @@ class QQBotClient(
         redirectBotLogToFile(file)
         redirectNetworkLogToFile(file)
     }
+    val msgQueue = LinkedBlockingQueue<Boolean>(20)
 
     override fun afterPropertiesSet() {
         CoroutineScope(Dispatchers.Default).launch {
@@ -72,9 +74,12 @@ class QQBotClient(
         for (handler in handlerHolder.currentQQHandlerList) {
             context.handler = handler
             try {
+                msgQueue.put(true)
                 handleMessage(context)
             } catch (e: Exception) {
                 reportError(context, e)
+            } finally {
+                msgQueue.take()
             }
         }
     }
