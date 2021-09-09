@@ -11,7 +11,6 @@ import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.message.data.MessageChainBuilder
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
-import net.mamoe.mirai.message.data.QuoteReply
 import net.mamoe.mirai.message.data.RichMessage
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -35,20 +34,8 @@ class PicSourceHandler(
     @Throws(Exception::class)
     override suspend fun onGroupMessage(event: GroupAwareMessageEvent): Int {
         val message = event.message
-        val image = when {
-            message.contains(Image.Key) -> {
-                message[Image.Key]!!
-            }
-            message.contains(QuoteReply.Key) -> {
-                val quoteReply = message[QuoteReply.Key]!!
-                quoteReply.source.ids[0].let {
-                    cacheService.getQQ(it)
-                }?.originalMessage?.get(Image.Key)
-            }
-            else -> null
-        } ?: return CONTINUE
+        val url = message[Image.Key]?.queryUrl() ?: return CONTINUE
         val content = message.contentToString()
-        val url = image.queryUrl()
         val encodeUrl = URLEncoder.encode(url, StandardCharsets.UTF_8)
         val sauce_nao = String.format(SAUCE_NAO, encodeUrl)
         val asscii2d = String.format(ASCII2D, encodeUrl)

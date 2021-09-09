@@ -78,7 +78,7 @@ class QQBotClient(
             val context = QQContext(client, tgClient, event, handler)
             try {
                 msgQueue.put(true)
-                if (handleMessage(context).equals(END)) break
+                if (handleMessage(context) == END) break
             } catch (e: Exception) {
                 reportError(context, e)
             } finally {
