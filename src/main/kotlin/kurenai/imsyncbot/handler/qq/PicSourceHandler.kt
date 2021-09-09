@@ -21,7 +21,6 @@ import org.telegram.telegrambots.meta.api.methods.send.SendPhoto
 import org.telegram.telegrambots.meta.api.objects.InputFile
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.TimeUnit
 
 @Component
 @EnableConfigurationProperties(ForwardHandlerProperties::class)
@@ -32,7 +31,6 @@ class PicSourceHandler(
 ) : QQHandler {
 
     private val log = KotlinLogging.logger {}
-    private val cache = kurenai.imsyncbot.cache.Cache<Long, Int>("pic-source")
 
     @Throws(Exception::class)
     override suspend fun onGroupMessage(event: GroupAwareMessageEvent): Int {
@@ -57,13 +55,11 @@ class PicSourceHandler(
         var matched = false
         if (content.contains("source", true)) {
             matched = true
-            if (overMaxQueryTimes(event)) return BREAK
             event.subject.sendMessage(RichMessage.Key.share(asscii2d, "Asscii2d搜索结果", "", url))
             event.subject.sendMessage(RichMessage.Key.share(sauce_nao, "SauceNAO搜索结果", "", url))
         }
         if (content.contains("url", true)) {
             matched = true
-            if (overMaxQueryTimes(event)) return BREAK
             val builder = MessageChainBuilder()
             builder.add(message.quote())
             builder.add(RichMessage.Key.share(url, "QQ图片URL", "", url))
@@ -82,18 +78,6 @@ class PicSourceHandler(
             log.error(e.message, e)
         }
         return BREAK
-    }
-
-    private fun overMaxQueryTimes(event: GroupAwareMessageEvent): Boolean {
-        val id = event.sender.id
-        val count = cache[id] ?: 0.also { cache.put(id, it + 1, 5, TimeUnit.MINUTES) }
-        if ((count > 10)) {
-            val builder = MessageChainBuilder()
-            builder.add(event.message.quote())
-            builder.add("Too much request, please try again in 5 minutes.")
-            return true
-        }
-        return false
     }
 
     companion object {
