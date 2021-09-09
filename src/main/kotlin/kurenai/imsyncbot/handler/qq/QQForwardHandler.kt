@@ -27,10 +27,6 @@ import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.File
-import java.io.IOException
-import java.security.KeyManagementException
-import java.security.KeyStoreException
-import java.security.NoSuchAlgorithmException
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
 
@@ -139,12 +135,6 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                     }
 
                     val url = image.queryUrl()
-//                    val file = File(BotUtil.getImagePath(image.imageId))
-//                    if (!file.exists()) {
-//                        withContext(Dispatchers.IO) {
-//                            FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
-//                        }
-//                    }
                     InputMediaPhoto.builder().media(url).mediaName(image.imageId).build()
                 }.let { ArrayList(it) }
             if (medias.isNotEmpty()) {
@@ -161,7 +151,7 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                     sendGroupMedias(chatId, replyId, gifMedias, source)
                 } catch (e: Exception) {
                     log.error(e) { e.message }
-                    sendSimpleImg(chatId, replyId, medias.map { it.media }, msg, source)
+                    sendSimpleMedia(chatId, replyId, medias.map { it.media }, msg, source)
                 }
             }
         } else if (count == 1) {
@@ -214,7 +204,7 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                     }
                 } catch (e: Exception) {
                     log.error(e) { e.message }
-                    sendSimpleImg(chatId, replyId, listOf(image.queryUrl()), msg, source)
+                    sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, source)
                 }
             }
         } else if (messageChain.contains(FileMessage.Key)) {
@@ -236,14 +226,9 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                 } else {
                     client.execute(SendDocument.builder().document(inputFile).chatId(chatId).caption(msg).build())
                 }
-            } catch (e: NoSuchAlgorithmException) {
+            } catch (e: Exception) {
                 log.error(e) { e.message }
-            } catch (e: KeyStoreException) {
-                log.error(e) { e.message }
-            } catch (e: KeyManagementException) {
-                log.error(e) { e.message }
-            } catch (e: IOException) {
-                log.error(e) { e.message }
+                sendSimpleMedia(chatId, replyId, listOf(url), msg, source, downloadInfo.filename)
             }
         } else if (messageChain.contains(OnlineAudio.Key)) {
             val voice = messageChain[OnlineAudio.Key]
@@ -254,7 +239,11 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                         FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
                     }
                 }
-                client.execute(SendVoice.builder().chatId(chatId).voice(InputFile(file)).build())
+                try {
+                    client.execute(SendVoice.builder().chatId(chatId).voice(InputFile(file)).build())
+                } catch (e: Exception) {
+                    sendSimpleMedia(chatId, replyId, listOf(url), msg, source, "语音")
+                }
             }
         } else {
             val builder = SendMessage.builder()
@@ -334,37 +323,10 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         }
     }
 
-//    private fun sendGroupMedias(chatId: String, replyId: Int?, medias: List<InputMediaPhoto>, source: OnlineMessageSource?) {
-//        if (medias.isEmpty()) return
-//        val mediaGroups = ArrayList<List<InputMediaPhoto>>()
-//        var offset = 0
-//        while (offset < medias.size) {
-//            val value = ArrayList<InputMediaPhoto>()
-//            for (n in offset until min(offset + 10, medias.size)) {
-//                value.add(medias[n])
-//            }
-//            mediaGroups.add(value)
-//            offset += 10
-//        }
-//
-//        mediaGroups.forEach { list ->
-//            val builder = EditMessageMedia.builder()
-//            replyId?.let(builder::replyToMessageId)
-//            ContextHolder.telegramBotClient.execute(
-//                builder
-//                    .medias(list)
-//                    .chatId(chatId)
-//                    .build()
-//            ).let { result ->
-//                source?.let { source -> cacheService.cache(source, result[0]) }
-//            }
-//        }
-//    }
-
-    private fun sendSimpleImg(chatId: String, replyId: Int?, urls: List<String>, msg: String, source: OnlineMessageSource?): Message {
+    private fun sendSimpleMedia(chatId: String, replyId: Int?, urls: List<String>, msg: String, source: OnlineMessageSource?, mask: String = "图片"): Message {
         var urlStr = ""
         for (url in urls) {
-            urlStr += "[图片]($url)\n"
+            urlStr += "[$mask]($url)\n"
         }
         return ContextHolder.telegramBotClient.execute(SendMessage(chatId, "$urlStr${msg.format2Markdown()}").apply {
             this.replyToMessageId = replyId
