@@ -4,8 +4,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.domain.FileCache
-import kurenai.imsyncbot.handler.Handler.Companion.BREAK
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
+import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
@@ -113,7 +113,7 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                 .replace(BotUtil.ID_PATTERN, "123456789")
                 .replace(BotUtil.MSG_PATTERN, demoContent)
             group.sendMessage("changed msg format\ne.g.\n$demoMsg")
-            return BREAK
+            return END
         }
 
         if (content.startsWith("\n")) {

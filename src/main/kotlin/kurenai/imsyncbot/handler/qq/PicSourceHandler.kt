@@ -1,8 +1,8 @@
 package kurenai.imsyncbot.handler.qq
 
 import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.handler.Handler.Companion.BREAK
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
+import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
 import mu.KotlinLogging
@@ -77,7 +77,7 @@ class PicSourceHandler(
             log.debug("caption: $caption")
             log.error(e.message, e)
         }
-        return BREAK
+        return END
     }
 
     companion object {

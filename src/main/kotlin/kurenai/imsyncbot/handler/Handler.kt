@@ -4,7 +4,7 @@ interface Handler : Comparable<Handler> {
 
     companion object {
         const val CONTINUE = 1
-        const val BREAK = 2
+        const val END = 2
     }
 
     fun order(): Int {

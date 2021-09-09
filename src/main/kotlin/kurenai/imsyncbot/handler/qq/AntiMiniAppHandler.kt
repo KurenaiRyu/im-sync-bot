@@ -4,8 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.handler.Handler.Companion.BREAK
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
+import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.AntiMiniAppHandlerProperties
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import mu.KotlinLogging
@@ -45,7 +45,7 @@ class AntiMiniAppHandler(private val properties: AntiMiniAppHandlerProperties) :
                     url = handleUrl(jsonNode["url"]?.asText() ?: "")
                     if (properties.enable) event.subject.sendMessage("title: $title\nurl: $url")
                     sendTg(chatId.toString(), url)
-                    return BREAK
+                    return END
                 }
             } catch (e: JsonProcessingException) {
                 log.error(e.message, e)

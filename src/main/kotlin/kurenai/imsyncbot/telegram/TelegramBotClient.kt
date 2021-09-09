@@ -9,7 +9,7 @@ import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.command.Command
 import kurenai.imsyncbot.config.BotProperties
-import kurenai.imsyncbot.handler.Handler.Companion.BREAK
+import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.service.CacheService
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
@@ -116,11 +116,11 @@ class TelegramBotClient(
         ) {
             if (update.hasMessage()) {
                 for (handler in handlerHolder.currentTgHandlerList) {
-                    if (handler.onMessage(message) == BREAK) break
+                    if (handler.onMessage(message) == END) break
                 }
             } else if (update.hasEditedMessage()) {
                 for (handler in handlerHolder.currentTgHandlerList) {
-                    if (handler.onEditMessage(update.editedMessage) == BREAK) break
+                    if (handler.onEditMessage(update.editedMessage) == END) break
                 }
             }
         }

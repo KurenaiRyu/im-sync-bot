@@ -1,8 +1,8 @@
 package kurenai.imsyncbot.handler.qq
 
 import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.handler.Handler.Companion.BREAK
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
+import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
@@ -40,7 +40,7 @@ class PixivHandler(private val forwardProperties: ForwardHandlerProperties) : QQ
             } catch (e: TelegramApiException) {
                 log.error(e.message, e)
             }
-            return BREAK
+            return END
         }
         return CONTINUE
     }

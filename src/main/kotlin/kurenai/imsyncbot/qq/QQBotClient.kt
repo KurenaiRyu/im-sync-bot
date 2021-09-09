@@ -6,6 +6,9 @@ import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.config.BotProperties
+import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
+import kurenai.imsyncbot.handler.Handler.Companion.END
+import kurenai.imsyncbot.telegram.TelegramBotClient
 import kurenai.imsyncbot.utils.BotUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
@@ -64,18 +67,18 @@ class QQBotClient(
             }
 
             filter.subscribeAlways<Event> {
-                handle(QQContext(this@QQBotClient, ContextHolder.telegramBotClient, it))
+                handle(this@QQBotClient, ContextHolder.telegramBotClient, it)
             }
             bot.join()
         }
     }
 
-    private suspend fun handle(context: QQContext) {
+    private suspend fun handle(client: QQBotClient, tgClient: TelegramBotClient, event: Event) {
         for (handler in handlerHolder.currentQQHandlerList) {
-            context.handler = handler
+            val context = QQContext(client, tgClient, event, handler)
             try {
                 msgQueue.put(true)
-                handleMessage(context)
+                if (handleMessage(context).equals(END)) break
             } catch (e: Exception) {
                 reportError(context, e)
             } finally {
@@ -85,11 +88,17 @@ class QQBotClient(
     }
 
     @Throws(Exception::class)
-    suspend fun handleMessage(context: QQContext) {
-        if (context.event is GroupAwareMessageEvent) {
-            context.handler?.onGroupMessage(context.event)
-        } else if (context.event is MessageRecallEvent) {
-            context.handler?.onRecall(context.event)
+    suspend fun handleMessage(context: QQContext): Int {
+        return when (context.event) {
+            is GroupAwareMessageEvent -> {
+                context.handler.onGroupMessage(context.event)
+            }
+            is MessageRecallEvent -> {
+                context.handler.onRecall(context.event)
+            }
+            else -> {
+                CONTINUE
+            }
         }
     }
 
