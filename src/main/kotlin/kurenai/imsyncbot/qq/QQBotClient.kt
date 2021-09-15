@@ -8,6 +8,7 @@ import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
+import kurenai.imsyncbot.handler.qq.QQForwardHandler
 import kurenai.imsyncbot.telegram.TelegramBotClient
 import kurenai.imsyncbot.utils.BotUtil
 import mu.KotlinLogging
@@ -21,7 +22,6 @@ import net.mamoe.mirai.event.events.MessageRecallEvent
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
-import java.util.concurrent.LinkedBlockingQueue
 
 @Component
 class QQBotClient(
@@ -39,14 +39,14 @@ class QQBotClient(
         redirectBotLogToFile(file)
         redirectNetworkLogToFile(file)
     }
-    val msgQueue = LinkedBlockingQueue<Boolean>(20)
 
     override fun afterPropertiesSet() {
         CoroutineScope(Dispatchers.Default).launch {
             log.info { "Login qq bot..." }
             bot.login()
-            log.info("Started qq-bot {}({})", bot.bot.nick, bot.id)
+            log.info { "Started qq-bot ${bot.nick}(${bot.id})" }
             ContextHolder.qqBot = bot
+            val forwardHandler = handlerHolder.currentQQHandlerList.filterIsInstance<QQForwardHandler>()[0]
             val filter = bot.eventChannel.filter { event ->
 
                 return@filter when (event) {
@@ -59,15 +59,22 @@ class QQBotClient(
                     is MessageRecallEvent -> {
                         true
                     }
+                    is GroupEvent -> {
+                        forwardHandler.onGroupEvent(event)
+                        false
+                    }
                     else -> {
-                        sendTgMsgString(event)
                         false
                     }
                 }
             }
 
             filter.subscribeAlways<Event> {
-                handle(this@QQBotClient, ContextHolder.telegramBotClient, it)
+                try {
+                    handle(this@QQBotClient, ContextHolder.telegramBotClient, it)
+                } catch (e: Exception) {
+                    reportError(it, e)
+                }
             }
             bot.join()
         }
@@ -76,14 +83,7 @@ class QQBotClient(
     private suspend fun handle(client: QQBotClient, tgClient: TelegramBotClient, event: Event) {
         for (handler in handlerHolder.currentQQHandlerList) {
             val context = QQContext(client, tgClient, event, handler)
-            try {
-                msgQueue.put(true)
-                if (handleMessage(context) == END) break
-            } catch (e: Exception) {
-                reportError(context, e)
-            } finally {
-                msgQueue.take()
-            }
+            if (handleMessage(context) == END) break
         }
     }
 
@@ -102,8 +102,7 @@ class QQBotClient(
         }
     }
 
-    suspend fun reportError(context: QQContext, e: Throwable) {
-        val event = context.event
+    suspend fun reportError(event: Event, e: Throwable) {
         if (event is GroupAwareMessageEvent) {
             val message = event.message
             val sender = event.sender

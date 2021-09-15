@@ -11,16 +11,23 @@ import kurenai.imsyncbot.command.Command
 import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.utils.RateLimiter
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.bots.DefaultBotOptions
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
+import org.telegram.telegrambots.meta.api.methods.BotApiMethod
+import org.telegram.telegrambots.meta.api.methods.send.SendAnimation
+import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageMedia
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText
+import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.Update
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
+import java.io.Serializable
 
 /**
  * 机器人实例
@@ -40,6 +47,7 @@ class TelegramBotClient(
 
     private val log = KotlinLogging.logger {}
     private val mapper: ObjectMapper = ObjectMapper()
+    val rateLimiter = RateLimiter()
 
     override fun getBotUsername(): String {
         return telegramBotProperties.username
@@ -127,6 +135,7 @@ class TelegramBotClient(
     }
 
     fun reportError(update: Update, e: Throwable) {
+        log.error(e) { e.message }
         try {
             ContextHolder.masterChatId.takeIf { it != 0L }?.let {
                 val message = update.message ?: update.editedMessage ?: update.callbackQuery.message
@@ -185,5 +194,23 @@ class TelegramBotClient(
         }
     }
 
-//    fun get
+    override fun execute(sendMediaGroup: SendMediaGroup): MutableList<Message> {
+        rateLimiter.acquireForFile(sendMediaGroup.medias.size)
+        return super.execute(sendMediaGroup)
+    }
+
+    override fun execute(sendAnimation: SendAnimation?): Message {
+        rateLimiter.acquireForFile()
+        return super.execute(sendAnimation)
+    }
+
+    override fun <T : Serializable?, Method : BotApiMethod<T>?> execute(method: Method): T {
+        rateLimiter.acquire()
+        return super.execute(method)
+    }
+
+    override fun execute(editMessageMedia: EditMessageMedia?): Serializable {
+        rateLimiter.acquire()
+        return super.execute(editMessageMedia)
+    }
 }

@@ -9,6 +9,7 @@ import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.Group
+import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.MessageChainBuilder
 import net.mamoe.mirai.message.data.MessageSource
@@ -72,22 +73,17 @@ class TgForwardHandler(
         val caption = message.caption ?: ""
         when {
             message.hasVoice() -> {
-                val builder = MessageChainBuilder()
-                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 val voice = message.voice
                 val file = getTgFile(voice.fileId, voice.fileUniqueId)
-                uploadAndSend(message, group, isMaster, senderId, senderName, builder, file)
+                uploadAndSend(message, group, file)
             }
             message.hasVideo() -> {
-                val builder = MessageChainBuilder()
-                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 val video = message.video
                 val file = getTgFile(video.fileId, video.fileUniqueId)
-                uploadAndSend(message, group, isMaster, senderId, senderName, builder, file, video.fileName)
+                uploadAndSend(message, group, file, video.fileName)
             }
             message.hasAnimation() -> {
                 val builder = MessageChainBuilder()
-                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 val animation = message.animation
                 val tgFile = getTgFile(animation.fileId, animation.fileUniqueId)
                 BotUtil.mp42gif(animation.fileId, tgFile)?.let { gifFile ->
@@ -97,42 +93,34 @@ class TgForwardHandler(
                     }
                 }
             }
-            message.hasDocument() -> {
-                val builder = MessageChainBuilder()
-                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
-                val document = message.document
-                if (document.fileName.endsWith("jpe") || document.fileName.endsWith("jpeg") || document.fileName.endsWith("png") || document.fileName.endsWith(
-                        "bmp"
-                    )
-                ) {
-                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
-                    getImage(group, document.fileId, document.fileUniqueId)?.let(builder::add)
-                    cacheService.cache(group.sendMessage(builder.build()).source, message)
-                } else {
-                    val file = getTgFile(document.fileId, document.fileUniqueId)
-                    uploadAndSend(message, group, isMaster, senderId, senderName, builder, file, document.fileName)
-                }
-            }
             message.hasSticker() -> {
-                val builder = MessageChainBuilder()
                 val sticker = message.sticker
-                if (sticker.isAnimated) {
-                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, sticker.emoji, builder)
-                    cacheService.cache(group.sendMessage(builder.build()).source, message)
-                } else {
-                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
+                if (!sticker.isAnimated) {
+                    val builder = MessageChainBuilder()
                     getImage(group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
+                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, "", builder)
                     group.sendMessage(builder.build()).let {
                         cacheService.cache(it.source, message)
                     }
                 }
             }
+            message.hasDocument() -> {
+                val document = message.document
+                val file = getTgFile(document.fileId, document.fileUniqueId)
+                val rec = uploadAndSend(message, group, file, document.fileName)
+                if (!isMaster) rec.quoteReply("Upload by $senderName.")
+                if (caption.isNotBlank()) {
+                    val builder = MessageChainBuilder()
+                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
+                    cacheService.cache(group.sendMessage(builder.build()).source, message)
+                }
+            }
             message.hasPhoto() -> {
                 val builder = MessageChainBuilder()
-                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 message.photo.groupBy { it.fileId.substring(0, 40) }
                     .mapNotNull { (_: String, photoSizes: List<PhotoSize>) -> photoSizes.maxByOrNull { it.fileSize } }
                     .mapNotNull { getImage(group, it.fileId, it.fileUniqueId) }.forEach(builder::add)
+                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
                 cacheService.cache(group.sendMessage(builder.build()).source, message)
             }
             message.hasText() -> {
@@ -147,13 +135,9 @@ class TgForwardHandler(
     private suspend fun uploadAndSend(
         message: Message,
         group: Group,
-        isMaster: Boolean,
-        id: Long,
-        username: String,
-        builder: MessageChainBuilder,
         file: org.telegram.telegrambots.meta.api.objects.File,
         fileName: String = "${file.fileId.substring(0, 40)}.${BotUtil.getSuffix(file.filePath)}",
-    ) {
+    ): MessageReceipt<Group> {
         var cacheFile = File(file.filePath)
         if (!cacheFile.exists() || !cacheFile.isFile) {
             cacheFile = File(BotUtil.getDocumentPath(fileName))
@@ -162,13 +146,11 @@ class TgForwardHandler(
             }
         }
 
-        withContext(Dispatchers.IO) {
-            group.sendFile("/$fileName", cacheFile).quote()
+        return withContext(Dispatchers.IO) {
+            val rec = group.sendFile("/$fileName", cacheFile)
+            cacheService.cache(rec.source, message)
+            return@withContext rec
         }
-        message.caption?.let {
-            builder.add(formatMsg(isMaster, id, username, it))
-        }
-        cacheService.cache(group.sendMessage(builder.build()).source, message)
     }
 
     private fun formatMsgAndQuote(
@@ -189,7 +171,7 @@ class TgForwardHandler(
         username: String,
         content: String,
     ): String {
-        return if (isMaster || username.isBlank()) {
+        return if (isMaster || username.isEmpty()) {
             content
         } else { //非空名称或是非主人则添加前缀
             qqMsgFormat
@@ -205,13 +187,10 @@ class TgForwardHandler(
         val client = ContextHolder.telegramBotClient
         val file = getTgFile(fileId, fileUniqueId)
         val suffix = BotUtil.getSuffix(file.filePath)
-        var image = File(file.filePath)
-        if (!image.exists() || !image.isFile) {
-            image = client.downloadFile(file)
-        }
-        if (suffix.equals("webp", true)) {
-            val png = BotUtil.webp2png(file.fileId, image)
-            if (png != null) image = png
+        val image = if (suffix.equals("webp", true)) {
+            BotUtil.webp2png(file)
+        } else {
+            File(file.filePath).takeIf { it.exists() } ?: client.downloadFile(file, BotUtil.getImage(fileId))
         }
 
         var ret: Image? = null

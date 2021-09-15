@@ -13,8 +13,7 @@ import kurenai.imsyncbot.utils.HttpUtil
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.*
-import net.mamoe.mirai.event.events.GroupAwareMessageEvent
-import net.mamoe.mirai.event.events.MessageRecallEvent
+import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import org.apache.commons.io.FileUtils
@@ -131,7 +130,7 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
             val medias = messageChain.filterIsInstance<Image>()
                 .map { image ->
                     cacheService.getFile(image.imageId)?.let {
-                        return@map InputMediaPhoto(it.fileId)
+                        return@map InputMediaPhoto(it.fileId).apply { mediaName = image.imageId }
                     }
 
                     val url = image.queryUrl()
@@ -154,9 +153,8 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                     sendSimpleMedia(chatId, replyId, medias.map { it.media }, msg, source)
                 }
             }
-        } else if (count == 1) {
-            messageChain[Image.Key]?.let { image ->
-
+        } else if (count > 0) {
+            messageChain.filterIsInstance<Image>().forEach { image ->
                 val imageSize: Long
                 val inputFile = cacheService.getFile(image.imageId).let {
                     if (it == null) {
@@ -279,6 +277,57 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         return CONTINUE
     }
 
+    fun onGroupEvent(event: GroupEvent) {
+        val msg = when (event) {
+            is MemberJoinEvent -> {
+                val tag = "\\#入群"
+                when (event) {
+                    is MemberJoinEvent.Active -> {
+                        "$tag *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*主动入群"
+                    }
+                    is MemberJoinEvent.Invite -> {
+                        "$tag *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*通过*${event.invitor.remarkOrNameCardOrNick.format2Markdown()}\\(${event.invitor.id}\\)*的邀请入群"
+                    }
+                    else -> return
+                }
+            }
+            is MemberLeaveEvent -> {
+                val tag = "\\#退群"
+                when (event) {
+                    is MemberLeaveEvent.Kick -> {
+                        "$tag *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*被踢出群"
+                    }
+                    is MemberLeaveEvent.Quit -> {
+                        "$tag *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*主动退群"
+                    }
+                    else -> return
+                }
+            }
+            is MemberMuteEvent -> {
+                "\\#禁言 *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*被禁言${event.durationSeconds / 60}分钟"
+            }
+            is GroupMuteAllEvent -> {
+                "\\#禁言 *${event.operator?.remarkOrNameCardOrNick?.format2Markdown()}(${event.operator?.id})*禁言了所有人"
+            }
+            is MemberUnmuteEvent -> {
+                "\\#解除禁言 *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*被*${event.operator?.remarkOrNameCardOrNick?.format2Markdown()}\\(${event.operator?.id}\\)*解除禁言"
+            }
+            is MemberCardChangeEvent -> {
+                if (event.new.isNotEmpty()) {
+                    "\\#名称 *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*将名字*${event.origin.format2Markdown()}*改为*${event.new.format2Markdown()}*"
+                } else {
+                    return
+                }
+            }
+            is MemberSpecialTitleChangeEvent -> {
+                "\\#头衔 *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*获得头衔*${event.new.format2Markdown()}*"
+            }
+            else -> return
+        }
+        val chatId = ContextHolder.qqTgBinding[event.group.id] ?: ContextHolder.defaultTgGroup
+        ContextHolder.telegramBotClient.execute(SendMessage(chatId.toString(), msg).apply { parseMode = ParseMode.MARKDOWNV2 })
+    }
+
     private fun getSingleContent(group: Group, atAccount: AtomicLong, msg: SingleMessage): String {
         return if (msg is At) {
             val target = msg.target
@@ -309,26 +358,33 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
             offset += 10
         }
 
+        var count = 0
         mediaGroups.forEach { list ->
             val builder = SendMediaGroup.builder()
             replyId?.let(builder::replyToMessageId)
-            ContextHolder.telegramBotClient.execute(
-                builder
-                    .medias(list)
-                    .chatId(chatId)
-                    .build()
-            ).let { result ->
-                source?.let { source -> cacheService.cache(source, result[0]) }
+            try {
+                ContextHolder.telegramBotClient.execute(
+                    builder
+                        .medias(list)
+                        .chatId(chatId)
+                        .build()
+                ).let { result ->
+                    source?.let { source -> cacheService.cache(source, result[0]) }
+                }
+            } catch (e: Exception) {
+                log.error(e) { "Send group medias[$count] fail." }
+                sendSimpleMedia(chatId, replyId, medias.map(InputMediaPhoto::getMedia), medias[0].caption, source)
             }
+            count++
         }
     }
 
-    private fun sendSimpleMedia(chatId: String, replyId: Int?, urls: List<String>, msg: String, source: OnlineMessageSource?, mask: String = "图片"): Message {
+    private fun sendSimpleMedia(chatId: String, replyId: Int?, urls: List<String>, msg: String?, source: OnlineMessageSource?, mask: String = "图片"): Message {
         var urlStr = ""
         for (url in urls) {
             urlStr += "[$mask]($url)\n"
         }
-        return ContextHolder.telegramBotClient.execute(SendMessage(chatId, "$urlStr${msg.format2Markdown()}").apply {
+        return ContextHolder.telegramBotClient.execute(SendMessage(chatId, "$urlStr${msg?.format2Markdown()}").apply {
             this.replyToMessageId = replyId
             this.parseMode = ParseMode.MARKDOWNV2
         }).let { rec ->

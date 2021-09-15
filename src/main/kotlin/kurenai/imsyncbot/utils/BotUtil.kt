@@ -23,6 +23,10 @@ object BotUtil {
         return IMAGE_PATH + imageName
     }
 
+    fun getImage(fileId: String): File {
+        return File(getImagePath("$fileId.webp"))
+    }
+
     fun getDocumentPath(docName: String): String {
         return DOCUMENT_PATH + docName
     }
@@ -54,6 +58,23 @@ object BotUtil {
             log.error(e) { e.message }
         }
         return null
+    }
+
+    fun webp2png(file: org.telegram.telegrambots.meta.api.objects.File): File {
+        val pngFile = File(getImagePath("${file.fileId}.png"))
+        val webpFile: File
+        if (pngFile.exists()) return pngFile
+        else {
+            pngFile.parentFile.mkdirs()
+            webpFile = File(file.filePath).takeIf { it.exists() } ?: File(getImagePath("${file.fileId}.webp"))
+            if (!webpFile.exists()) {
+                ContextHolder.telegramBotClient.downloadFile(file, webpFile)
+            }
+        }
+        val future =
+            Runtime.getRuntime().exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
+        future.get()
+        return pngFile
     }
 
     fun mp42gif(id: String, tgFile: org.telegram.telegrambots.meta.api.objects.File): File? {
