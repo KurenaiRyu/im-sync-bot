@@ -161,8 +161,13 @@ class TgForwardHandler(
         content: String,
         builder: MessageChainBuilder,
     ) {
-        quoteMsgSource?.quote()?.let(builder::add)
-        builder.add(formatMsg(isMaster, id, username, content))
+        val msg = if (quoteMsgSource != null) {
+            builder.add(quoteMsgSource.quote())
+            content.takeIf { it.isNotEmpty() } ?: " "
+        } else {
+            content
+        }
+        builder.add(formatMsg(isMaster, id, username, msg))
     }
 
     private fun formatMsg(

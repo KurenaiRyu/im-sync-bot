@@ -17,9 +17,7 @@ import org.springframework.stereotype.Component
 import org.telegram.telegrambots.bots.DefaultBotOptions
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod
-import org.telegram.telegrambots.meta.api.methods.send.SendAnimation
-import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage
+import org.telegram.telegrambots.meta.api.methods.send.*
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageMedia
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText
 import org.telegram.telegrambots.meta.api.objects.Message
@@ -194,22 +192,64 @@ class TelegramBotClient(
         }
     }
 
+    @Throws(TelegramApiException::class)
+    fun send(sendDocument: SendDocument): Message? {
+        rateLimiter.acquireForFile()
+        return super.execute(sendDocument)
+    }
+
+    @Throws(TelegramApiException::class)
+    fun send(sendPhoto: SendPhoto): Message {
+        rateLimiter.acquireForFile()
+        return super.execute(sendPhoto)
+    }
+
+    @Throws(TelegramApiException::class)
+    fun send(sendVideo: SendVideo): Message {
+        rateLimiter.acquireForFile()
+        return super.execute(sendVideo)
+    }
+
+    @Throws(TelegramApiException::class)
+    fun send(sendVideoNote: SendVideoNote): Message {
+        rateLimiter.acquire()
+        return super.execute(sendVideoNote)
+    }
+
+    @Throws(TelegramApiException::class)
+    fun send(sendSticker: SendSticker): Message {
+        rateLimiter.acquireForFile()
+        return super.execute(sendSticker)
+    }
+
+    @Throws(TelegramApiException::class)
+    fun send(sendAudio: SendAudio): Message {
+        rateLimiter.acquireForFile()
+        return super.execute(sendAudio)
+    }
+
+    @Throws(TelegramApiException::class)
+    fun send(sendVoice: SendVoice): Message {
+        rateLimiter.acquireForFile()
+        return super.execute(sendVoice)
+    }
+
     override fun execute(sendMediaGroup: SendMediaGroup): MutableList<Message> {
         rateLimiter.acquireForFile(sendMediaGroup.medias.size)
         return super.execute(sendMediaGroup)
     }
 
-    override fun execute(sendAnimation: SendAnimation?): Message {
+    override fun execute(sendAnimation: SendAnimation): Message {
         rateLimiter.acquireForFile()
         return super.execute(sendAnimation)
     }
 
-    override fun <T : Serializable?, Method : BotApiMethod<T>?> execute(method: Method): T {
+    override fun <T : Serializable, Method : BotApiMethod<T>> execute(method: Method): T {
         rateLimiter.acquire()
         return super.execute(method)
     }
 
-    override fun execute(editMessageMedia: EditMessageMedia?): Serializable {
+    override fun execute(editMessageMedia: EditMessageMedia): Serializable {
         rateLimiter.acquire()
         return super.execute(editMessageMedia)
     }

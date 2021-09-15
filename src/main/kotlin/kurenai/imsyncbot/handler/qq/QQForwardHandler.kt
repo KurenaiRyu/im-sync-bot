@@ -189,13 +189,13 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                         if (imageSize > picToFileSize) {
                             val builder = SendDocument.builder()
                             replyId?.let(builder::replyToMessageId)
-                            client.execute(
+                            client.send(
                                 builder.caption(msg).chatId(chatId).document(inputFile).thumb(inputFile).build()
                             )
                         } else {
                             val builder = SendPhoto.builder()
                             replyId?.let(builder::replyToMessageId)
-                            client.execute(builder.caption(msg).chatId(chatId).photo(inputFile).build())
+                            client.send(builder.caption(msg).chatId(chatId).photo(inputFile).build())
                         }
                     }?.let { m ->
                         cacheMsg(source, m, inputFile, image.imageId, imageSize)
@@ -216,13 +216,13 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                 val inputFile = InputFile(file)
                 val filename: String = downloadInfo.filename.lowercase()
                 if (filename.endsWith(".mkv") || filename.endsWith(".mp4")) {
-                    client.execute(SendVideo.builder().video(inputFile).chatId(chatId).caption(msg).build())
+                    client.send(SendVideo.builder().video(inputFile).chatId(chatId).caption(msg).build())
                 } else if (filename.endsWith(".bmp") || filename.endsWith(".jpeg") || filename.endsWith(".jpg") || filename.endsWith(".png")) {
-                    client.execute(
+                    client.send(
                         SendDocument.builder().document(inputFile).thumb(InputFile(url)).chatId(chatId).caption(msg).build()
                     )
                 } else {
-                    client.execute(SendDocument.builder().document(inputFile).chatId(chatId).caption(msg).build())
+                    client.send(SendDocument.builder().document(inputFile).chatId(chatId).caption(msg).build())
                 }
             } catch (e: Exception) {
                 log.error(e) { e.message }
@@ -238,7 +238,7 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                     }
                 }
                 try {
-                    client.execute(SendVoice.builder().chatId(chatId).voice(InputFile(file)).build())
+                    client.send(SendVoice.builder().chatId(chatId).voice(InputFile(file)).build())
                 } catch (e: Exception) {
                     sendSimpleMedia(chatId, replyId, listOf(url), msg, source, "语音")
                 }

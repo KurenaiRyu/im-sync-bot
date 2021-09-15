@@ -56,7 +56,7 @@ class PicSourceHandler(
         val chartId = forwardProperties.group.qqTelegram[event.subject.id] ?: ContextHolder.defaultTgGroup
         val caption = "[SAUCE\\_NAO](${sauce_nao})\n[ASCII2D](${asscii2d})"
         try {
-            ContextHolder.telegramBotClient.execute(
+            ContextHolder.telegramBotClient.send(
                 SendPhoto.builder().chatId(chartId.toString()).caption(caption).photo(InputFile(url)).parseMode(ParseMode.MARKDOWNV2)
                     .build()
             )
