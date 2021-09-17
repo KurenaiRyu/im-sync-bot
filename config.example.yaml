@@ -10,7 +10,7 @@ spring:
     hikari:
       auto-commit: true
   redis:
-    host: ${RDIS_HOST:localhost}
+    host: ${REDIS_HOST:localhost}
 bot:
   telegram:
     token: 1234567:adgcgasdfadf # tg机器人token
