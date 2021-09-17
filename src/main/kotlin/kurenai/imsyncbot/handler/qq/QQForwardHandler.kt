@@ -197,12 +197,17 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                             replyId?.let(builder::replyToMessageId)
                             client.send(builder.caption(msg).chatId(chatId).photo(inputFile).build())
                         }
-                    }?.let { m ->
-                        cacheMsg(source, m, inputFile, image.imageId, imageSize)
                     }
                 } catch (e: Exception) {
-                    log.error(e) { e.message }
-                    sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, source)
+                    log.error(e) { "Send image fail." }
+                    try {
+                        client.send(SendDocument(chatId, inputFile))
+                    } catch (e: Exception) {
+                        log.error(e) { "Send image fall back to send document fail." }
+                        sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, source)
+                    }
+                }?.let { m ->
+                    cacheMsg(source, m, inputFile, image.imageId, imageSize)
                 }
             }
         } else if (messageChain.contains(FileMessage.Key)) {
@@ -349,27 +354,44 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         if (medias.isEmpty()) return
         val mediaGroups = ArrayList<List<InputMediaPhoto>>()
         var offset = 0
+        val increase = 5
         while (offset < medias.size) {
             val value = ArrayList<InputMediaPhoto>()
-            for (n in offset until min(offset + 10, medias.size)) {
+            for (n in offset until min(offset + increase, medias.size)) {
                 value.add(medias[n])
             }
             mediaGroups.add(value)
-            offset += 10
+            offset += increase
         }
 
         var count = 0
         mediaGroups.forEach { list ->
-            val builder = SendMediaGroup.builder()
-            replyId?.let(builder::replyToMessageId)
+            val client = ContextHolder.telegramBotClient
             try {
-                ContextHolder.telegramBotClient.execute(
-                    builder
-                        .medias(list)
-                        .chatId(chatId)
-                        .build()
-                ).let { result ->
-                    source?.let { source -> cacheService.cache(source, result[0]) }
+                if (list.size > 1) {
+                    val builder = SendMediaGroup.builder()
+                    replyId?.let(builder::replyToMessageId)
+                    client.execute(
+                        builder
+                            .medias(list)
+                            .chatId(chatId)
+                            .build()
+                    ).let { result ->
+                        source?.let { source -> cacheService.cache(source, result[0]) }
+                    }
+                } else if (list.size == 1) {
+                    val builder = SendPhoto.builder()
+                    replyId?.let(builder::replyToMessageId)
+                    val file = list[0].newMediaFile
+                    client.execute(
+                        builder
+                            .photo(InputFile(file, file.name))
+                            .chatId(chatId)
+                            .caption(list[0].caption)
+                            .build()
+                    ).let { result ->
+                        source?.let { source -> cacheService.cache(source, result) }
+                    }
                 }
             } catch (e: Exception) {
                 log.error(e) { "Send group medias[$count] fail." }

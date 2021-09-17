@@ -26,6 +26,8 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.Serializable
+import java.util.concurrent.TimeUnit
+import java.util.function.Supplier
 
 /**
  * 机器人实例
@@ -45,7 +47,10 @@ class TelegramBotClient(
 
     private val log = KotlinLogging.logger {}
     private val mapper: ObjectMapper = ObjectMapper()
-    val rateLimiter = RateLimiter()
+    private val rateLimiterLock = Object()
+    private val time = TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
+    val rateLimiter = RateLimiter(rateLimiterLock, time = time)
+    val fileRateLimiter = RateLimiter(rateLimiterLock, "FileRateLimiter", 0.25, 10, time)
 
     override fun getBotUsername(): String {
         return telegramBotProperties.username
@@ -194,20 +199,63 @@ class TelegramBotClient(
 
     @Throws(TelegramApiException::class)
     fun send(sendDocument: SendDocument): Message? {
-        rateLimiter.acquireForFile()
-        return super.execute(sendDocument)
+        return executeFile(sendDocument.document.isNew) {
+            super.execute(sendDocument)
+        }
     }
 
     @Throws(TelegramApiException::class)
     fun send(sendPhoto: SendPhoto): Message {
-        rateLimiter.acquireForFile()
-        return super.execute(sendPhoto)
+        return executeFile(sendPhoto.photo.isNew) {
+            super.execute(sendPhoto)
+        }
     }
 
     @Throws(TelegramApiException::class)
     fun send(sendVideo: SendVideo): Message {
-        rateLimiter.acquireForFile()
-        return super.execute(sendVideo)
+        return executeFile(sendVideo.video.isNew) {
+            super.execute(sendVideo)
+        }
+    }
+    @Throws(TelegramApiException::class)
+    fun send(sendSticker: SendSticker): Message {
+        return executeFile(sendSticker.sticker.isNew) {
+            super.execute(sendSticker)
+        }
+    }
+
+    @Throws(TelegramApiException::class)
+    fun send(sendAudio: SendAudio): Message {
+        return executeFile(sendAudio.audio.isNew) {
+            super.execute(sendAudio)
+        }
+    }
+
+    @Throws(TelegramApiException::class)
+    fun send(sendVoice: SendVoice): Message {
+        return executeFile(sendVoice.voice.isNew) {
+            super.execute(sendVoice)
+        }
+    }
+
+    override fun execute(sendMediaGroup: SendMediaGroup): MutableList<Message> {
+        return executeFile(size = sendMediaGroup.medias.size) {
+            super.execute(sendMediaGroup)
+        }
+    }
+
+    override fun execute(sendAnimation: SendAnimation): Message {
+        val supplier = Supplier {
+            super.execute(sendAnimation)
+        }
+        return if (sendAnimation.animation.isNew) {
+            fileRateLimiter.acquire {
+                supplier.get()
+            }
+        } else {
+            rateLimiter.acquire()
+            supplier.get()
+        }
     }
 
     @Throws(TelegramApiException::class)
@@ -216,33 +264,6 @@ class TelegramBotClient(
         return super.execute(sendVideoNote)
     }
 
-    @Throws(TelegramApiException::class)
-    fun send(sendSticker: SendSticker): Message {
-        rateLimiter.acquireForFile()
-        return super.execute(sendSticker)
-    }
-
-    @Throws(TelegramApiException::class)
-    fun send(sendAudio: SendAudio): Message {
-        rateLimiter.acquireForFile()
-        return super.execute(sendAudio)
-    }
-
-    @Throws(TelegramApiException::class)
-    fun send(sendVoice: SendVoice): Message {
-        rateLimiter.acquireForFile()
-        return super.execute(sendVoice)
-    }
-
-    override fun execute(sendMediaGroup: SendMediaGroup): MutableList<Message> {
-        rateLimiter.acquireForFile(sendMediaGroup.medias.size)
-        return super.execute(sendMediaGroup)
-    }
-
-    override fun execute(sendAnimation: SendAnimation): Message {
-        rateLimiter.acquireForFile()
-        return super.execute(sendAnimation)
-    }
 
     override fun <T : Serializable, Method : BotApiMethod<T>> execute(method: Method): T {
         rateLimiter.acquire()
@@ -252,5 +273,16 @@ class TelegramBotClient(
     override fun execute(editMessageMedia: EditMessageMedia): Serializable {
         rateLimiter.acquire()
         return super.execute(editMessageMedia)
+    }
+
+    private fun <T> executeFile(isNew: Boolean = true, size: Int = 1, supplier: Supplier<T>): T {
+        return if (isNew) {
+            fileRateLimiter.acquire(size) {
+                supplier.get()
+            }
+        } else {
+            rateLimiter.acquire(size)
+            supplier.get()
+        }
     }
 }

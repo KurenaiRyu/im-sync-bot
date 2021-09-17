@@ -2,16 +2,20 @@ package kurenai.imsyncbot.utils
 
 import mu.KotlinLogging
 import java.util.concurrent.TimeUnit
+import java.util.function.Supplier
 import kotlin.math.max
 import kotlin.math.min
 
-class RateLimiter(val permitsPerSecond: Long = 5L, private val bucketSize: Long = 20L) {
+class RateLimiter(
+    private val lock: Object,
+    private val name: String = "RateLimiter",
+    permitsPerSecond: Double = 5.0,
+    private val bucketSize: Long = 20,
+    private var time: Long = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()),
+    private val rate: Long = (TimeUnit.SECONDS.toMillis(1) / permitsPerSecond).toLong(),
+) {
 
     private val log = KotlinLogging.logger {}
-
-    var time = TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
-    private val rate = TimeUnit.SECONDS.toMillis(1) / permitsPerSecond
-    private val lock = Object()
 
     fun acquire() {
         return acquire(1)
@@ -21,24 +25,28 @@ class RateLimiter(val permitsPerSecond: Long = 5L, private val bucketSize: Long 
         acquire(permits, rate)
     }
 
-    fun acquireForFile() {
-        acquireForFile(1)
+    fun <T> acquire(supplier: Supplier<T>): T {
+        return acquire(1, supplier)
     }
 
-    fun acquireForFile(permits: Int) {
-        acquire(permits, TimeUnit.SECONDS.toMillis(5))
+    fun <T> acquire(permits: Int, supplier: Supplier<T>): T {
+        synchronized(lock) {
+            val ret: T = supplier.get()
+            acquire(permits, rate)
+            return ret
+        }
     }
 
     private fun acquire(permits: Int, rate: Long) {
+        log.debug { "$name has ${min((now() - time) / this.rate, bucketSize)} tokens, acquire ${permits * rate / this.rate} tokens." }
         synchronized(lock) {
             val now = now()
-            log.debug { "Has ${min((now - time) / this.rate, bucketSize)} tokens, acquire ${permits * rate / this.rate} tokens." }
             time = max(time, now - bucketSize * this.rate) + permits * rate
             if (time > now) {
                 lock.wait(time - now)
             }
-            log.debug { "Acquire successes, now has ${min((now() - time) / this.rate, bucketSize)} tokens." }
         }
+        log.debug { "Acquire successes, now has ${min((now() - time) / this.rate, bucketSize)} tokens." }
     }
 
     private fun now(): Long {
