@@ -16,6 +16,9 @@ java.sourceCompatibility = JavaVersion.VERSION_11
 
 repositories {
     mavenLocal()
+//    maven { url = uri("https://maven.aliyun.com/repository/public/") }
+//    maven { url = uri("https://maven.aliyun.com/repository/spring/") }
+    maven { url = uri("https://github.com/KurenaiRyu/maven-repo/raw/release/") }
     mavenCentral()
     maven("https://m2.dv8tion.net/releases")
 }
