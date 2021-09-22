@@ -1,5 +1,7 @@
 package kurenai.imsyncbot.handler.qq
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ContextHolder
@@ -17,6 +19,7 @@ import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import org.apache.commons.io.FileUtils
+import org.apache.commons.lang3.StringUtils
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.ParseMode
 import org.telegram.telegrambots.meta.api.methods.send.*
@@ -34,6 +37,8 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
 
     private val log = KotlinLogging.logger {}
 
+    private val xmlMapper = XmlMapper()
+    private val jsonMapper = ObjectMapper()
     private val bindingName: Map<Long, String>
     private val picToFileSize = 500 * 1024
     private var tgMsgFormat = "\$name: \$msg"
@@ -58,7 +63,12 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         val content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
         val chatId = ContextHolder.qqTgBinding[group.id] ?: ContextHolder.defaultTgGroup
 
-        if (content.startsWith("<?xml version='1.0'") || content.contains("\"app\":")) return CONTINUE
+        if (content.startsWith("<?xml version='1.0'")) {
+            return handleRichMessage(event, chatId, senderName)
+        }
+        if (content.contains("\"app\":")) {
+            return handleAppMessage(event, chatId, senderName)
+        }
 
         if (messageChain.contains(ForwardMessage.Key)) {
             return onGroupForwardMessage(
@@ -85,6 +95,37 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         return CONTINUE
     }
 
+    private suspend fun handleAppMessage(event: GroupAwareMessageEvent, chatId: Long, senderName: String): Int {
+        val jsonNode = jsonMapper.readTree(event.message.contentToString())
+        val url = if (jsonNode["view"].asText("") == "news") {
+            val news = jsonNode["meta"]?.get("news")
+            news?.get("jumpUrl")?.asText() ?: ""
+        } else {
+            val item = jsonNode["meta"]?.get("detail_1")
+            item?.get("qqdocurl")?.asText() ?: ""
+        }
+        if (url.isNotBlank()) return handleGroupMessage(buildMessageChain { add(handleUrl(url)) }, event.group, chatId.toString(), event.sender.id, senderName)
+        return CONTINUE
+    }
+
+    private suspend fun handleRichMessage(event: GroupAwareMessageEvent, chatId: Long, senderName: String): Int {
+        val jsonNode = xmlMapper.readTree(event.message.contentToString())
+        val action = jsonNode["action"].asText("")
+        val url: String
+        if (action == "web") {
+            url = handleUrl(jsonNode["url"]?.asText() ?: "")
+            return handleGroupMessage(buildMessageChain { add(url) }, event.group, chatId.toString(), event.sender.id, senderName)
+        }
+        return CONTINUE
+    }
+
+    private fun handleUrl(url: String): String {
+        if (StringUtils.isNotBlank(url) && url.contains("?") && url.contains("b23.tv")) {
+            return url.substring(0, url.indexOf("?"))
+        }
+        return url
+    }
+
     private suspend fun handleGroupMessage(
         messageChain: MessageChain,
         group: Group,
@@ -99,8 +140,6 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         val replyId = messageChain[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
         val atAccount = AtomicLong(-100)
         var content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
-
-        if (content.startsWith("<?xml version='1.0'") || content.contains("\"app\":")) return CONTINUE
 
         val isMaster = ContextHolder.qqBot.id == senderId || ContextHolder.masterOfQQ == senderId
 
