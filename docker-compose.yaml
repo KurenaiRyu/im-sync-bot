@@ -9,7 +9,7 @@ services:
       #      BASE_URL: "http://api:8081/bot"
       REDIS_HOST: "redis"
     volumes:
-      - ./data:/var/lib/telegram-bot-api/
+      - ./api-data:/var/lib/telegram-bot-api/
       - ./device.json:/im-sync-bot/device.json
       - ./cache:/im-sync-bot/cache
       - ./config.yaml:/im-sync-bot/config.yaml
