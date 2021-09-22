@@ -18,11 +18,12 @@ class BindGroupCommand(
     private val log = KotlinLogging.logger {}
 
     override fun execute(update: Update): Boolean {
-        if (update.message.from.id != ContextHolder.masterOfTg) {
+        if (!ContextHolder.masterOfTg.contains(update.message.from.id)) {
             ContextHolder.telegramBotClient.execute(
                 SendMessage.builder().chatId(update.message.chatId.toString()).text("Only for master.")
                     .replyToMessageId(update.message.messageId).build()
             )
+            return false
         }
 
         val rec = doExec(update.message.text)

@@ -15,7 +15,7 @@ class StartCommand(val botConfigRepository: BotConfigRepository) : Command {
     override fun execute(update: Update): Boolean {
         if (update.hasMessage()) {
             val message = update.message
-            if (message.isUserMessage && message.from.id == ContextHolder.masterOfTg) {
+            if (message.isUserMessage && ContextHolder.masterOfTg.contains(message.from.id)) {
                 val chatId = message.chatId.toString()
                 botConfigRepository.save(BotConfig(BotConfigConstant.MASTER_CHAT_ID, chatId))
                 ContextHolder.masterChatId = message.chatId

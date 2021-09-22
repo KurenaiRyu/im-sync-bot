@@ -11,8 +11,8 @@ class ForwardHandlerProperties {
 
     var tgMsgFormat = "\$name: \$msg"
     var qqMsgFormat = "\$name: \$msg"
-    var masterOfTg = 0L
-    var masterOfQq = 0L
+    var masterOfTg = emptyList<Long>()
+    var masterOfQq = emptyList<Long>()
     var group = Group()
     var member = Member()
 

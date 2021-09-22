@@ -141,7 +141,7 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         val atAccount = AtomicLong(-100)
         var content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
 
-        val isMaster = ContextHolder.qqBot.id == senderId || ContextHolder.masterOfQQ == senderId
+        val isMaster = ContextHolder.qqBot.id == senderId || ContextHolder.masterOfQQ.contains(senderId)
 
         if (isMaster && changeMsgFormatCmd(content)) {
             val demoContent = "demo msg."
@@ -324,47 +324,47 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
     fun onGroupEvent(event: GroupEvent) {
         val msg = when (event) {
             is MemberJoinEvent -> {
-                val tag = "\\#入群"
+                val tag = "\\#入群 \\#id${event.member.id} \\#group${event.group.id}\n"
                 when (event) {
                     is MemberJoinEvent.Active -> {
-                        "$tag *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*主动入群"
+                        "$tag`${event.member.remarkOrNameCardOrNick.format2Markdown()}`主动入群`${event.group.name}`"
                     }
                     is MemberJoinEvent.Invite -> {
-                        "$tag *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*通过*${event.invitor.remarkOrNameCardOrNick.format2Markdown()}\\(${event.invitor.id}\\)*的邀请入群"
+                        "$tag`${event.member.remarkOrNameCardOrNick.format2Markdown()}`通过`${event.invitor.remarkOrNameCardOrNick.format2Markdown()}` \\#id${event.invitor.id}\\ 的邀请入群`${event.group.name}`"
                     }
                     else -> return
                 }
             }
             is MemberLeaveEvent -> {
-                val tag = "\\#退群"
+                val tag = "\\#退群 \\#id${event.member.id} \\#group${event.group.id}\n"
                 when (event) {
                     is MemberLeaveEvent.Kick -> {
-                        "$tag *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*被踢出群"
+                        "$tag`${event.member.remarkOrNameCardOrNick.format2Markdown()}`被踢出群`${event.group.name}`"
                     }
                     is MemberLeaveEvent.Quit -> {
-                        "$tag *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*主动退群"
+                        "$tag`${event.member.remarkOrNameCardOrNick.format2Markdown()}`主动退群`${event.group.name}`"
                     }
                     else -> return
                 }
             }
             is MemberMuteEvent -> {
-                "\\#禁言 *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*被禁言${event.durationSeconds / 60}分钟"
+                "\\#禁言 \\#id${event.member.id}\n`${event.member.remarkOrNameCardOrNick.format2Markdown()}`被禁言${event.durationSeconds / 60}分钟"
             }
             is GroupMuteAllEvent -> {
-                "\\#禁言 *${event.operator?.remarkOrNameCardOrNick?.format2Markdown()}(${event.operator?.id})*禁言了所有人"
+                "\\#禁言\n`${event.operator?.remarkOrNameCardOrNick?.format2Markdown()}` \\#id${event.operator?.id} 禁言了所有人"
             }
             is MemberUnmuteEvent -> {
-                "\\#解除禁言 *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*被*${event.operator?.remarkOrNameCardOrNick?.format2Markdown()}\\(${event.operator?.id}\\)*解除禁言"
+                "\\#禁言\n`${event.member.remarkOrNameCardOrNick.format2Markdown()}` \\#${event.member.id} 被`${event.operator?.remarkOrNameCardOrNick?.format2Markdown()})` \\#id${event.operator?.id} 解除禁言"
             }
             is MemberCardChangeEvent -> {
                 if (event.new.isNotEmpty()) {
-                    "\\#名称 *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*将名字*${event.origin.format2Markdown()}*改为*${event.new.format2Markdown()}*"
+                    "\\#名称 \\#id${event.member.id}\n`${event.origin.format2Markdown()}`改为`${event.new.format2Markdown()}`"
                 } else {
                     return
                 }
             }
             is MemberSpecialTitleChangeEvent -> {
-                "\\#头衔 *${event.member.remarkOrNameCardOrNick.format2Markdown()}\\(${event.member.id}\\)*获得头衔*${event.new.format2Markdown()}*"
+                "\\#头衔 #id${event.member.id}\n`${event.member.remarkOrNameCardOrNick.format2Markdown()})`获得头衔`${event.new.format2Markdown()}`"
             }
             else -> return
         }

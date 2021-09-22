@@ -68,7 +68,7 @@ class TgForwardHandler(
             return CONTINUE
         }
         val senderId = message.from.id
-        val isMaster = senderId == ContextHolder.masterOfTg
+        val isMaster = ContextHolder.masterOfTg.contains(senderId)
         val senderName = getSenderName(message)
         val caption = message.caption ?: ""
         when {

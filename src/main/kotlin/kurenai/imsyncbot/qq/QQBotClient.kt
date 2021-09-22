@@ -107,15 +107,17 @@ class QQBotClient(
             val message = event.message
             val sender = event.sender
             val group = event.group
-            val master = ContextHolder.qqBot.getFriend(ContextHolder.masterOfQQ)
-            master?.takeIf { it.id != 0L }?.sendMessage(
-                master.sendMessage(message).quote()
-                    .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
-            )
-            ContextHolder.telegramBotClient.execute(
-                SendMessage.builder().chatId(BotUtil.getTgChatByQQ(event.group.id).toString()).text(event.message.contentToString())
-                    .build()
-            )
+            for (qq in ContextHolder.masterOfQQ) {
+                val master = ContextHolder.qqBot.getFriend(qq)
+                master?.takeIf { it.id != 0L }?.sendMessage(
+                    master.sendMessage(message).quote()
+                        .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
+                )
+                ContextHolder.telegramBotClient.execute(
+                    SendMessage.builder().chatId(BotUtil.getTgChatByQQ(event.group.id).toString()).text(event.message.contentToString())
+                        .build()
+                )
+            }
         }
     }
 
