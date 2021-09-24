@@ -6,3 +6,5 @@ build
 *.log
 *.gz
 *.iml
+api-data
+redis-data
