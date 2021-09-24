@@ -20,12 +20,11 @@ repositories {
 //    maven { url = uri("https://maven.aliyun.com/repository/spring/") }
     maven { url = uri("https://github.com/KurenaiRyu/maven-repo/raw/release/") }
     mavenCentral()
-    maven("https://m2.dv8tion.net/releases")
 }
 
 dependencies {
 
-    val miraiVersion = "2.7.1-dev-1"
+    val miraiVersion = "2.8.0-M1"
 
     implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {
         exclude("net.mamoe", "mirai-core-api")
