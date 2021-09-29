@@ -4,9 +4,11 @@ import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.command.Command
 import kurenai.imsyncbot.domain.BindingGroup
 import kurenai.imsyncbot.repository.BindingGroupRepository
+import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.MessageEvent
 import org.springframework.stereotype.Component
+import org.telegram.telegrambots.meta.api.methods.ParseMode
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import org.telegram.telegrambots.meta.api.objects.Update
 
@@ -16,6 +18,7 @@ class BindGroupCommand(
 ) : Command {
 
     private val log = KotlinLogging.logger {}
+    private val errorMsg = "Command error.\nexample command: /bindGroup rm 123456"
 
     override fun execute(update: Update): Boolean {
         if (!ContextHolder.masterOfTg.contains(update.message.from.id)) {
@@ -26,17 +29,11 @@ class BindGroupCommand(
             return false
         }
 
-        val rec = doExec(update.message.text)
-        if (rec.isNotEmpty()) {
-            ContextHolder.telegramBotClient.execute(
-                SendMessage.builder().chatId(update.message.chatId.toString()).text(rec).replyToMessageId(update.message.messageId).build()
-            )
-        }
+        doExec(update)
         return false
     }
 
     override fun execute(event: MessageEvent): Boolean {
-        doExec(event.message.contentToString())
         return false
     }
 
@@ -48,20 +45,31 @@ class BindGroupCommand(
         return "/bindGroup 显示当前绑定列表\n/bindGroup <qqGroupId>:<tgGroupId(chatId)> 增加一对绑定关系\n/bindGroup rm <qqGroupId(tgGroupId)> 移除该id关联绑定(可以是qq或者tg)"
     }
 
-    private fun doExec(text: String): String {
+    private fun doExec(update: Update) {
+        val text = update.message.text
         val content = text.substring(10).trim()
-        if (content.isEmpty()) {
+        val rec = if (content.isEmpty()) {
             val sb = StringBuilder("qq-telegram group binding list\n----------------------")
             val qqBot = ContextHolder.qqBot
             ContextHolder.qqTgBinding.forEach {
-                sb.append("\n${it.key} <=> ${it.value}")
+                sb.append("\n*${it.key}* \\<\\=\\> *${it.value.toString().format2Markdown()}*")
                 qqBot.getGroup(it.key)?.let { group ->
-                    sb.append(" #${group.name}")
+                    sb.append(" ${group.name.format2Markdown()}")
                 }
             }
-            return sb.toString()
+            val msg = SendMessage(update.message.chatId.toString(), sb.toString())
+                .apply {
+                    this.parseMode = ParseMode.MARKDOWNV2
+                    this.replyToMessageId = update.message.messageId
+                }
+            try {
+                ContextHolder.telegramBotClient.execute(msg)
+            } catch (e: Exception) {
+                ContextHolder.telegramBotClient.execute(msg.apply { this.parseMode = null })
+            }
+            return
         } else if (content.startsWith("rm", true)) {
-            return try {
+            try {
                 val group = content.substring(2).trim().toLong()
                 var removed = ContextHolder.qqTgBinding.remove(group)
                 if (removed != null) {
@@ -77,7 +85,7 @@ class BindGroupCommand(
                 if (removed != null) "Remove success."
                 else "Not found group."
             } catch (e: Exception) {
-                "Command error.\nexample command: /bindGroup rm 123456"
+                errorMsg
             }
         } else {
             val split = content.split(":")
@@ -86,13 +94,20 @@ class BindGroupCommand(
                     repository.save(BindingGroup(split[0].toLong(), split[1].toLong()))
                     ContextHolder.qqTgBinding[split[0].toLong()] = split[1].toLong()
                     ContextHolder.tgQQBinding[split[1].toLong()] = split[0].toLong()
-                    return "Binding success."
+                    "Binding success."
                 } catch (e: Exception) {
                     log.error(e.message, e)
+                    errorMsg
                 }
+            } else {
+                errorMsg
             }
         }
-        return "Command error.\nexample command: /bindGroup 123456:654321"
+        if (rec.isNotEmpty()) {
+            ContextHolder.telegramBotClient.execute(
+                SendMessage.builder().chatId(update.message.chatId.toString()).text(rec).replyToMessageId(update.message.messageId).build()
+            )
+        }
     }
 
 
