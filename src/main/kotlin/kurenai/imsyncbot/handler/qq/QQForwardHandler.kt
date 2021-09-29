@@ -2,8 +2,7 @@ package kurenai.imsyncbot.handler.qq
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.domain.FileCache
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
@@ -44,12 +43,15 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
 
+    private val contextMap = HashMap<Long, ExecutorCoroutineDispatcher>()
+
     init {
         bindingName = properties.member.bindingName
         if (properties.tgMsgFormat.contains("\$msg")) tgMsgFormat = properties.tgMsgFormat
         if (properties.qqMsgFormat.contains("\$msg")) qqMsgFormat = properties.qqMsgFormat
     }
 
+    @OptIn(ObsoleteCoroutinesApi::class)
     @Throws(Exception::class)
     override suspend fun onGroupMessage(event: GroupAwareMessageEvent): Int {
         val group = event.group
@@ -63,23 +65,31 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         val content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
         val chatId = ContextHolder.qqTgBinding[group.id] ?: ContextHolder.defaultTgGroup
 
-        if (content.startsWith("<?xml version='1.0'")) {
-            return handleRichMessage(event, chatId, senderName)
-        }
-        if (content.contains("\"app\":")) {
-            return handleAppMessage(event, chatId, senderName)
-        }
-
-        if (messageChain.contains(ForwardMessage.Key)) {
-            return onGroupForwardMessage(
-                messageChain[ForwardMessage.Key]!!,
-                group,
-                chatId.toString(),
-                senderName
-            )
+        val singleContext = if (contextMap.contains(chatId)) {
+            contextMap[chatId]!!
+        } else {
+            newSingleThreadContext("Chat$chatId")
         }
 
-        return handleGroupMessage(messageChain, event.group, chatId.toString(), sender.id, senderName)
+        return withContext(singleContext) {
+            if (content.startsWith("<?xml version='1.0'")) {
+                return@withContext handleRichMessage(event, chatId, senderName)
+            }
+            if (content.contains("\"app\":")) {
+                return@withContext handleAppMessage(event, chatId, senderName)
+            }
+
+            if (messageChain.contains(ForwardMessage.Key)) {
+                return@withContext onGroupForwardMessage(
+                    messageChain[ForwardMessage.Key]!!,
+                    group,
+                    chatId.toString(),
+                    senderName
+                )
+            }
+            handleGroupMessage(messageChain, event.group, chatId.toString(), sender.id, senderName)
+        }
+
     }
 
     @Throws(TelegramApiException::class)
