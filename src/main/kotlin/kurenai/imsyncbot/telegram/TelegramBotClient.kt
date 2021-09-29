@@ -10,6 +10,7 @@ import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.command.Command
 import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.handler.Handler.Companion.END
+import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.RateLimiter
 import mu.KotlinLogging
@@ -43,6 +44,7 @@ class TelegramBotClient(
     private val commands: List<Command>,
     private val callbacks: List<Callback>,
     private val cacheService: CacheService,
+    private val privateChatHandler: PrivateChatHandler,
 ) : TelegramLongPollingBot(options) {
 
     private val log = KotlinLogging.logger {}
@@ -121,6 +123,10 @@ class TelegramBotClient(
             }
         }
 
+        if (message.chatId.equals(privateChatHandler.privateChat)) {
+            privateChatHandler.onPrivateChat(update)
+            return
+        }
 
         if (update.hasMessage() && (message.isGroupMessage || message.isSuperGroupMessage) ||
             update.hasEditedMessage() && (update.editedMessage.isSuperGroupMessage || update.editedMessage.isGroupMessage)

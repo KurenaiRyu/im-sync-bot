@@ -21,6 +21,8 @@ class CacheService(
         const val TG_QQ_MSG_ID_CACHE_KEY = "TG_QQ_MSG_ID_CACHE"
         const val QQ_TG_MSG_ID_CACHE_KEY = "QQ_TG_MSG_ID_CACHE"
         const val TG_FILE_CACHE_KEY = "TG_FILE_CACHE"
+        const val QQ_TG_PRIVATE_MSG_ID_CACHE_KEY = "QQ_TG_PRIVATE_MSG_ID_CACHE"
+        const val TG_QQ_PRIVATE_MSG_ID_CACHE_KEY = "TG_QQ_PRIVATE_MSG_ID_CACHE"
         val TTL = TimeUnit.DAYS.toMillis(7)
     }
 
@@ -35,6 +37,11 @@ class CacheService(
         cache.put(QQ_MSG_CACHE_KEY, qqMsgId, MessageSourceCache(source), TTL)
 
         cache(message)
+    }
+
+    fun cachePrivateChat(friendId: Long, messageId: Int) {
+        cache.put(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId, friendId)
+        cache.put(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId, messageId)
     }
 
     fun cacheFile(qqId: String, fileCache: FileCache) {
@@ -96,5 +103,13 @@ class CacheService(
         return getIdByQQ(id)?.let {
             getTg(it)
         }
+    }
+
+    fun getPrivateChatByQQ(friendId: Long): Int? {
+        return cache.get(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId)
+    }
+
+    fun getPrivateChatByTG(messageId: Int): Long? {
+        return cache.get(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId)
     }
 }

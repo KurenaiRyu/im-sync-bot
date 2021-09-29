@@ -8,6 +8,7 @@ import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
+import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.handler.qq.QQForwardHandler
 import kurenai.imsyncbot.telegram.TelegramBotClient
 import kurenai.imsyncbot.utils.BotUtil
@@ -15,10 +16,7 @@ import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
-import net.mamoe.mirai.event.events.BotEvent
-import net.mamoe.mirai.event.events.GroupAwareMessageEvent
-import net.mamoe.mirai.event.events.GroupEvent
-import net.mamoe.mirai.event.events.MessageRecallEvent
+import net.mamoe.mirai.event.events.*
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
@@ -28,6 +26,7 @@ class QQBotClient(
     private val properties: QQBotProperties,
     private val botProperties: BotProperties,
     private val handlerHolder: HandlerHolder,
+    private val privateChatHandler: PrivateChatHandler,
 ) : InitializingBean {
 
     private val log = KotlinLogging.logger {}
@@ -50,6 +49,10 @@ class QQBotClient(
             val filter = bot.eventChannel.filter { event ->
 
                 return@filter when (event) {
+                    is FriendEvent -> {
+                        privateChatHandler.onFriendEvent(event)
+                        false
+                    }
                     is GroupAwareMessageEvent -> {
                         val groupId = event.group.id
                         properties.filter.group.takeIf { it.isNotEmpty() }?.contains(groupId) != false

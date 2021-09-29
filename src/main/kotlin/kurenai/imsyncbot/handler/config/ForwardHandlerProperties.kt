@@ -15,6 +15,8 @@ class ForwardHandlerProperties {
     var masterOfQq = emptyList<Long>()
     var group = Group()
     var member = Member()
+    var privateChat = 0L
+    var privateChatChannel = 0L
 
     class Group {
         var defaultQQ: Long = 0
