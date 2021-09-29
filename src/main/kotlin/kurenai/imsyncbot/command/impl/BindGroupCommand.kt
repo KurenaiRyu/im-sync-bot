@@ -49,10 +49,10 @@ class BindGroupCommand(
         val text = update.message.text
         val content = text.substring(10).trim()
         val rec = if (content.isEmpty()) {
-            val sb = StringBuilder("qq-telegram group binding list\n----------------------")
+            val sb = StringBuilder("qq-telegram group binding list\n----------------------".format2Markdown())
             val qqBot = ContextHolder.qqBot
             ContextHolder.qqTgBinding.forEach {
-                sb.append("\n*${it.key}* \\<\\=\\> *${it.value.toString().format2Markdown()}*")
+                sb.append("\n`${it.key}` \\<\\=\\> `${it.value.toString().format2Markdown()}`")
                 qqBot.getGroup(it.key)?.let { group ->
                     sb.append(" ${group.name.format2Markdown()}")
                 }
@@ -65,6 +65,7 @@ class BindGroupCommand(
             try {
                 ContextHolder.telegramBotClient.execute(msg)
             } catch (e: Exception) {
+                log.debug { "列表发送失败: ${e.message}" }
                 ContextHolder.telegramBotClient.execute(msg.apply { this.parseMode = null })
             }
             return
