@@ -6,6 +6,7 @@ import kurenai.imsyncbot.repository.BotConfigRepository
 import mu.KotlinLogging
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.filefilter.AgeFileFilter
+import org.apache.commons.io.filefilter.SizeFileFilter
 import org.apache.commons.lang3.time.DateUtils
 import org.springframework.beans.factory.InitializingBean
 import java.io.File
@@ -24,11 +25,10 @@ class BotInitializer(
                 ContextHolder.masterChatId = it.toLong()
             }
         }
-
-        val clearCacheTimer = Timer("clear cache file", true)
+        val cacheDir = File("./cache")
+        val clearCacheTimer = Timer("ClearCacheFile", true)
         clearCacheTimer.scheduleAtFixedRate(timerTask {
-            val oldestAllowedFileDate = DateUtils.addDays(Date(), -3) //minus days from current date
-            val cacheDir = File("./cache")
+            val oldestAllowedFileDate = DateUtils.addDays(Date(), -5) //minus days from current date
 
             val filesToDelete = ArrayList<File>()
             cacheDir.listFiles()?.forEach { file ->
@@ -36,16 +36,30 @@ class BotInitializer(
                     filesToDelete.addAll(FileUtils.listFiles(file, AgeFileFilter(oldestAllowedFileDate), null))
                 }
             }
+            doDeleteCacheFile(filesToDelete)
+        }, 5000L, 12 * 60 * 60 * 1000L)
 
-            if (filesToDelete.isNotEmpty()) {
-                //if deleting subdirs, replace null above with TrueFileFilter.INSTANCE
-                log.info { "Clearing cache files..." }
-                filesToDelete.forEach {
-                    log.debug { "${it.name} deleted." }
-                    FileUtils.deleteQuietly(it)
-                } //I don't want an exception if a file is not deleted. Otherwise use filesToDelete.next().delete() in a try/catch
-                log.info { "Clear ${filesToDelete.size} cache files." }
+        val clearLargeCacheTimer = Timer("ClearLargeCacheFile", true)
+        clearLargeCacheTimer.scheduleAtFixedRate(timerTask {
+            val filesToDelete = ArrayList<File>()
+            cacheDir.listFiles()?.forEach { file ->
+                if (file.isDirectory) {
+                    filesToDelete.addAll(FileUtils.listFiles(file, SizeFileFilter(1 * 1024 * 1024L), null))
+                }
             }
-        }, 5000L, 24 * 60 * 60 * 1000L)
+            doDeleteCacheFile(filesToDelete)
+        }, 1000L, 6 * 60 * 60 * 1000L)
+    }
+
+    fun doDeleteCacheFile(filesToDelete: ArrayList<File>) {
+        if (filesToDelete.isNotEmpty()) {
+            //if deleting subdirs, replace null above with TrueFileFilter.INSTANCE
+            log.info { "Clearing cache files..." }
+            filesToDelete.forEach {
+                log.debug { "${it.name} deleted." }
+                FileUtils.deleteQuietly(it)
+            } //I don't want an exception if a file is not deleted. Otherwise use filesToDelete.next().delete() in a try/catch
+            log.info { "Clear ${filesToDelete.size} cache files." }
+        }
     }
 }
