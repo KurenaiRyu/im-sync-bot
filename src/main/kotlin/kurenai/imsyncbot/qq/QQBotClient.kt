@@ -2,6 +2,8 @@ package kurenai.imsyncbot.qq
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ObsoleteCoroutinesApi
+import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
@@ -30,6 +32,14 @@ class QQBotClient(
 ) : InitializingBean {
 
     private val log = KotlinLogging.logger {}
+    private val forwardHandler = handlerHolder.currentQQHandlerList.filterIsInstance<QQForwardHandler>()[0]
+
+    @OptIn(ObsoleteCoroutinesApi::class)
+    private val eventActor = CoroutineScope(Dispatchers.IO).actor<Event> {
+        for (msg in channel) {
+            doSubscribe(msg)
+        }
+    }
     val bot = BotFactory.newBot(properties.account, properties.password) {
         fileBasedDeviceInfo() // 使用 device.json 存储设备信息
         protocol = properties.protocol // 切换协议
@@ -45,14 +55,9 @@ class QQBotClient(
             bot.login()
             log.info { "Started qq-bot ${bot.nick}(${bot.id})" }
             ContextHolder.qqBot = bot
-            val forwardHandler = handlerHolder.currentQQHandlerList.filterIsInstance<QQForwardHandler>()[0]
             val filter = bot.eventChannel.filter { event ->
 
                 return@filter when (event) {
-                    is FriendEvent -> {
-                        privateChatHandler.onFriendEvent(event)
-                        false
-                    }
                     is GroupAwareMessageEvent -> {
                         val groupId = event.group.id
                         properties.filter.group.takeIf { it.isNotEmpty() }?.contains(groupId) != false
@@ -62,10 +67,6 @@ class QQBotClient(
                     is MessageRecallEvent -> {
                         true
                     }
-                    is GroupEvent -> {
-                        forwardHandler.onGroupEvent(event)
-                        false
-                    }
                     else -> {
                         false
                     }
@@ -73,13 +74,31 @@ class QQBotClient(
             }
 
             filter.subscribeAlways<Event> {
-                try {
-                    handle(this@QQBotClient, ContextHolder.telegramBotClient, it)
-                } catch (e: Exception) {
-                    reportError(it, e)
+                when (this) {
+                    is GroupEvent -> {
+                        forwardHandler.onGroupEvent(this)
+                    }
+                    else -> {
+                        eventActor.send(this)
+                    }
                 }
             }
             bot.join()
+        }
+    }
+
+    private suspend fun doSubscribe(event: Event) {
+        try {
+            when (event) {
+                is FriendEvent -> {
+                    privateChatHandler.onFriendEvent(event)
+                }
+                else -> {
+                    handle(this@QQBotClient, ContextHolder.telegramBotClient, event)
+                }
+            }
+        } catch (e: Exception) {
+            reportError(event, e)
         }
     }
 
