@@ -95,13 +95,15 @@ class TgForwardHandler(
             }
             message.hasSticker() -> {
                 val sticker = message.sticker
-                if (!sticker.isAnimated) {
-                    val builder = MessageChainBuilder()
+                val builder = MessageChainBuilder()
+                if (sticker.isAnimated) {
+                    builder.add(sticker.emoji)
+                } else {
                     getImage(group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, "", builder)
-                    group.sendMessage(builder.build()).let {
-                        cacheService.cache(it.source, message)
-                    }
+                }
+                group.sendMessage(builder.build()).let {
+                    cacheService.cache(it.source, message)
                 }
             }
             message.hasDocument() -> {
@@ -195,7 +197,7 @@ class TgForwardHandler(
         val image = if (suffix.equals("webp", true)) {
             BotUtil.webp2png(file)
         } else {
-            File(file.filePath).takeIf { it.exists() } ?: client.downloadFile(file, BotUtil.getImage(fileId))
+            File(file.filePath).takeIf { it.exists() } ?: client.downloadFile(file, File(BotUtil.getImagePath("$fileId.webp")))
         }
 
         var ret: Image? = null

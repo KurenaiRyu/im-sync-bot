@@ -105,11 +105,11 @@ class CacheService(
         }
     }
 
-    fun getPrivateChatByQQ(friendId: Long): Int? {
+    fun getPrivateChannelMessageId(friendId: Long): Int? {
         return cache.get(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId)
     }
 
-    fun getPrivateChatByTG(messageId: Int): Long? {
+    fun getFriendId(messageId: Int): Long? {
         return cache.get(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId)
     }
 }

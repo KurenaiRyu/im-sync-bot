@@ -26,11 +26,9 @@ object HttpUtil {
     private val client = buildClient()
 
     @Throws(NoSuchAlgorithmException::class, KeyStoreException::class, KeyManagementException::class, IOException::class)
-    suspend fun download(url: String): ByteArray {
-        return withContext(Dispatchers.IO) {
-            val res = client.execute(RequestBuilder.get(url).build())
-            EntityUtils.toByteArray(res.entity)
-        }
+    fun download(url: String): ByteArray {
+        val res = client.execute(RequestBuilder.get(url).build())
+        return EntityUtils.toByteArray(res.entity)
     }
 
     @Throws(NoSuchAlgorithmException::class, KeyStoreException::class, KeyManagementException::class, IOException::class)

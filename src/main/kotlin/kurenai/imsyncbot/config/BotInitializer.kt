@@ -18,6 +18,8 @@ class BotInitializer(
 ) : InitializingBean {
 
     private val log = KotlinLogging.logger {}
+    private val largeFileSize = 1 * 1024 * 1024L
+    private val largeDirSize = 2 * 1024 * 1024 * 1024L
 
     override fun afterPropertiesSet() {
         if (botConfigRepository.existsById(BotConfigConstant.MASTER_CHAT_ID)) {
@@ -26,7 +28,7 @@ class BotInitializer(
             }
         }
         val cacheDir = File("./cache")
-        val clearCacheTimer = Timer("ClearCacheFile", true)
+        val clearCacheTimer = Timer("ClearCache", true)
         clearCacheTimer.scheduleAtFixedRate(timerTask {
             val oldestAllowedFileDate = DateUtils.addDays(Date(), -5) //minus days from current date
 
@@ -39,15 +41,17 @@ class BotInitializer(
             doDeleteCacheFile(filesToDelete)
         }, 5000L, 12 * 60 * 60 * 1000L)
 
-        val clearLargeCacheTimer = Timer("ClearLargeCacheFile", true)
+        val clearLargeCacheTimer = Timer("ClearLargeCache", true)
         clearLargeCacheTimer.scheduleAtFixedRate(timerTask {
-            val filesToDelete = ArrayList<File>()
-            cacheDir.listFiles()?.forEach { file ->
-                if (file.isDirectory) {
-                    filesToDelete.addAll(FileUtils.listFiles(file, SizeFileFilter(1 * 1024 * 1024L), null))
+            if (FileUtils.sizeOf(cacheDir) > largeDirSize) {
+                val filesToDelete = ArrayList<File>()
+                cacheDir.listFiles()?.forEach { file ->
+                    if (file.isDirectory) {
+                        filesToDelete.addAll(FileUtils.listFiles(file, SizeFileFilter(largeFileSize), null))
+                    }
                 }
+                doDeleteCacheFile(filesToDelete)
             }
-            doDeleteCacheFile(filesToDelete)
         }, 1000L, 6 * 60 * 60 * 1000L)
     }
 

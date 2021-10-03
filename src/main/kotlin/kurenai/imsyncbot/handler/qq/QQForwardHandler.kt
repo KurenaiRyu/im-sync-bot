@@ -72,22 +72,20 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         }
 
         return withContext(singleContext) {
-            if (content.startsWith("<?xml version='1.0'")) {
-                return@withContext handleRichMessage(event, chatId, senderName)
-            }
-            if (content.contains("\"app\":")) {
-                return@withContext handleAppMessage(event, chatId, senderName)
-            }
-
-            if (messageChain.contains(ForwardMessage.Key)) {
-                return@withContext onGroupForwardMessage(
+            return@withContext if (content.startsWith("<?xml version='1.0'")) {
+                handleRichMessage(event, chatId, senderName)
+            } else if (content.contains("\"app\":")) {
+                handleAppMessage(event, chatId, senderName)
+            } else if (messageChain.contains(ForwardMessage.Key)) {
+                onGroupForwardMessage(
                     messageChain[ForwardMessage.Key]!!,
                     group,
                     chatId.toString(),
                     senderName
                 )
+            } else {
+                handleGroupMessage(messageChain, event.group, chatId.toString(), sender.id, senderName)
             }
-            handleGroupMessage(messageChain, event.group, chatId.toString(), sender.id, senderName)
         }
 
     }

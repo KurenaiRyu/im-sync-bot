@@ -2,6 +2,12 @@ package kurenai.imsyncbot.utils
 
 import kurenai.imsyncbot.ContextHolder
 import mu.KotlinLogging
+import net.mamoe.mirai.contact.Contact
+import net.mamoe.mirai.message.data.Image
+import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
+import org.apache.commons.io.FileUtils
+import org.telegram.telegrambots.meta.api.methods.GetFile
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.ExecutionException
@@ -19,12 +25,49 @@ object BotUtil {
 
     private val log = KotlinLogging.logger {}
 
-    fun getImagePath(imageName: String): String {
-        return IMAGE_PATH + imageName
+    @Throws(TelegramApiException::class, IOException::class)
+    suspend fun getImage(friend: Contact, fileId: String, fileUniqueId: String): Image? {
+        val client = ContextHolder.telegramBotClient
+        val file = getTgFile(fileId, fileUniqueId)
+        val image = if (file.filePath.lowercase().endsWith(".webp")) {
+            webp2png(file)
+        } else {
+            File(file.filePath).takeIf { it.exists() } ?: client.downloadFile(file, File(getImagePath("$fileId.webp")))
+        }
+
+        var ret: Image? = null
+        try {
+            image.toExternalResource().use {
+                ret = friend.uploadImage(it)
+            }
+        } catch (e: IOException) {
+            log.error(e) { e.message }
+        }
+        return ret
     }
 
-    fun getImage(fileId: String): File {
-        return File(getImagePath("$fileId.webp"))
+    fun getTgFile(fileId: String, fileUniqueId: String): org.telegram.telegrambots.meta.api.objects.File {
+        try {
+            return ContextHolder.telegramBotClient.execute(GetFile.builder().fileId(fileId).build())
+        } catch (e: TelegramApiException) {
+            log.error(e) { e.message }
+        }
+        return org.telegram.telegrambots.meta.api.objects.File().apply {
+            this.fileId = fileId
+            this.fileUniqueId = fileUniqueId
+        }
+    }
+
+    fun downloadFile(filename: String, url: String): File {
+        val file = File(getDocumentPath(filename))
+        if (!file.exists()) {
+            FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+        }
+        return file
+    }
+
+    fun getImagePath(imageName: String): String {
+        return IMAGE_PATH + imageName
     }
 
     fun getDocumentPath(docName: String): String {

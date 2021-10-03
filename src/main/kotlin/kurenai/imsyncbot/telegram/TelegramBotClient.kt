@@ -277,7 +277,7 @@ class TelegramBotClient(
     }
 
     override fun execute(editMessageMedia: EditMessageMedia): Serializable {
-        rateLimiter.acquire()
+        fileRateLimiter.acquire()
         return super.execute(editMessageMedia)
     }
 
