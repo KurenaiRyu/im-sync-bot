@@ -26,6 +26,7 @@ import org.telegram.telegrambots.meta.api.objects.InputFile
 import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.PhotoSize
 import org.telegram.telegrambots.meta.api.objects.Update
+import java.util.concurrent.ConcurrentHashMap
 
 @Component
 class PrivateChatHandler(
@@ -39,13 +40,14 @@ class PrivateChatHandler(
 
     val privateChat = forwardHandlerProperties.privateChat
     val privateChatChannel = forwardHandlerProperties.privateChatChannel
-    val locks = HashMap<Int, Object>()
+    val locks = ConcurrentHashMap<Int, Object>()
+    val newChannelLock = Object()
     val msgIds = HashMap<Int, Int>()
     private val picToFileSize = 500 * 1024
     private val contextMap = HashMap<Long, ExecutorCoroutineDispatcher>()
 
     suspend fun onFriendEvent(event: FriendEvent): Int {
-        val client = ContextHolder.telegramBotClient
+//        val client = ContextHolder.telegramBotClient
         when (event) {
             is FriendMessageEvent -> {
                 onFriendMessage(event.friend, event.message)
@@ -72,10 +74,15 @@ class PrivateChatHandler(
         }
         return withContext(singleContext) {
             val client = ContextHolder.telegramBotClient
-            val bot = ContextHolder.qqBot
             var messageId = message[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
             if (messageId == null) {
-                messageId = newChannel(friend) ?: return@withContext
+                synchronized(newChannelLock) {
+                    log.debug { "Locked by ${friend.id}" }
+                    messageId = message[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
+                    if (messageId == null) {
+                        messageId = newChannel(friend) ?: return@withContext
+                    }
+                }
             }
             for (msg in message) {
                 when (msg) {

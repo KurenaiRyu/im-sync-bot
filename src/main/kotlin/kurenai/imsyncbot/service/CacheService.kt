@@ -110,6 +110,6 @@ class CacheService(
     }
 
     fun getFriendId(messageId: Int): Long? {
-        return cache.get(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId)
+        return cache.get<Int?, Int?>(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId).toLong()
     }
 }
