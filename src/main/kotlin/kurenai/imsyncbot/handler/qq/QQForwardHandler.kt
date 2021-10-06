@@ -5,6 +5,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.domain.FileCache
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
@@ -33,7 +34,11 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
 
 @Component
-class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheService: CacheService) : QQHandler {
+class QQForwardHandler(
+    properties: ForwardHandlerProperties,
+    private val botProperties: BotProperties,
+    private val cacheService: CacheService,
+) : QQHandler {
 
     private val log = KotlinLogging.logger {}
 
@@ -131,6 +136,8 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
         senderName: String,
     ): Int {
         log.debug { "${group.name}(${group.id}) - $senderName($senderId): ${messageChain.contentToString()}" }
+        val rejectPic = botProperties.ban.picGroup.contains(group.id)
+        if (rejectPic) log.debug { "Reject picture" }
 
         val client = ContextHolder.telegramBotClient
         val source = messageChain[OnlineMessageSource.Key]
@@ -175,18 +182,22 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
             if (medias.isNotEmpty()) {
                 medias[0].caption = msg
 
-                val gifMedias = ArrayList<InputMediaPhoto>()
-                for (i in 0 until medias.size) {
-                    if (medias[i].mediaName.endsWith(".git")) {
-                        gifMedias.add(medias.removeAt(i))
-                    }
-                }
-                try {
-                    sendGroupMedias(chatId, replyId, medias, source)
-                    sendGroupMedias(chatId, replyId, gifMedias, source)
-                } catch (e: Exception) {
-                    log.error(e) { e.message }
+                if (rejectPic) {
                     sendSimpleMedia(chatId, replyId, medias.map { it.media }, msg, source)
+                } else {
+                    val gifMedias = ArrayList<InputMediaPhoto>()
+                    for (i in 0 until medias.size) {
+                        if (medias[i].mediaName.endsWith(".git")) {
+                            gifMedias.add(medias.removeAt(i))
+                        }
+                    }
+                    try {
+                        sendGroupMedias(chatId, replyId, medias, source)
+                        sendGroupMedias(chatId, replyId, gifMedias, source)
+                    } catch (e: Exception) {
+                        log.error(e) { e.message }
+                        sendSimpleMedia(chatId, replyId, medias.map { it.media }, msg, source)
+                    }
                 }
             }
         } else if (count > 0) {
@@ -211,7 +222,9 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
                 }
 
                 try {
-                    if (image.imageId.endsWith(".gif")) {
+                    if (rejectPic) {
+                        sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, source)
+                    } else if (image.imageId.endsWith(".gif")) {
                         val builder = SendAnimation.builder()
                         replyId?.let(builder::replyToMessageId)
                         client.execute(
@@ -363,7 +376,10 @@ class QQForwardHandler(properties: ForwardHandlerProperties, private val cacheSe
             is MemberSpecialTitleChangeEvent -> {
                 "\\#头衔 #id${event.member.id}\n`${event.member.remarkOrNameCardOrNick.format2Markdown()})`获得头衔`${event.new.format2Markdown()}`"
             }
-            else -> return
+            else -> {
+                log.debug { "未支持群事件 ${event.javaClass} 的处理" }
+                return
+            }
         }
         val chatId = ContextHolder.qqTgBinding[event.group.id] ?: ContextHolder.defaultTgGroup
         ContextHolder.telegramBotClient.execute(SendMessage(chatId.toString(), msg).apply { parseMode = ParseMode.MARKDOWNV2 })

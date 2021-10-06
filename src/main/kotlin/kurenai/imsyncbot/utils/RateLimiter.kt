@@ -2,7 +2,6 @@ package kurenai.imsyncbot.utils
 
 import mu.KotlinLogging
 import java.util.concurrent.TimeUnit
-import java.util.function.Supplier
 import kotlin.math.max
 import kotlin.math.min
 
@@ -25,13 +24,13 @@ class RateLimiter(
         acquire(permits, rate)
     }
 
-    fun <T> acquire(supplier: Supplier<T>): T {
+    fun <T> acquire(supplier: () -> T): T {
         return acquire(1, supplier)
     }
 
-    fun <T> acquire(permits: Int, supplier: Supplier<T>): T {
+    fun <T> acquire(permits: Int, supplier: () -> T): T {
         synchronized(lock) {
-            val ret: T = supplier.get()
+            val ret: T = supplier()
             acquire(permits, rate)
             return ret
         }

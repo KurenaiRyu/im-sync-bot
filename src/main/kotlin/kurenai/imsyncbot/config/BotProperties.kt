@@ -11,6 +11,7 @@ class BotProperties {
     class Ban {
         var group: List<Long> = Collections.emptyList()
         var member: List<Long> = Collections.emptyList()
+        var picGroup: List<Long> = Collections.emptyList()
     }
 
 }

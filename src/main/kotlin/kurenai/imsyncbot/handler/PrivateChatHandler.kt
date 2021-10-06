@@ -1,8 +1,6 @@
 package kurenai.imsyncbot.handler
 
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
-import kotlinx.coroutines.newSingleThreadContext
-import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
@@ -66,97 +64,89 @@ class PrivateChatHandler(
     }
 
     suspend fun onFriendMessage(friend: Friend, message: MessageChain, isSync: Boolean = false) {
-        val friendId = friend.id
-        val singleContext = if (contextMap.contains(friendId)) {
-            contextMap[friendId]!!
-        } else {
-            newSingleThreadContext("Friend$friendId")
-        }
-        return withContext(singleContext) {
-            val client = ContextHolder.telegramBotClient
-            var messageId = message[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
-            if (messageId == null) {
-                synchronized(newChannelLock) {
-                    log.debug { "Locked by ${friend.id}" }
-                    messageId = message[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
-                    if (messageId == null) {
-                        messageId = newChannel(friend) ?: return@withContext
-                    }
+        val client = ContextHolder.telegramBotClient
+        var messageId = message[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
+        if (messageId == null) {
+            synchronized(newChannelLock) {
+                log.debug { "Locked by ${friend.id}" }
+                messageId = message[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
+                if (messageId == null) {
+                    messageId = newChannel(friend) ?: return
                 }
             }
-            for (msg in message) {
-                when (msg) {
-                    is Image -> {
-                        try {
-                            val aspectRatio = msg.width.toFloat() / msg.height.toFloat()
-                            var sendByFile = aspectRatio > 10 || aspectRatio < 0.1
-                            val inputFile = cacheService.getFile(msg.imageId).let {
-                                if (it == null) {
-                                    val file = BotUtil.downloadFile(msg.imageId, msg.queryUrl())
-                                    if (!sendByFile && file.length() > picToFileSize) {
-                                        sendByFile = true
-                                    }
-                                    InputFile(file)
-                                } else {
-                                    if (!sendByFile && it.fileSize > picToFileSize) {
-                                        sendByFile = true
-                                    }
-                                    InputFile(it.fileId)
+        }
+        for (msg in message) {
+            when (msg) {
+                is Image -> {
+                    try {
+                        val aspectRatio = msg.width.toFloat() / msg.height.toFloat()
+                        var sendByFile = aspectRatio > 10 || aspectRatio < 0.1
+                        val inputFile = cacheService.getFile(msg.imageId).let {
+                            if (it == null) {
+                                val file = BotUtil.downloadFile(msg.imageId, msg.queryUrl())
+                                if (!sendByFile && file.length() > picToFileSize) {
+                                    sendByFile = true
                                 }
-                            }
-                            if (sendByFile) {
-                                client.send(SendDocument(privateChat.toString(), inputFile).apply {
-                                    replyToMessageId = messageId
-                                    if (isSync) {
-                                        caption = "同步消息"
-                                    }
-                                })
+                                InputFile(file)
                             } else {
-                                client.send(SendPhoto(privateChat.toString(), inputFile).apply {
-                                    replyToMessageId = messageId
-                                    if (isSync) {
-                                        caption = "同步消息"
-                                    }
-                                })
+                                if (!sendByFile && it.fileSize > picToFileSize) {
+                                    sendByFile = true
+                                }
+                                InputFile(it.fileId)
                             }
-                        } catch (e: Exception) {
-                            log.debug { "fallback to send text" }
-                            var content = "[图片](${msg.queryUrl()})"
-                            if (isSync) content = "同步消息\n\n$content"
-                            client.execute(SendMessage(privateChat.toString(), content).apply {
+                        }
+                        if (sendByFile) {
+                            client.send(SendDocument(privateChat.toString(), inputFile).apply {
                                 replyToMessageId = messageId
-                                parseMode = ParseMode.MARKDOWNV2
+                                if (isSync) {
+                                    caption = "同步消息"
+                                }
+                            })
+                        } else {
+                            client.send(SendPhoto(privateChat.toString(), inputFile).apply {
+                                replyToMessageId = messageId
+                                if (isSync) {
+                                    caption = "同步消息"
+                                }
                             })
                         }
-                    }
-                    is FileMessage -> {
-                        var content = "文件 ${msg.name}\n\n暂不支持私聊文件上传下载"
+                    } catch (e: Exception) {
+                        log.debug { "fallback to send text" }
+                        var content = "[图片](${msg.queryUrl()})"
                         if (isSync) content = "同步消息\n\n$content"
+                        client.execute(SendMessage(privateChat.toString(), content).apply {
+                            replyToMessageId = messageId
+                            parseMode = ParseMode.MARKDOWNV2
+                        })
+                    }
+                }
+                is FileMessage -> {
+                    var content = "文件 ${msg.name}\n\n暂不支持私聊文件上传下载"
+                    if (isSync) content = "同步消息\n\n$content"
+                    client.execute(SendMessage(privateChat.toString(), content).apply {
+                        replyToMessageId = messageId
+                    })
+                }
+                is OnlineAudio -> {
+                    val file = BotUtil.downloadFile(msg.filename, msg.urlForDownload)
+                    client.execute(SendVoice(privateChat.toString(), InputFile(file)).apply {
+                        replyToMessageId = messageId
+                        if (isSync) {
+                            caption = "同步消息"
+                        }
+                    })
+                }
+                else -> {
+                    msg.contentToString().takeIf { it.isNotEmpty() }?.let {
+                        val content = if (isSync) "同步消息\n\n$it" else it
                         client.execute(SendMessage(privateChat.toString(), content).apply {
                             replyToMessageId = messageId
                         })
                     }
-                    is OnlineAudio -> {
-                        val file = BotUtil.downloadFile(msg.filename, msg.urlForDownload)
-                        client.execute(SendVoice(privateChat.toString(), InputFile(file)).apply {
-                            replyToMessageId = messageId
-                            if (isSync) {
-                                caption = "同步消息"
-                            }
-                        })
-                    }
-                    else -> {
-                        msg.contentToString().takeIf { it.isNotEmpty() }?.let {
-                            val content = if (isSync) "同步消息\n\n$it" else it
-                            client.execute(SendMessage(privateChat.toString(), content).apply {
-                                replyToMessageId = messageId
-                            })
-                        }
-                    }
-                }?.let { rec ->
-                    message[OnlineMessageSource.Key]?.let { source ->
-                        cacheService.cache(source, rec)
-                    }
+                }
+            }?.let { rec ->
+                message[OnlineMessageSource.Key]?.let { source ->
+                    cacheService.cache(source, rec)
                 }
             }
         }
@@ -167,6 +157,7 @@ class PrivateChatHandler(
         if (update.message.from.id == 777000L && update.message.forwardFromChat.id == privateChatChannel) {
             onChannelForward(update)
         } else if (update.message.isReply) {
+            //TODO: 无法回复
             val bot = ContextHolder.qqBot
             val client = ContextHolder.telegramBotClient
             val message = update.message
@@ -201,6 +192,7 @@ class PrivateChatHandler(
                     client.execute(SendMessage(privateChat.toString(), "暂不支持私聊发送文件。").apply {
                         replyToMessageId = update.message.messageId
                     })
+                    return
                 }
                 message.hasPhoto() -> {
                     message.photo.groupBy { it.fileId.substring(0, 40) }
@@ -214,9 +206,7 @@ class PrivateChatHandler(
                     builder.add(message.text)
                 }
             }
-            if (builder.isNotEmpty()) {
-                cacheService.cache(friend.sendMessage(builder.build()).source, update.message)
-            }
+            cacheService.cache(friend.sendMessage(builder.build()).source, update.message)
         }
     }
 

@@ -75,9 +75,7 @@ class TelegramBotClient(
     }
 
     suspend fun onUpdateReceivedSuspend(update: Update) {
-        CoroutineScope(Dispatchers.IO).launch {
-            log.debug("onUpdateReceived: {}", mapper.writeValueAsString(update))
-        }
+        log.debug("onUpdateReceived: {}", mapper.writeValueAsString(update))
         val message = update.message ?: update.editedMessage ?: update.callbackQuery.message
 
         if (botProperties.ban.member.contains(message.from.id)) {
@@ -223,6 +221,7 @@ class TelegramBotClient(
             super.execute(sendVideo)
         }
     }
+
     @Throws(TelegramApiException::class)
     fun send(sendSticker: SendSticker): Message {
         return executeFile(sendSticker.sticker.isNew) {
@@ -244,51 +243,85 @@ class TelegramBotClient(
         }
     }
 
-    override fun execute(sendMediaGroup: SendMediaGroup): MutableList<Message> {
+    fun send(sendMediaGroup: SendMediaGroup): MutableList<Message> {
         return executeFile(size = sendMediaGroup.medias.size) {
             super.execute(sendMediaGroup)
         }
     }
 
-    override fun execute(sendAnimation: SendAnimation): Message {
-        val supplier = Supplier {
+    fun send(sendAnimation: SendAnimation): Message {
+        return executeFile(sendAnimation.animation.isNew) {
             super.execute(sendAnimation)
-        }
-        return if (sendAnimation.animation.isNew) {
-            fileRateLimiter.acquire {
-                supplier.get()
-            }
-        } else {
-            rateLimiter.acquire()
-            supplier.get()
         }
     }
 
     @Throws(TelegramApiException::class)
     fun send(sendVideoNote: SendVideoNote): Message {
-        rateLimiter.acquire()
-        return super.execute(sendVideoNote)
+        return execute(Supplier {
+            super.execute(sendVideoNote)
+        })
+    }
+
+    fun send(editMessageMedia: EditMessageMedia): Serializable {
+        return execute(Supplier { super.execute(editMessageMedia) })
+    }
+
+    fun <T : Serializable, Method : BotApiMethod<T>> send(method: Method): T {
+        return execute(Supplier { super.execute(method) })
+    }
+
+    override fun execute(sendMediaGroup: SendMediaGroup): MutableList<Message> {
+        return send(sendMediaGroup)
+    }
+
+    override fun execute(sendAnimation: SendAnimation): Message {
+        return send(sendAnimation)
     }
 
 
     override fun <T : Serializable, Method : BotApiMethod<T>> execute(method: Method): T {
-        rateLimiter.acquire()
-        return super.execute(method)
+        return send(method)
     }
 
     override fun execute(editMessageMedia: EditMessageMedia): Serializable {
-        fileRateLimiter.acquire()
-        return super.execute(editMessageMedia)
+        return send(editMessageMedia)
     }
 
     private fun <T> executeFile(isNew: Boolean = true, size: Int = 1, supplier: Supplier<T>): T {
-        return if (isNew) {
-            fileRateLimiter.acquire(size) {
+        return awareErrorHandler {
+            if (isNew) {
+                fileRateLimiter.acquire(size) {
+                    supplier.get()
+                }
+            } else {
+                rateLimiter.acquire(size)
                 supplier.get()
             }
-        } else {
-            rateLimiter.acquire(size)
-            supplier.get()
+        }
+    }
+
+    private fun <T> execute(supplier: Supplier<T>): T {
+        return awareErrorHandler {
+            rateLimiter.acquire {
+                supplier.get()
+            }
+        }
+    }
+
+    private fun <T> awareErrorHandler(executor: () -> T): T {
+        return try {
+            executor()
+        } catch (e: TelegramApiException) {
+            val message = e.message
+            if (message != null && message.contains("Too Many Requests: retry after")) {
+                synchronized(rateLimiterLock) {
+                    log.debug { "Wait for many requests ${time}ms" }
+                    val time = message.substring(message.length - 4).toLong() * 1000
+                    rateLimiterLock.wait(time)
+                    executor()
+                }
+            }
+            throw e
         }
     }
 }

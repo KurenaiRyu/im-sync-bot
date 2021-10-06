@@ -12,12 +12,12 @@ import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.handler.qq.QQForwardHandler
-import kurenai.imsyncbot.telegram.TelegramBotClient
 import kurenai.imsyncbot.utils.BotUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
+import net.mamoe.mirai.event.GlobalEventChannel
 import net.mamoe.mirai.event.events.*
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
@@ -35,9 +35,9 @@ class QQBotClient(
     private val forwardHandler = handlerHolder.currentQQHandlerList.filterIsInstance<QQForwardHandler>()[0]
 
     @OptIn(ObsoleteCoroutinesApi::class)
-    private val eventActor = CoroutineScope(Dispatchers.IO).actor<Event> {
-        for (msg in channel) {
-            doSubscribe(msg)
+    private val eventActor = CoroutineScope(Dispatchers.IO).actor<MessageEvent> {
+        for (event in channel) {
+            doSubscribe(event)
         }
     }
     val bot = BotFactory.newBot(properties.account, properties.password) {
@@ -55,31 +55,37 @@ class QQBotClient(
             bot.login()
             log.info { "Started qq-bot ${bot.nick}(${bot.id})" }
             ContextHolder.qqBot = bot
-            val filter = bot.eventChannel.filter { event ->
+            val filter = GlobalEventChannel.filter { event ->
 
                 return@filter when (event) {
                     is GroupAwareMessageEvent -> {
                         val groupId = event.group.id
-                        properties.filter.group.takeIf { it.isNotEmpty() }?.contains(groupId) != false
-                                && !botProperties.ban.group.contains(groupId)
-                                && !botProperties.ban.member.contains(event.sender.id)
-                    }
-                    is MessageRecallEvent -> {
-                        true
+                        if (properties.filter.group.isNotEmpty() && !properties.filter.group.contains(groupId)) {
+                            false
+                        } else {
+                            !botProperties.ban.group.contains(groupId) && !botProperties.ban.member.contains(event.sender.id)
+                        }
+
                     }
                     else -> {
-                        false
+                        true
                     }
                 }
             }
 
             filter.subscribeAlways<Event> {
                 when (this) {
+                    is FriendEvent -> {
+                        privateChatHandler.onFriendEvent(this)
+                    }
+                    is MessageEvent -> {
+                        eventActor.send(this)
+                    }
                     is GroupEvent -> {
                         forwardHandler.onGroupEvent(this)
                     }
                     else -> {
-                        eventActor.send(this)
+                        log.debug { "未支持事件 ${this.javaClass} 的处理" }
                     }
                 }
             }
@@ -87,40 +93,29 @@ class QQBotClient(
         }
     }
 
-    private suspend fun doSubscribe(event: Event) {
+    private suspend fun doSubscribe(event: MessageEvent) {
         try {
-            when (event) {
-                is FriendEvent -> {
-                    privateChatHandler.onFriendEvent(event)
-                }
-                else -> {
-                    handle(this@QQBotClient, ContextHolder.telegramBotClient, event)
-                }
-            }
+            handle(event)
         } catch (e: Exception) {
+            log.error(e) { "处理信息失败，发送失败报告。" }
             reportError(event, e)
         }
     }
 
-    private suspend fun handle(client: QQBotClient, tgClient: TelegramBotClient, event: Event) {
+    private suspend fun handle(event: MessageEvent) {
         for (handler in handlerHolder.currentQQHandlerList) {
-            val context = QQContext(client, tgClient, event, handler)
-            if (handleMessage(context) == END) break
-        }
-    }
-
-    @Throws(Exception::class)
-    suspend fun handleMessage(context: QQContext): Int {
-        return when (context.event) {
-            is GroupAwareMessageEvent -> {
-                context.handler.onGroupMessage(context.event)
+            val result = when (event) {
+                is GroupAwareMessageEvent -> {
+                    handler.onGroupMessage(event)
+                }
+                is MessageRecallEvent -> {
+                    handler.onRecall(event)
+                }
+                else -> {
+                    CONTINUE
+                }
             }
-            is MessageRecallEvent -> {
-                context.handler.onRecall(context.event)
-            }
-            else -> {
-                CONTINUE
-            }
+            if (result == END) break
         }
     }
 

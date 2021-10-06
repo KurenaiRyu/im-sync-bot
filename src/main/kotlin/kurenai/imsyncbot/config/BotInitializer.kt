@@ -19,7 +19,7 @@ class BotInitializer(
 
     private val log = KotlinLogging.logger {}
     private val largeFileSize = 1 * 1024 * 1024L
-    private val largeDirSize = 2 * 1024 * 1024 * 1024L
+    private val largeDirSize = 1 * 1024 * 1024 * 1024L
 
     override fun afterPropertiesSet() {
         if (botConfigRepository.existsById(BotConfigConstant.MASTER_CHAT_ID)) {
@@ -55,7 +55,7 @@ class BotInitializer(
         }, 1000L, 6 * 60 * 60 * 1000L)
     }
 
-    fun doDeleteCacheFile(filesToDelete: ArrayList<File>) {
+    private fun doDeleteCacheFile(filesToDelete: ArrayList<File>) {
         if (filesToDelete.isNotEmpty()) {
             //if deleting subdirs, replace null above with TrueFileFilter.INSTANCE
             log.info { "Clearing cache files..." }
