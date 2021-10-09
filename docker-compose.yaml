@@ -8,6 +8,10 @@ services:
     environment:
       #      BASE_URL: "http://api:8081/bot"
       REDIS_HOST: "redis"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200m"
     volumes:
       - ./api-data:/var/lib/telegram-bot-api/
       - ./device.json:/im-sync-bot/device.json
@@ -19,6 +23,10 @@ services:
     image: redis:alpine
     container_name: redis
     restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
     volumes:
       - ./redis-data:/usr/local/etc/redis
 
@@ -32,6 +40,10 @@ services:
       TELEGRAM_STAT: 1
       TELEGRAM_LOCAL: 1
       TELEGRAM_VERBOSITY: 4
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
     ports:
       - 8081-8082:8081-8082
     volumes:
