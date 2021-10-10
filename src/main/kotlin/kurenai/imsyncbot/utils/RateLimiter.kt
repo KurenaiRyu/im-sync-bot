@@ -8,8 +8,8 @@ import kotlin.math.min
 class RateLimiter(
     private val lock: Object,
     private val name: String = "RateLimiter",
-    permitsPerSecond: Double = 5.0,
-    private val bucketSize: Long = 20,
+    permitsPerSecond: Double = 0.5,
+    private val bucketSize: Long = 1,
     private var time: Long = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()),
     private val rate: Long = (TimeUnit.SECONDS.toMillis(1) / permitsPerSecond).toLong(),
 ) {
@@ -44,11 +44,11 @@ class RateLimiter(
             if (time > now) {
                 lock.wait(time - now)
             }
+            log.debug { "Acquire successes, now has ${min((now() - time) / this.rate, bucketSize)} tokens." }
         }
-        log.debug { "Acquire successes, now has ${min((now() - time) / this.rate, bucketSize)} tokens." }
     }
 
-    private fun now(): Long {
+    fun now(): Long {
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
     }
 

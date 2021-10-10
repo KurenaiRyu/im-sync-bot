@@ -26,7 +26,7 @@ class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwar
 
         val originMessage = cacheService.getTg(message.replyToMessage.messageId)
         if (originMessage == null) {
-            client.execute(EditMessageText("转发失败：缓存中无法找到该条消息，无法重试").apply {
+            client.send(EditMessageText("转发失败：缓存中无法找到该条消息，无法重试").apply {
                 this.chatId = chatId
                 this.messageId = messageId
             })
@@ -36,17 +36,17 @@ class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwar
         val messageId = message.messageId
         val chatId = message.chatId.toString()
         val retryMsg = "${message.text}\n\n正在重试..."
-        client.execute(EditMessageText(retryMsg).apply {
+        client.send(EditMessageText(retryMsg).apply {
             this.chatId = chatId
             this.messageId = messageId
         })
 
         try {
             forwardHandler.onMessage(originMessage)
-            client.execute(DeleteMessage(chatId, messageId))
+            client.send(DeleteMessage(chatId, messageId))
         } catch (e: Exception) {
             log.error(e) { e.message }
-            client.execute(EditMessageText("#转发失败\n${e.message}").apply {
+            client.send(EditMessageText("#转发失败\n${e.message}").apply {
                 this.chatId = chatId
                 this.messageId = messageId
                 this.replyMarkup =

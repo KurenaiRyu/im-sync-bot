@@ -114,7 +114,7 @@ class PrivateChatHandler(
                         log.debug { "fallback to send text" }
                         var content = "[图片](${msg.queryUrl()})"
                         if (isSync) content = "同步消息\n\n$content"
-                        client.execute(SendMessage(privateChat.toString(), content).apply {
+                        client.send(SendMessage(privateChat.toString(), content).apply {
                             replyToMessageId = messageId
                             parseMode = ParseMode.MARKDOWNV2
                         })
@@ -123,13 +123,13 @@ class PrivateChatHandler(
                 is FileMessage -> {
                     var content = "文件 ${msg.name}\n\n暂不支持私聊文件上传下载"
                     if (isSync) content = "同步消息\n\n$content"
-                    client.execute(SendMessage(privateChat.toString(), content).apply {
+                    client.send(SendMessage(privateChat.toString(), content).apply {
                         replyToMessageId = messageId
                     })
                 }
                 is OnlineAudio -> {
                     val file = BotUtil.downloadFile(msg.filename, msg.urlForDownload)
-                    client.execute(SendVoice(privateChat.toString(), InputFile(file)).apply {
+                    client.send(SendVoice(privateChat.toString(), InputFile(file)).apply {
                         replyToMessageId = messageId
                         if (isSync) {
                             caption = "同步消息"
@@ -139,7 +139,7 @@ class PrivateChatHandler(
                 else -> {
                     msg.contentToString().takeIf { it.isNotEmpty() }?.let {
                         val content = if (isSync) "同步消息\n\n$it" else it
-                        client.execute(SendMessage(privateChat.toString(), content).apply {
+                        client.send(SendMessage(privateChat.toString(), content).apply {
                             replyToMessageId = messageId
                         })
                     }
@@ -166,17 +166,17 @@ class PrivateChatHandler(
             val builder = MessageChainBuilder()
             when {
                 message.hasVoice() -> {
-                    client.execute(SendMessage(privateChat.toString(), "暂不支持私聊发送语音。").apply {
+                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送语音。").apply {
                         replyToMessageId = update.message.messageId
                     })
                 }
                 message.hasAudio() -> {
-                    client.execute(SendMessage(privateChat.toString(), "暂不支持私聊发送音频。").apply {
+                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送音频。").apply {
                         replyToMessageId = update.message.messageId
                     })
                 }
                 message.hasVideo() -> {
-                    client.execute(SendMessage(privateChat.toString(), "暂不支持私聊发送视频。").apply {
+                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送视频。").apply {
                         replyToMessageId = update.message.messageId
                     })
                 }
@@ -189,7 +189,7 @@ class PrivateChatHandler(
                     }
                 }
                 message.hasDocument() -> {
-                    client.execute(SendMessage(privateChat.toString(), "暂不支持私聊发送文件。").apply {
+                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送文件。").apply {
                         replyToMessageId = update.message.messageId
                     })
                     return
@@ -216,7 +216,7 @@ class PrivateChatHandler(
         var messageId = cacheService.getPrivateChannelMessageId(friend.id)
         if (messageId == null) {
             val rec = bot.getFriend(friend.id)?.let {
-                client.send(SendPhoto(privateChatChannel.toString(), InputFile(bot.getFriend(friend.id)?.avatarUrl)).apply {
+                client.execute(SendPhoto(privateChatChannel.toString(), InputFile(bot.getFriend(friend.id)?.avatarUrl)).apply {
                     caption = "昵称：#${friend.nick}\n备注：#${friend.remark}\n#id${friend.id}\n"
                 })
             } ?: client.execute(SendMessage(privateChatChannel.toString(), "昵称：${friend.nick}\n备注：${friend.remark}\n#id${friend.id}\n")) as Message

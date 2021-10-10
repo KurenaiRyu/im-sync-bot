@@ -16,13 +16,13 @@ class LogCommand : Command {
 
     private val log = KotlinLogging.logger {}
 
-    override fun execute(update: Update): Boolean {
+    override suspend fun execute(update: Update): Boolean {
         try {
             val file = File(BotConstant.LOG_FILE_PATH)
-            ContextHolder.telegramBotClient.execute(SendDocument(update.message.chatId.toString(), InputFile(file)))
+            ContextHolder.telegramBotClient.send(SendDocument(update.message.chatId.toString(), InputFile(file)))
         } catch (e: Exception) {
             log.error(e.message, e)
-            ContextHolder.telegramBotClient.execute(
+            ContextHolder.telegramBotClient.send(
                 SendMessage.builder().chatId(update.message.chatId.toString()).text("error: ${e.message}").build()
             )
         }

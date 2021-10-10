@@ -2,8 +2,6 @@ package kurenai.imsyncbot.qq
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ObsoleteCoroutinesApi
-import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
@@ -34,12 +32,6 @@ class QQBotClient(
     private val log = KotlinLogging.logger {}
     private val forwardHandler = handlerHolder.currentQQHandlerList.filterIsInstance<QQForwardHandler>()[0]
 
-    @OptIn(ObsoleteCoroutinesApi::class)
-    private val eventActor = CoroutineScope(Dispatchers.IO).actor<MessageEvent> {
-        for (event in channel) {
-            doSubscribe(event)
-        }
-    }
     val bot = BotFactory.newBot(properties.account, properties.password) {
         fileBasedDeviceInfo() // 使用 device.json 存储设备信息
         protocol = properties.protocol // 切换协议
@@ -73,19 +65,24 @@ class QQBotClient(
                 }
             }
 
-            filter.subscribeAlways<Event> {
-                when (this) {
-                    is FriendEvent -> {
-                        privateChatHandler.onFriendEvent(this)
-                    }
-                    is MessageEvent -> {
-                        eventActor.send(this)
-                    }
-                    is GroupEvent -> {
-                        forwardHandler.onGroupEvent(this)
-                    }
-                    else -> {
-                        log.debug { "未支持事件 ${this.javaClass} 的处理" }
+            filter.subscribeAlways<Event> { event ->
+                CoroutineScope(Dispatchers.Default).launch {
+                    when (event) {
+                        is FriendEvent -> {
+                            privateChatHandler.onFriendEvent(event)
+                        }
+                        is MessageEvent -> {
+                            handle(event)
+                        }
+                        is MessageRecallEvent -> {
+                            forwardHandler.onRecall(event)
+                        }
+                        is GroupEvent -> {
+                            forwardHandler.onGroupEvent(event)
+                        }
+                        else -> {
+                            log.debug { "未支持事件 ${event.javaClass} 的处理" }
+                        }
                     }
                 }
             }
@@ -93,29 +90,26 @@ class QQBotClient(
         }
     }
 
-    private suspend fun doSubscribe(event: MessageEvent) {
+    private suspend fun handle(event: Event) {
         try {
-            handle(event)
+            for (handler in handlerHolder.currentQQHandlerList) {
+                val result = when (event) {
+                    is GroupAwareMessageEvent -> {
+                        handler.onGroupMessage(event)
+                    }
+                    else -> {
+                        CONTINUE
+                    }
+                }
+                if (result == END) break
+            }
         } catch (e: Exception) {
             log.error(e) { "处理信息失败，发送失败报告。" }
-            reportError(event, e)
-        }
-    }
-
-    private suspend fun handle(event: MessageEvent) {
-        for (handler in handlerHolder.currentQQHandlerList) {
-            val result = when (event) {
-                is GroupAwareMessageEvent -> {
-                    handler.onGroupMessage(event)
-                }
-                is MessageRecallEvent -> {
-                    handler.onRecall(event)
-                }
-                else -> {
-                    CONTINUE
-                }
+            try {
+                reportError(event, e)
+            } catch (e: Exception) {
+                log.error(e) { "发送报告失败。" }
             }
-            if (result == END) break
         }
     }
 
@@ -130,7 +124,7 @@ class QQBotClient(
                     master.sendMessage(message).quote()
                         .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
                 )
-                ContextHolder.telegramBotClient.execute(
+                ContextHolder.telegramBotClient.send(
                     SendMessage.builder().chatId(BotUtil.getTgChatByQQ(event.group.id).toString()).text(event.message.contentToString())
                         .build()
                 )
@@ -138,9 +132,9 @@ class QQBotClient(
         }
     }
 
-    private fun sendTgMsgString(event: BotEvent) {
+    private suspend fun sendTgMsgString(event: BotEvent) {
         if (event is GroupEvent) {
-            ContextHolder.telegramBotClient.execute(
+            ContextHolder.telegramBotClient.send(
                 SendMessage.builder().text(event.toString())
                     .chatId(BotUtil.getTgChatByQQ(event.group.id).toString()).build()
             )

@@ -14,9 +14,9 @@ class GroupCommand(
     private val repository: BindingGroupRepository,
 ) : Command {
 
-    override fun execute(update: Update): Boolean {
+    override suspend fun execute(update: Update): Boolean {
         if (!ContextHolder.masterOfTg.contains(update.message.from.id)) {
-            ContextHolder.telegramBotClient.execute(
+            ContextHolder.telegramBotClient.send(
                 SendMessage.builder().chatId(update.message.chatId.toString()).text("Only for master.")
                     .replyToMessageId(update.message.messageId).build()
             )
@@ -26,12 +26,12 @@ class GroupCommand(
         val rec = doExec(update.message.text)
         if (rec.isNotEmpty()) {
             val client = ContextHolder.telegramBotClient
-            client.execute(SendMessage.builder().chatId(update.message.chatId.toString()).text(rec).build())
+            client.send(SendMessage.builder().chatId(update.message.chatId.toString()).text(rec).build())
         }
         return false
     }
 
-    override fun execute(event: MessageEvent): Boolean {
+    override suspend fun execute(event: MessageEvent): Boolean {
         doExec(event.message.contentToString())
         return false
     }
@@ -44,13 +44,13 @@ class GroupCommand(
         return "/group <id> 显示qq或者tg群信息(该bot已加入的)"
     }
 
-    private fun doExec(text: String): String {
+    private suspend fun doExec(text: String): String {
         val content = text.substring(6).trim()
         return if (content.isEmpty()) {
             "command error.\nexample command: /group 123456"
         } else {
             try {
-                val chat = ContextHolder.telegramBotClient.execute(GetChat.builder().chatId(content).build())
+                val chat = ContextHolder.telegramBotClient.send(GetChat.builder().chatId(content).build())
                 if (chat.isSuperGroupChat || chat.isGroupChat || chat.isChannelChat) {
                     "id: ${chat.id}\ntitle: ${chat.title}\ndescription: ${chat.description}\n"
                 } else {

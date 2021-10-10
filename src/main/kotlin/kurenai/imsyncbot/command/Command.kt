@@ -5,11 +5,11 @@ import org.telegram.telegrambots.meta.api.objects.Update
 
 interface Command {
 
-    fun execute(update: Update): Boolean {
+    suspend fun execute(update: Update): Boolean {
         return true
     }
 
-    fun execute(event: MessageEvent): Boolean {
+    suspend fun execute(event: MessageEvent): Boolean {
         return true
     }
 

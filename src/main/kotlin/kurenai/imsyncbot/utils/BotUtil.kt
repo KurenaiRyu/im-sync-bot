@@ -46,9 +46,9 @@ object BotUtil {
         return ret
     }
 
-    fun getTgFile(fileId: String, fileUniqueId: String): org.telegram.telegrambots.meta.api.objects.File {
+    suspend fun getTgFile(fileId: String, fileUniqueId: String): org.telegram.telegrambots.meta.api.objects.File {
         try {
-            return ContextHolder.telegramBotClient.execute(GetFile.builder().fileId(fileId).build())
+            return ContextHolder.telegramBotClient.send(GetFile.builder().fileId(fileId).build())
         } catch (e: TelegramApiException) {
             log.error(e) { e.message }
         }

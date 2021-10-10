@@ -50,9 +50,10 @@ class TelegramBotClient(
     private val log = KotlinLogging.logger {}
     private val mapper: ObjectMapper = ObjectMapper()
     private val rateLimiterLock = Object()
-    private val time = TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
+    private val manyRequestsLock = Object()
+    private var time = TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
     val rateLimiter = RateLimiter(rateLimiterLock, time = time)
-    val fileRateLimiter = RateLimiter(rateLimiterLock, "FileRateLimiter", 0.25, 10, time)
+    val fileRateLimiter = RateLimiter(rateLimiterLock, "FileRateLimiter", 0.20, 1, time)
 
     override fun getBotUsername(): String {
         return telegramBotProperties.username
@@ -104,7 +105,7 @@ class TelegramBotClient(
                     sb.append("${command.getName()}\n")
                     sb.append(command.getHelp())
                 }
-                execute(
+                send(
                     SendMessage.builder().chatId(message.chatId.toString()).replyToMessageId(message.messageId)
                         .text(sb.toString()).build()
                 )
@@ -141,7 +142,7 @@ class TelegramBotClient(
         }
     }
 
-    fun reportError(update: Update, e: Throwable) {
+    suspend fun reportError(update: Update, e: Throwable) {
         log.error(e) { e.message }
         try {
             ContextHolder.masterChatId.takeIf { it != 0L }?.let {
@@ -156,10 +157,10 @@ class TelegramBotClient(
                         } else id
                     }
                 }/$msgId"
-                val recMsgId = execute(SendMessage(masterChatId, simpleMsg)).messageId
-                execute(EditMessageText.builder().chatId(masterChatId).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
+                val recMsgId = send(SendMessage(masterChatId, simpleMsg)).messageId
+                send(EditMessageText.builder().chatId(masterChatId).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
 
-                execute(SendMessage(msgChatId, "#转发失败\n${e.message}").apply {
+                send(SendMessage(msgChatId, "#转发失败\n${e.message}").apply {
                     this.replyToMessageId = msgId
                     this.replyMarkup =
                         InlineKeyboardMarkup().apply {
@@ -202,89 +203,72 @@ class TelegramBotClient(
     }
 
     @Throws(TelegramApiException::class)
-    fun send(sendDocument: SendDocument): Message? {
+    suspend fun send(sendDocument: SendDocument): Message? {
         return executeFile(sendDocument.document.isNew) {
             super.execute(sendDocument)
         }
     }
 
     @Throws(TelegramApiException::class)
-    fun send(sendPhoto: SendPhoto): Message {
+    suspend fun send(sendPhoto: SendPhoto): Message {
         return executeFile(sendPhoto.photo.isNew) {
             super.execute(sendPhoto)
         }
     }
 
     @Throws(TelegramApiException::class)
-    fun send(sendVideo: SendVideo): Message {
+    suspend fun send(sendVideo: SendVideo): Message {
         return executeFile(sendVideo.video.isNew) {
             super.execute(sendVideo)
         }
     }
 
     @Throws(TelegramApiException::class)
-    fun send(sendSticker: SendSticker): Message {
+    suspend fun send(sendSticker: SendSticker): Message {
         return executeFile(sendSticker.sticker.isNew) {
             super.execute(sendSticker)
         }
     }
 
     @Throws(TelegramApiException::class)
-    fun send(sendAudio: SendAudio): Message {
+    suspend fun send(sendAudio: SendAudio): Message {
         return executeFile(sendAudio.audio.isNew) {
             super.execute(sendAudio)
         }
     }
 
     @Throws(TelegramApiException::class)
-    fun send(sendVoice: SendVoice): Message {
+    suspend fun send(sendVoice: SendVoice): Message {
         return executeFile(sendVoice.voice.isNew) {
             super.execute(sendVoice)
         }
     }
 
-    fun send(sendMediaGroup: SendMediaGroup): MutableList<Message> {
+    suspend fun send(sendMediaGroup: SendMediaGroup): MutableList<Message> {
         return executeFile(size = sendMediaGroup.medias.size) {
             super.execute(sendMediaGroup)
         }
     }
 
-    fun send(sendAnimation: SendAnimation): Message {
+    suspend fun send(sendAnimation: SendAnimation): Message {
         return executeFile(sendAnimation.animation.isNew) {
             super.execute(sendAnimation)
         }
     }
 
     @Throws(TelegramApiException::class)
-    fun send(sendVideoNote: SendVideoNote): Message {
+    suspend fun send(sendVideoNote: SendVideoNote): Message {
         return execute(Supplier {
             super.execute(sendVideoNote)
         })
     }
 
-    fun send(editMessageMedia: EditMessageMedia): Serializable {
+    suspend fun send(editMessageMedia: EditMessageMedia): Serializable {
         return execute(Supplier { super.execute(editMessageMedia) })
     }
 
-    fun <T : Serializable, Method : BotApiMethod<T>> send(method: Method): T {
+    suspend fun <T : Serializable, Method : BotApiMethod<T>> send(method: Method): T {
         return execute(Supplier { super.execute(method) })
-    }
-
-    override fun execute(sendMediaGroup: SendMediaGroup): MutableList<Message> {
-        return send(sendMediaGroup)
-    }
-
-    override fun execute(sendAnimation: SendAnimation): Message {
-        return send(sendAnimation)
-    }
-
-
-    override fun <T : Serializable, Method : BotApiMethod<T>> execute(method: Method): T {
-        return send(method)
-    }
-
-    override fun execute(editMessageMedia: EditMessageMedia): Serializable {
-        return send(editMessageMedia)
     }
 
     private fun <T> executeFile(isNew: Boolean = true, size: Int = 1, supplier: Supplier<T>): T {
@@ -314,14 +298,16 @@ class TelegramBotClient(
         } catch (e: TelegramApiException) {
             val message = e.message
             if (message != null && message.contains("Too Many Requests: retry after")) {
-                synchronized(rateLimiterLock) {
-                    log.debug { "Wait for many requests ${time}ms" }
-                    val time = message.substring(message.length - 4).toLong() * 1000
-                    rateLimiterLock.wait(time)
-                    executor()
+                synchronized(manyRequestsLock) {
+                    val manyRequestsWaitTime = message.substring(message.length - 2).trim().toLong() * 1000
+                    log.debug { "Wait for many requests ${manyRequestsWaitTime / 1000}s" }
+                    time = rateLimiter.now() + manyRequestsWaitTime
+                    manyRequestsLock.wait(manyRequestsWaitTime)
                 }
+                awareErrorHandler(executor)
+            } else {
+                throw e
             }
-            throw e
         }
     }
 }

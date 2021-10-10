@@ -20,9 +20,9 @@ class BindGroupCommand(
     private val log = KotlinLogging.logger {}
     private val errorMsg = "Command error.\nexample command: /bindGroup rm 123456"
 
-    override fun execute(update: Update): Boolean {
+    override suspend fun execute(update: Update): Boolean {
         if (!ContextHolder.masterOfTg.contains(update.message.from.id)) {
-            ContextHolder.telegramBotClient.execute(
+            ContextHolder.telegramBotClient.send(
                 SendMessage.builder().chatId(update.message.chatId.toString()).text("Only for master.")
                     .replyToMessageId(update.message.messageId).build()
             )
@@ -33,7 +33,7 @@ class BindGroupCommand(
         return false
     }
 
-    override fun execute(event: MessageEvent): Boolean {
+    override suspend fun execute(event: MessageEvent): Boolean {
         return false
     }
 
@@ -45,7 +45,7 @@ class BindGroupCommand(
         return "/bindGroup 显示当前绑定列表\n/bindGroup <qqGroupId>:<tgGroupId(chatId)> 增加一对绑定关系\n/bindGroup rm <qqGroupId(tgGroupId)> 移除该id关联绑定(可以是qq或者tg)"
     }
 
-    private fun doExec(update: Update) {
+    private suspend fun doExec(update: Update) {
         val text = update.message.text
         val content = text.substring(10).trim()
         val rec = if (content.isEmpty()) {
@@ -63,10 +63,10 @@ class BindGroupCommand(
                     this.replyToMessageId = update.message.messageId
                 }
             try {
-                ContextHolder.telegramBotClient.execute(msg)
+                ContextHolder.telegramBotClient.send(msg)
             } catch (e: Exception) {
                 log.debug { "列表发送失败: ${e.message}" }
-                ContextHolder.telegramBotClient.execute(msg.apply { this.parseMode = null })
+                ContextHolder.telegramBotClient.send(msg.apply { this.parseMode = null })
             }
             return
         } else if (content.startsWith("rm", true)) {
@@ -105,7 +105,7 @@ class BindGroupCommand(
             }
         }
         if (rec.isNotEmpty()) {
-            ContextHolder.telegramBotClient.execute(
+            ContextHolder.telegramBotClient.send(
                 SendMessage.builder().chatId(update.message.chatId.toString()).text(rec).replyToMessageId(update.message.messageId).build()
             )
         }

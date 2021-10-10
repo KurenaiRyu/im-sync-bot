@@ -11,7 +11,7 @@ class ErrorCommand : Command {
 
     }
 
-    override fun execute(update: Update): Boolean {
+    override suspend fun execute(update: Update): Boolean {
         println(update)
         if (true) {
             throw Exception("test")

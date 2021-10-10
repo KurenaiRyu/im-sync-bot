@@ -35,8 +35,8 @@ class PixivHandler(private val forwardProperties: ForwardHandlerProperties) : QQ
             event.subject.sendMessage(artUrl)
             event.subject.sendMessage(userUrl)
             try {
-                telegramBotClient.execute(SendMessage.builder().chatId(chartId).text(artUrl).build())
-                telegramBotClient.execute(SendMessage.builder().chatId(chartId).text(userUrl).build())
+                telegramBotClient.send(SendMessage.builder().chatId(chartId).text(artUrl).build())
+                telegramBotClient.send(SendMessage.builder().chatId(chartId).text(userUrl).build())
             } catch (e: TelegramApiException) {
                 log.error(e.message, e)
             }

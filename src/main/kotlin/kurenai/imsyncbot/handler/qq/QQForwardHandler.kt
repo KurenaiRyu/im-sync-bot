@@ -88,7 +88,7 @@ class QQForwardHandler(
     override suspend fun onRecall(event: MessageRecallEvent): Int {
         val message = cacheService.getByQQ(event.messageIds[0])
         message?.let {
-            ContextHolder.telegramBotClient.execute(
+            ContextHolder.telegramBotClient.send(
                 DeleteMessage.builder().chatId(it.chatId.toString())
                     .messageId(it.messageId)
                     .build()
@@ -227,7 +227,7 @@ class QQForwardHandler(
                     } else if (image.imageId.endsWith(".gif")) {
                         val builder = SendAnimation.builder()
                         replyId?.let(builder::replyToMessageId)
-                        client.execute(
+                        client.send(
                             builder
                                 .chatId(chatId)
                                 .caption(msg)
@@ -300,7 +300,7 @@ class QQForwardHandler(
         } else {
             val builder = SendMessage.builder()
             replyId?.let(builder::replyToMessageId)
-            client.execute(builder.chatId(chatId).text(msg).build())
+            client.send(builder.chatId(chatId).text(msg).build())
                 .let { m ->
                     source?.let { cacheService.cache(source, m) }
                 }
@@ -331,7 +331,7 @@ class QQForwardHandler(
         return CONTINUE
     }
 
-    fun onGroupEvent(event: GroupEvent) {
+    suspend fun onGroupEvent(event: GroupEvent) {
         val msg = when (event) {
             is MemberJoinEvent -> {
                 val tag = "\\#入群 \\#id${event.member.id} \\#group${event.group.id}\n"
@@ -382,7 +382,7 @@ class QQForwardHandler(
             }
         }
         val chatId = ContextHolder.qqTgBinding[event.group.id] ?: ContextHolder.defaultTgGroup
-        ContextHolder.telegramBotClient.execute(SendMessage(chatId.toString(), msg).apply { parseMode = ParseMode.MARKDOWNV2 })
+        ContextHolder.telegramBotClient.send(SendMessage(chatId.toString(), msg).apply { parseMode = ParseMode.MARKDOWNV2 })
     }
 
     private fun getSingleContent(group: Group, atAccount: AtomicLong, msg: SingleMessage): String {
@@ -402,7 +402,7 @@ class QQForwardHandler(
         }
     }
 
-    private fun sendGroupMedias(chatId: String, replyId: Int?, medias: List<InputMediaPhoto>, source: OnlineMessageSource?) {
+    private suspend fun sendGroupMedias(chatId: String, replyId: Int?, medias: List<InputMediaPhoto>, source: OnlineMessageSource?) {
         if (medias.isEmpty()) return
         val mediaGroups = ArrayList<List<InputMediaPhoto>>()
         var offset = 0
@@ -423,7 +423,7 @@ class QQForwardHandler(
                 if (list.size > 1) {
                     val builder = SendMediaGroup.builder()
                     replyId?.let(builder::replyToMessageId)
-                    client.execute(
+                    client.send(
                         builder
                             .medias(list)
                             .chatId(chatId)
@@ -435,7 +435,7 @@ class QQForwardHandler(
                     val builder = SendPhoto.builder()
                     replyId?.let(builder::replyToMessageId)
                     val file = list[0].newMediaFile
-                    client.execute(
+                    client.send(
                         builder
                             .photo(InputFile(file, file.name))
                             .chatId(chatId)
@@ -453,12 +453,12 @@ class QQForwardHandler(
         }
     }
 
-    private fun sendSimpleMedia(chatId: String, replyId: Int?, urls: List<String>, msg: String?, source: OnlineMessageSource?, mask: String = "图片"): Message {
+    private suspend fun sendSimpleMedia(chatId: String, replyId: Int?, urls: List<String>, msg: String?, source: OnlineMessageSource?, mask: String = "图片"): Message {
         var urlStr = ""
         for (url in urls) {
             urlStr += "[$mask]($url)\n"
         }
-        return ContextHolder.telegramBotClient.execute(SendMessage(chatId, "$urlStr${msg?.format2Markdown()}").apply {
+        return ContextHolder.telegramBotClient.send(SendMessage(chatId, "$urlStr${msg?.format2Markdown()}").apply {
             this.replyToMessageId = replyId
             this.parseMode = ParseMode.MARKDOWNV2
         }).let { rec ->
