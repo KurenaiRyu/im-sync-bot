@@ -41,7 +41,7 @@ class PrivateChatHandler(
     val locks = ConcurrentHashMap<Int, Object>()
     val newChannelLock = Object()
     val msgIds = HashMap<Int, Int>()
-    private val picToFileSize = 500 * 1024
+    private val picToFileSize = forwardHandlerProperties.picToFileSize * 1024 * 1024
     private val contextMap = HashMap<Long, ExecutorCoroutineDispatcher>()
 
     suspend fun onFriendEvent(event: FriendEvent): Int {
@@ -80,7 +80,7 @@ class PrivateChatHandler(
                 is Image -> {
                     try {
                         val aspectRatio = msg.width.toFloat() / msg.height.toFloat()
-                        var sendByFile = aspectRatio > 10 || aspectRatio < 0.1 || msg.width > 1080 || msg.height > 1080
+                        var sendByFile = aspectRatio > 10 || aspectRatio < 0.1 || msg.width > 1920 || msg.height > 1920
                         val inputFile = cacheService.getFile(msg.imageId).let {
                             if (it == null) {
                                 val file = BotUtil.downloadFile(msg.imageId, msg.queryUrl())

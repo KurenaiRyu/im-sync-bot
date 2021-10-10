@@ -45,7 +45,7 @@ class QQForwardHandler(
     private val xmlMapper = XmlMapper()
     private val jsonMapper = ObjectMapper()
     private val bindingName: Map<Long, String>
-    private val picToFileSize = properties.picToFileSize * 1024
+    private val picToFileSize = properties.picToFileSize * 1024 * 1024
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
 
@@ -204,7 +204,7 @@ class QQForwardHandler(
             messageChain.filterIsInstance<Image>().forEach { image ->
                 val imageSize: Long
                 val aspectRatio = image.width.toFloat() / image.height.toFloat()
-                val sendByFile = aspectRatio > 10 || aspectRatio < 0.1 || image.width > 1080 || image.height > 1080 || image.size > picToFileSize
+                var sendByFile = aspectRatio > 10 || aspectRatio < 0.1 || image.width > 1920 || image.height > 1920 || image.size > picToFileSize
                 val inputFile = cacheService.getFile(image.imageId).let {
                     if (it == null) {
 
@@ -222,6 +222,7 @@ class QQForwardHandler(
                         InputFile(it.fileId)
                     }
                 }
+                if (imageSize > picToFileSize) sendByFile = true
 
                 try {
                     if (rejectPic) {
