@@ -80,7 +80,7 @@ class PrivateChatHandler(
                 is Image -> {
                     try {
                         val aspectRatio = msg.width.toFloat() / msg.height.toFloat()
-                        var sendByFile = aspectRatio > 10 || aspectRatio < 0.1
+                        var sendByFile = aspectRatio > 10 || aspectRatio < 0.1 || msg.width > 1080 || msg.height > 1080
                         val inputFile = cacheService.getFile(msg.imageId).let {
                             if (it == null) {
                                 val file = BotUtil.downloadFile(msg.imageId, msg.queryUrl())

@@ -17,6 +17,7 @@ class ForwardHandlerProperties {
     var member = Member()
     var privateChat = 0L
     var privateChatChannel = 0L
+    var picToFileSize = 10L
 
     class Group {
         var defaultQQ: Long = 0

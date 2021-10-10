@@ -45,7 +45,7 @@ class QQForwardHandler(
     private val xmlMapper = XmlMapper()
     private val jsonMapper = ObjectMapper()
     private val bindingName: Map<Long, String>
-    private val picToFileSize = 500 * 1024
+    private val picToFileSize = properties.picToFileSize * 1024
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
 
@@ -203,6 +203,8 @@ class QQForwardHandler(
         } else if (count > 0) {
             messageChain.filterIsInstance<Image>().forEach { image ->
                 val imageSize: Long
+                val aspectRatio = image.width.toFloat() / image.height.toFloat()
+                val sendByFile = aspectRatio > 10 || aspectRatio < 0.1 || image.width > 1080 || image.height > 1080 || image.size > picToFileSize
                 val inputFile = cacheService.getFile(image.imageId).let {
                     if (it == null) {
 
@@ -235,7 +237,7 @@ class QQForwardHandler(
                                 .build()
                         )
                     } else {
-                        if (imageSize > picToFileSize) {
+                        if (sendByFile) {
                             val builder = SendDocument.builder()
                             replyId?.let(builder::replyToMessageId)
                             client.send(
@@ -250,7 +252,9 @@ class QQForwardHandler(
                 } catch (e: Exception) {
                     log.error(e) { "Send image fail." }
                     try {
-                        client.send(SendDocument(chatId, inputFile))
+                        client.send(SendDocument(chatId, inputFile).apply {
+                            caption = msg
+                        })
                     } catch (e: Exception) {
                         log.error(e) { "Send image fall back to send document fail." }
                         sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, source)
