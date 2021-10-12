@@ -35,10 +35,12 @@ build/
 ### bot ###
 device.json
 device.json.*
+cache
 
 ### log ###
 *.log
 *.gz
+logs
 
 ## config ##
 config.yaml
