@@ -161,7 +161,7 @@ class PrivateChatHandler(
             val bot = ContextHolder.qqBot
             val client = ContextHolder.telegramBotClient
             val message = update.message
-            val friendId = cacheService.getFriendId(getRootReplyMessageId(message.replyToMessage)) ?: return
+            val friendId = cacheService.getFriendId(getRootReplyMessageId(message)) ?: return
             val friend = bot.getFriend(friendId) ?: return
             val builder = MessageChainBuilder()
             when {
@@ -246,7 +246,7 @@ class PrivateChatHandler(
 
     private fun getRootReplyMessageId(message: Message): Int {
         return if (message.isReply) {
-            getRootReplyMessageId(message.replyToMessage)
+            cacheService.getTg(message.chatId, message.replyToMessage.messageId)?.let(this::getRootReplyMessageId) ?: message.messageId
         } else {
             message.messageId
         }

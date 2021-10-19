@@ -97,8 +97,8 @@ class CacheService(
         }
     }
 
-    fun getTg(chatId: String?, messageId: Int): Message? {
-        return cache.get(TG_MSG_CACHE_KEY, messageId) ?: getOnlineTg(chatId, messageId)
+    fun getTg(chatId: Long?, messageId: Int): Message? {
+        return cache.get(TG_MSG_CACHE_KEY, messageId) ?: getOnlineTg(chatId.toString(), messageId)
     }
 
     fun getOnlineTg(chatId: String?, messageId: Int): Message? {
@@ -110,7 +110,7 @@ class CacheService(
 
     fun getByQQ(group: Long, id: Int): Message? {
         return getIdByQQ(id)?.let {
-            getTg(ContextHolder.qqTgBinding[group]?.toString(), it)
+            getTg(ContextHolder.qqTgBinding[group], it)
         }
     }
 
