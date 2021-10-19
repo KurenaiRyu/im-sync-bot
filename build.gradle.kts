@@ -35,6 +35,10 @@ dependencies {
     }
     implementation("net.mamoe", "mirai-core-utils-jvm", miraiVersion)
 
+    implementation("org.telegram", "telegrambots-spring-boot-starter", "5.3.0") {
+        exclude("org.telegram", "telegrambots-meta")
+    }
+    implementation("org.telegram", "telegrambots-meta", "5.3.0.10")
 
     implementation("org.springframework.boot", "spring-boot-starter")
     implementation("org.springframework.boot", "spring-boot-starter-data-jpa")
@@ -45,7 +49,6 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
-    implementation("org.telegram", "telegrambots-spring-boot-starter", "5.3.0")
     implementation("org.apache.httpcomponents", "httpclient")
     implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")
     implementation("com.fasterxml.jackson.dataformat", "jackson-dataformat-xml")

@@ -12,12 +12,14 @@ class ForwardHandlerProperties {
     var tgMsgFormat = "\$name: \$msg"
     var qqMsgFormat = "\$name: \$msg"
     var masterOfTg = emptyList<Long>()
+    var masterNameOfTg = ""
     var masterOfQq = emptyList<Long>()
     var group = Group()
     var member = Member()
     var privateChat = 0L
     var privateChatChannel = 0L
     var picToFileSize = 10L
+    var enableRecall = false
 
     class Group {
         var defaultQQ: Long = 0

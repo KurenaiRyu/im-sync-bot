@@ -11,7 +11,7 @@ interface QQHandler : Handler {
         return CONTINUE
     }
 
-    suspend fun onRecall(event: MessageRecallEvent): Int {
+    suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {
         return CONTINUE
     }
 

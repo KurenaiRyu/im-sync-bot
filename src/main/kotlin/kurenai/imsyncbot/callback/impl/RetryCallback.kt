@@ -24,7 +24,7 @@ class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwar
         }
         val client = ContextHolder.telegramBotClient
 
-        val originMessage = cacheService.getTg(message.replyToMessage.messageId)
+        val originMessage = cacheService.getTg(message.chatId, message.replyToMessage.messageId)
         if (originMessage == null) {
             client.send(EditMessageText("转发失败：缓存中无法找到该条消息，无法重试").apply {
                 this.chatId = chatId

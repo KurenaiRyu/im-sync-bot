@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
+import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
@@ -71,6 +72,12 @@ class TgForwardHandler(
         val isMaster = ContextHolder.masterOfTg.contains(senderId)
         val senderName = getSenderName(message)
         val caption = message.caption ?: ""
+
+        if ((message.from.userName == "GroupAnonymousBot" || isMaster) && (caption.contains("#nfwd") || message.text?.contains("#nfwd") == true)) {
+            log.debug { "No forward message." }
+            return END
+        }
+
         when {
             message.hasVoice() -> {
                 val voice = message.voice

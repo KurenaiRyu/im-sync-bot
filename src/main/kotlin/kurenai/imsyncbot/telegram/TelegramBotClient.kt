@@ -203,82 +203,82 @@ class TelegramBotClient(
     }
 
     @Throws(TelegramApiException::class)
-    suspend fun send(sendDocument: SendDocument): Message? {
+    fun send(sendDocument: SendDocument): Message? {
         return executeFile(sendDocument.document.isNew) {
             super.execute(sendDocument)
         }
     }
 
     @Throws(TelegramApiException::class)
-    suspend fun send(sendPhoto: SendPhoto): Message {
+    fun send(sendPhoto: SendPhoto): Message {
         return executeFile(sendPhoto.photo.isNew) {
             super.execute(sendPhoto)
         }
     }
 
     @Throws(TelegramApiException::class)
-    suspend fun send(sendVideo: SendVideo): Message {
+    fun send(sendVideo: SendVideo): Message {
         return executeFile(sendVideo.video.isNew) {
             super.execute(sendVideo)
         }
     }
 
     @Throws(TelegramApiException::class)
-    suspend fun send(sendSticker: SendSticker): Message {
+    fun send(sendSticker: SendSticker): Message {
         return executeFile(sendSticker.sticker.isNew) {
             super.execute(sendSticker)
         }
     }
 
     @Throws(TelegramApiException::class)
-    suspend fun send(sendAudio: SendAudio): Message {
+    fun send(sendAudio: SendAudio): Message {
         return executeFile(sendAudio.audio.isNew) {
             super.execute(sendAudio)
         }
     }
 
     @Throws(TelegramApiException::class)
-    suspend fun send(sendVoice: SendVoice): Message {
+    fun send(sendVoice: SendVoice): Message {
         return executeFile(sendVoice.voice.isNew) {
             super.execute(sendVoice)
         }
     }
 
-    suspend fun send(sendMediaGroup: SendMediaGroup): MutableList<Message> {
+    fun send(sendMediaGroup: SendMediaGroup): MutableList<Message> {
         return executeFile(size = sendMediaGroup.medias.size) {
             super.execute(sendMediaGroup)
         }
     }
 
-    suspend fun send(sendAnimation: SendAnimation): Message {
+    fun send(sendAnimation: SendAnimation): Message {
         return executeFile(sendAnimation.animation.isNew) {
             super.execute(sendAnimation)
         }
     }
 
     @Throws(TelegramApiException::class)
-    suspend fun send(sendVideoNote: SendVideoNote): Message {
+    fun send(sendVideoNote: SendVideoNote): Message {
         return execute(Supplier {
             super.execute(sendVideoNote)
         })
     }
 
-    suspend fun send(editMessageMedia: EditMessageMedia): Serializable {
+    fun send(editMessageMedia: EditMessageMedia): Serializable {
         return execute(Supplier { super.execute(editMessageMedia) })
     }
 
-    suspend fun <T : Serializable, Method : BotApiMethod<T>> send(method: Method): T {
+    fun <T : Serializable, Method : BotApiMethod<T>> send(method: Method): T {
         return execute(Supplier { super.execute(method) })
     }
 
     private fun <T> executeFile(isNew: Boolean = true, size: Int = 1, supplier: Supplier<T>): T {
         return awareErrorHandler {
             if (isNew) {
-                fileRateLimiter.acquire(size) {
+//                fileRateLimiter.acquire(size) {
                     supplier.get()
-                }
+//                }
             } else {
-                rateLimiter.acquire(size)
+//                rateLimiter.acquire(size)
                 supplier.get()
             }
         }
@@ -286,9 +286,9 @@ class TelegramBotClient(
 
     private fun <T> execute(supplier: Supplier<T>): T {
         return awareErrorHandler {
-            rateLimiter.acquire {
+//            rateLimiter.acquire {
                 supplier.get()
-            }
+//            }
         }
     }
 

@@ -1,5 +1,6 @@
 package kurenai.imsyncbot.service
 
+import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.domain.FileCache
 import kurenai.imsyncbot.domain.MessageSourceCache
 import mu.KotlinLogging
@@ -7,6 +8,7 @@ import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceBuilder
 import net.mamoe.mirai.message.data.OnlineMessageSource
 import org.springframework.stereotype.Component
+import org.telegram.telegrambots.meta.api.methods.GetMessageInfo
 import org.telegram.telegrambots.meta.api.objects.Message
 import java.util.concurrent.TimeUnit
 
@@ -95,13 +97,20 @@ class CacheService(
         }
     }
 
-    fun getTg(id: Int): Message? {
-        return cache.get(TG_MSG_CACHE_KEY, id)
+    fun getTg(chatId: String?, messageId: Int): Message? {
+        return cache.get(TG_MSG_CACHE_KEY, messageId) ?: getOnlineTg(chatId, messageId)
     }
 
-    fun getByQQ(id: Int): Message? {
+    fun getOnlineTg(chatId: String?, messageId: Int): Message? {
+        if (chatId == null) return null
+        return ContextHolder.telegramBotClient.send(GetMessageInfo(chatId, messageId))?.also {
+            cache(it)
+        }
+    }
+
+    fun getByQQ(group: Long, id: Int): Message? {
         return getIdByQQ(id)?.let {
-            getTg(it)
+            getTg(ContextHolder.qqTgBinding[group]?.toString(), it)
         }
     }
 

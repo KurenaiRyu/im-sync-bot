@@ -3,6 +3,7 @@ package kurenai.imsyncbot.handler.qq
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.BotProperties
@@ -25,6 +26,8 @@ import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.ParseMode
 import org.telegram.telegrambots.meta.api.methods.send.*
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageCaption
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText
 import org.telegram.telegrambots.meta.api.objects.InputFile
 import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto
@@ -48,6 +51,8 @@ class QQForwardHandler(
     private val picToFileSize = properties.picToFileSize * 1024 * 1024
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
+    private var enableRecall = properties.enableRecall
+    private var singleContext = newSingleThreadContext("SingleContext")
 
     init {
         bindingName = properties.member.bindingName
@@ -85,14 +90,31 @@ class QQForwardHandler(
     }
 
     @Throws(TelegramApiException::class)
-    override suspend fun onRecall(event: MessageRecallEvent): Int {
-        val message = cacheService.getByQQ(event.messageIds[0])
+    override suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {
+        val message = cacheService.getByQQ(event.group.id, event.messageIds[0])
         message?.let {
-            ContextHolder.telegramBotClient.send(
-                DeleteMessage.builder().chatId(it.chatId.toString())
-                    .messageId(it.messageId)
-                    .build()
-            )
+            if (enableRecall) {
+                ContextHolder.telegramBotClient.send(
+                    DeleteMessage.builder().chatId(it.chatId.toString())
+                        .messageId(it.messageId)
+                        .build()
+                )
+            } else {
+                ContextHolder.telegramBotClient.send(if (message.text.isNullOrBlank()) {
+                    EditMessageText("~~${message.text.format2Markdown()}~~").apply {
+                        chatId = it.chatId.toString()
+                        messageId = it.messageId
+                        parseMode = ParseMode.MARKDOWNV2
+                    }
+                } else {
+                    EditMessageCaption().apply {
+                        chatId = it.chatId.toString()
+                        messageId = it.messageId
+                        caption = "~~${message.caption.format2Markdown()}~~"
+                        parseMode = ParseMode.MARKDOWNV2
+                    }
+                })
+            }
         }
         return CONTINUE
     }
@@ -320,20 +342,22 @@ class QQForwardHandler(
         chatId: String,
         senderName: String,
     ): Int {
-        for ((senderId, _, forwardSenderName, messageChain) in msg.nodeList) {
-            try {
-                handleGroupMessage(
-                    messageChain,
-                    group,
-                    chatId,
-                    senderId,
-                    "$senderName forward from $forwardSenderName"
-                )
-            } catch (e: java.lang.Exception) {
-                log.error(e) { e.message }
+        return withContext(singleContext) {
+            for ((senderId, _, forwardSenderName, messageChain) in msg.nodeList) {
+                try {
+                    handleGroupMessage(
+                        messageChain,
+                        group,
+                        chatId,
+                        senderId,
+                        "$senderName forward from $forwardSenderName"
+                    )
+                } catch (e: java.lang.Exception) {
+                    log.error(e) { e.message }
+                }
             }
+            CONTINUE
         }
-        return CONTINUE
     }
 
     suspend fun onGroupEvent(event: GroupEvent) {

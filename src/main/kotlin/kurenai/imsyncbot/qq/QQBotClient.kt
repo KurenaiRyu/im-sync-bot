@@ -2,6 +2,8 @@ package kurenai.imsyncbot.qq
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
@@ -9,6 +11,7 @@ import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
+import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.handler.qq.QQForwardHandler
 import kurenai.imsyncbot.utils.BotUtil
 import mu.KotlinLogging
@@ -17,6 +20,8 @@ import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.GlobalEventChannel
 import net.mamoe.mirai.event.events.*
+import net.mamoe.mirai.message.data.At
+import net.mamoe.mirai.message.data.PlainText
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
@@ -25,12 +30,15 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 class QQBotClient(
     private val properties: QQBotProperties,
     private val botProperties: BotProperties,
+    private val forwardHandlerProperties: ForwardHandlerProperties,
     private val handlerHolder: HandlerHolder,
     private val privateChatHandler: PrivateChatHandler,
 ) : InitializingBean {
 
     private val log = KotlinLogging.logger {}
     private val forwardHandler = handlerHolder.currentQQHandlerList.filterIsInstance<QQForwardHandler>()[0]
+//    @OptIn(ObsoleteCoroutinesApi::class)
+//    private val eventChannels = ConcurrentHashMap<Long, SendChannel<MessageEvent>>()
 
     val bot = BotFactory.newBot(properties.account, properties.password) {
         fileBasedDeviceInfo() // 使用 device.json 存储设备信息
@@ -56,8 +64,13 @@ class QQBotClient(
                             false
                         } else {
                             !botProperties.ban.group.contains(groupId) && !botProperties.ban.member.contains(event.sender.id)
-                        }
+                        }.also {
 
+                            val list = event.message.filterIsInstance<At>()
+                            if (!it && list.isNotEmpty() && forwardHandlerProperties.masterOfQq.contains(list[0].target)) {
+                                sendTgMsgString(event)
+                            }
+                        }
                     }
                     else -> {
                         true
@@ -72,9 +85,19 @@ class QQBotClient(
                             privateChatHandler.onFriendEvent(event)
                         }
                         is MessageEvent -> {
+//                            if (event is GroupEvent) {
+//                                var channel = eventChannels[event.group.id]
+//                                if (channel == null) {
+//                                    val newChannel = buildSendChannel()
+//                                    channel = eventChannels.putIfAbsent(event.group.id, newChannel) ?: newChannel
+//                                }
+//                                channel.send(event)
+
+//                            } else {
                             handle(event)
+//                            }
                         }
-                        is MessageRecallEvent -> {
+                        is MessageRecallEvent.GroupRecall -> {
                             forwardHandler.onRecall(event)
                         }
                         is GroupEvent -> {
@@ -132,12 +155,26 @@ class QQBotClient(
         }
     }
 
-    private suspend fun sendTgMsgString(event: BotEvent) {
-        if (event is GroupEvent) {
+    private suspend fun sendTgMsgString(event: GroupAwareMessageEvent) {
+        try {
+            val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
             ContextHolder.telegramBotClient.send(
-                SendMessage.builder().text(event.toString())
-                    .chatId(BotUtil.getTgChatByQQ(event.group.id).toString()).build()
+                SendMessage(BotUtil.getTgChatByQQ(event.group.id).toString(), "#提醒 #id${event.sender.id} #group${event.group.id}\n @${forwardHandlerProperties.masterNameOfTg} $content")
             )
+        } catch (e: Exception) {
+            log.error(e) { "Send tg message by string fail." }
         }
+    }
+
+    private fun buildSendChannel(): SendChannel<MessageEvent> {
+        return CoroutineScope(Dispatchers.Default).actor {
+            for (event in channel) {
+                doSubscribe(event)
+            }
+        }
+    }
+
+    private suspend fun doSubscribe(event: MessageEvent) {
+        handle(event)
     }
 }
