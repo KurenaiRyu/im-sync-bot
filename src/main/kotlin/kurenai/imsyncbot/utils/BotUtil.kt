@@ -5,7 +5,6 @@ import mu.KotlinLogging
 import net.mamoe.mirai.contact.Contact
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import org.apache.commons.io.FileUtils
 import org.telegram.telegrambots.meta.api.methods.GetFile
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.File
@@ -61,7 +60,7 @@ object BotUtil {
     fun downloadFile(filename: String, url: String): File {
         val file = File(getDocumentPath(filename))
         if (!file.exists()) {
-            FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+            HttpUtil.download(url, file)
         }
         return file
     }

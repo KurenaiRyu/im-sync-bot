@@ -20,7 +20,6 @@ import net.mamoe.mirai.contact.*
 import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
-import org.apache.commons.io.FileUtils
 import org.apache.commons.lang3.StringUtils
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.ParseMode
@@ -100,17 +99,17 @@ class QQForwardHandler(
                         .build()
                 )
             } else {
-                ContextHolder.telegramBotClient.send(if (message.text.isNullOrBlank()) {
-                    EditMessageText("~~${message.text.format2Markdown()}~~").apply {
-                        chatId = it.chatId.toString()
-                        messageId = it.messageId
-                        parseMode = ParseMode.MARKDOWNV2
-                    }
-                } else {
+                ContextHolder.telegramBotClient.send(if (it.text.isNullOrBlank()) {
                     EditMessageCaption().apply {
                         chatId = it.chatId.toString()
                         messageId = it.messageId
-                        caption = "~~${message.caption.format2Markdown()}~~"
+                        caption = "~${it.caption.format2Markdown()}~\n"
+                        parseMode = ParseMode.MARKDOWNV2
+                    }
+                } else {
+                    EditMessageText("~${it.text.format2Markdown()}~\n").apply {
+                        chatId = it.chatId.toString()
+                        messageId = it.messageId
                         parseMode = ParseMode.MARKDOWNV2
                     }
                 })
@@ -157,7 +156,7 @@ class QQForwardHandler(
         senderId: Long,
         senderName: String,
     ): Int {
-        log.debug { "${group.name}(${group.id}) - $senderName($senderId): ${messageChain.contentToString()}" }
+        log.info { "${group.name}(${group.id}) - $senderName($senderId): ${messageChain.contentToString()}" }
         val rejectPic = botProperties.ban.picGroup.contains(group.id)
         if (rejectPic) log.debug { "Reject picture" }
 
@@ -231,10 +230,12 @@ class QQForwardHandler(
                     if (it == null) {
 
                         val file = File(BotUtil.getImagePath(image.imageId))
-                        if (!file.exists() || !file.isFile) {
-                            val url: String = image.queryUrl()
-                            withContext(Dispatchers.IO) {
-                                FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+                        if (!rejectPic) {
+                            if (!file.exists() || !file.isFile) {
+                                val url: String = image.queryUrl()
+                                withContext(Dispatchers.IO) {
+                                    HttpUtil.download(url, file)
+                                }
                             }
                         }
                         imageSize = file.length()
@@ -292,7 +293,7 @@ class QQForwardHandler(
             try {
                 val file = File(BotUtil.getDocumentPath(downloadInfo.filename))
                 if (!file.exists() || !file.isFile) withContext(Dispatchers.IO) {
-                    FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+                    HttpUtil.download(url, file)
                 }
                 val inputFile = InputFile(file)
                 val filename: String = downloadInfo.filename.lowercase()
@@ -315,7 +316,7 @@ class QQForwardHandler(
                 val file = File(url)
                 if (!file.exists() || !file.isFile) {
                     withContext(Dispatchers.IO) {
-                        FileUtils.writeByteArrayToFile(file, HttpUtil.download(url))
+                        HttpUtil.download(url, file)
                     }
                 }
                 try {

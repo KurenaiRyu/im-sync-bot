@@ -85,17 +85,7 @@ class QQBotClient(
                             privateChatHandler.onFriendEvent(event)
                         }
                         is MessageEvent -> {
-//                            if (event is GroupEvent) {
-//                                var channel = eventChannels[event.group.id]
-//                                if (channel == null) {
-//                                    val newChannel = buildSendChannel()
-//                                    channel = eventChannels.putIfAbsent(event.group.id, newChannel) ?: newChannel
-//                                }
-//                                channel.send(event)
-
-//                            } else {
                             handle(event)
-//                            }
                         }
                         is MessageRecallEvent.GroupRecall -> {
                             forwardHandler.onRecall(event)
