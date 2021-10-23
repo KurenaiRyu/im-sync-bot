@@ -486,7 +486,7 @@ class QQForwardHandler(
     private suspend fun sendSimpleMedia(chatId: String, replyId: Int?, urls: List<String>, msg: String?, source: OnlineMessageSource?, mask: String = "图片"): Message {
         var urlStr = ""
         for (url in urls) {
-            urlStr += "[$mask]($url)\n"
+            urlStr += "[${mask.format2Markdown()}](${url.format2Markdown()})\n"
         }
         return ContextHolder.telegramBotClient.send(SendMessage(chatId, "$urlStr${msg?.format2Markdown()}").apply {
             this.replyToMessageId = replyId
