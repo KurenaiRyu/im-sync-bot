@@ -38,12 +38,18 @@ class MultiPartDownloader(
                 .build()
         )
         writeToFile(response.entity.content)
-        val time = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
         response.getFirstHeader(HttpHeaders.CONTENT_LENGTH)?.let {
-            val length = it.value.toLong()
-            val speed = length / 1024.0 / 1024 / time * 1000
-            val sizeOfKb = length / 1024
-            log.debug { "Download ${file.name} part of $offset-$rightOffset ($sizeOfKb kb) in $time ms (${String.format("%.2f", speed)} Mbit/s)" }
+            val sizeOfMb = length / 1024.0 / 1024
+            val timeOfSeconds = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) / 1000.0
+            val speed = sizeOfMb / timeOfSeconds
+            log.info {
+                "Downloaded ${file.name} part of $offset-$rightOffset ${String.format("%.3f", sizeOfMb)} MB in ${String.format("%.2f", timeOfSeconds)} s (${
+                    String.format(
+                        "%.2f",
+                        speed
+                    )
+                } MB/s)"
+            }
         }
         countDownLatch.countDown()
     }

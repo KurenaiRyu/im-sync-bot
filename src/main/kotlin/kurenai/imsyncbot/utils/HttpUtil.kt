@@ -34,7 +34,7 @@ object HttpUtil {
     private val log = KotlinLogging.logger {}
 
     const val UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:89.0) Gecko/20100101 Firefox/89.0"
-    private const val filePartLength = 200 * 1024L
+    private const val filePartLength = 1024 * 1024L
     private const val MAX_TIMEOUT = 7000
     private val connMgr: PoolingHttpClientConnectionManager = PoolingHttpClientConnectionManager()
     private val requestConfig: RequestConfig
@@ -58,31 +58,35 @@ object HttpUtil {
     fun download(url: String, file: File) {
         val start = System.nanoTime()
         getRemoteFileSize(url)?.let {
-            createFile(file, it)
-            download(url, file, it)
+            multiPartDownload(url, file, it)
         } ?: run {
             createFile(file)
             DefaultDownloader(url, file, client).run()
         }
-        val time = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
-        val speed = file.length() / 1024.0 / 1024 / time * 1000
         val sizeOfMb = file.length() / 1024.0 / 1024
-        log.info { "Download ${file.name} ${String.format("%.3f", sizeOfMb)} MB in $time ms (${String.format("%.2f", speed)} MB/s)" }
+        val timeOfSeconds = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) / 1000.0
+        val speed = sizeOfMb / timeOfSeconds
+        log.info { "Downloaded ${file.name} ${String.format("%.3f", sizeOfMb)} MB in ${String.format("%.2f", timeOfSeconds)} s (${String.format("%.2f", speed)} MB/s)" }
     }
 
     @Throws(NoSuchAlgorithmException::class, KeyStoreException::class, KeyManagementException::class, IOException::class)
-    fun download(url: String, file: File, size: Long) {
-        if (size <= filePartLength) {
+    private fun multiPartDownload(url: String, file: File, size: Long) {
+        createFile(file, size)
+        val partLength = if (size <= filePartLength) {
             return DefaultDownloader(url, file, client).run()
+        } else if (size > filePartLength * 20) {
+            filePartLength * 4
+        } else {
+            filePartLength
         }
 
-        val moreOne = size % filePartLength != 0L
-        val count = (size / filePartLength) + if (moreOne) 1 else 0
+        val moreOne = size % partLength != 0L
+        val count = (size / partLength) + if (moreOne) 1 else 0
         val countDownLatch = CountDownLatch(count.toInt())
         var offset = 0L
         for (i in 2..count) {
-            pool.execute(MultiPartDownloader(url, file, offset, filePartLength, client, countDownLatch))
-            offset += filePartLength
+            pool.execute(MultiPartDownloader(url, file, offset, partLength, client, countDownLatch))
+            offset += partLength
         }
         if (moreOne) {
             pool.execute(MultiPartDownloader(url, file, offset, client, countDownLatch))
@@ -112,16 +116,23 @@ object HttpUtil {
     }
 
     private fun getRemoteFileSize(url: String): Long? {
-        val res = client.execute(RequestBuilder
-            .head(url)
-            .addHeader(HttpHeaders.RANGE, "bytes=0-")
-            .build())
-        val code = res.statusLine.statusCode
-        return if (code != 206) {
-            log.error { "Get remote file size fail: [$code] ${res.statusLine.reasonPhrase}" }
+        return try {
+            val res = client.execute(
+                RequestBuilder
+                    .get(url)
+                    .addHeader(HttpHeaders.RANGE, "bytes=0-1")
+                    .build()
+            )
+            val code = res.statusLine.statusCode
+            if (code != 206) {
+                log.debug { "Get remote file size fail: [$code] ${res.statusLine.reasonPhrase}" }
+                null
+            } else {
+                res.getFirstHeader(HttpHeaders.CONTENT_RANGE)?.value?.substringAfterLast('/')?.toLong()
+            }
+        } catch (e: Exception) {
+            log.debug { "Get remote file size error: ${e.message}" }
             null
-        } else {
-            res.getFirstHeader(HttpHeaders.CONTENT_LENGTH)?.value?.toLong()
         }
     }
 
