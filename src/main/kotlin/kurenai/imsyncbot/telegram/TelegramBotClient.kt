@@ -12,6 +12,7 @@ import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.service.ConfigService
 import kurenai.imsyncbot.utils.RateLimiter
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
@@ -20,7 +21,6 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod
 import org.telegram.telegrambots.meta.api.methods.send.*
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageMedia
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText
 import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.Update
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup
@@ -45,6 +45,7 @@ class TelegramBotClient(
     private val callbacks: List<Callback>,
     private val cacheService: CacheService,
     private val privateChatHandler: PrivateChatHandler,
+    private val configService: ConfigService
 ) : TelegramLongPollingBot(options) {
 
     private val log = KotlinLogging.logger {}
@@ -53,7 +54,7 @@ class TelegramBotClient(
     private val manyRequestsLock = Object()
     private var time = TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
     val rateLimiter = RateLimiter(rateLimiterLock, time = time)
-    val fileRateLimiter = RateLimiter(rateLimiterLock, "FileRateLimiter", 0.20, 1, time)
+//    val fileRateLimiter = RateLimiter(rateLimiterLock, "FileRateLimiter", 0.20, 1, time)
 
     override fun getBotUsername(): String {
         return telegramBotProperties.username
@@ -111,7 +112,7 @@ class TelegramBotClient(
                 )
             } else {
                 for (command in commands) {
-                    if (command.match(text)) {
+                    if (command.match(update)) {
                         if (command.execute(update)) {
                             break
                         } else {
@@ -145,30 +146,31 @@ class TelegramBotClient(
     suspend fun reportError(update: Update, e: Throwable) {
         log.error(e) { e.message }
         try {
-            ContextHolder.masterChatId.takeIf { it != 0L }?.let {
-                val message = update.message ?: update.editedMessage ?: update.callbackQuery.message
-                val masterChatId = it.toString()
-                val msgChatId = message.chatId.toString()
-                val msgId = message.messageId
-                val simpleMsg = "#转发失败\n${e.message}\n\nhttps://t.me/c/${
-                    msgChatId.let { id ->
-                        if (id.startsWith("-100")) {
-                            id.substring(4)
-                        } else id
-                    }
-                }/$msgId"
-                val recMsgId = send(SendMessage(masterChatId, simpleMsg)).messageId
-                send(EditMessageText.builder().chatId(masterChatId).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
+            val message = update.message ?: update.editedMessage ?: update.callbackQuery.message
+            val msgChatId = message.chatId.toString()
+            val msgId = message.messageId
 
-                send(SendMessage(msgChatId, "#转发失败\n${e.message}").apply {
-                    this.replyToMessageId = msgId
-                    this.replyMarkup =
-                        InlineKeyboardMarkup().apply {
-                            this.keyboard = listOf(listOf(InlineKeyboardButton("重试").apply { this.callbackData = "retry" }))
-                        }
-                })
-                cacheService.cache(message)
-            }
+            //pm master
+//            val simpleMsg = "#转发失败\n${e.message}\n\nhttps://t.me/c/${
+//                msgChatId.let { id ->
+//                    if (id.startsWith("-100")) {
+//                        id.substring(4)
+//                    } else id
+//                }
+//            }/$msgId"
+//            configService.get(BotConfigKey.MASTER_CHAT_ID)?.let {
+//                val recMsgId = send(SendMessage(it, simpleMsg)).messageId
+//                send(EditMessageText.builder().chatId(it).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
+//            }
+
+            send(SendMessage(msgChatId, "#转发失败\n${e.message}").apply {
+                this.replyToMessageId = msgId
+                this.replyMarkup =
+                    InlineKeyboardMarkup().apply {
+                        this.keyboard = listOf(listOf(InlineKeyboardButton("重试").apply { this.callbackData = "retry" }))
+                    }
+            })
+            cacheService.cache(message)
         } catch (e: Exception) {
             log.error(e) { e.message }
         }

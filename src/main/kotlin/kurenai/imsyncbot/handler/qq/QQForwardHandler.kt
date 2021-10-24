@@ -5,6 +5,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.withContext
+import kurenai.imsyncbot.BotConfigKey
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.domain.FileCache
@@ -12,6 +13,7 @@ import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.service.ConfigService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
@@ -40,6 +42,7 @@ class QQForwardHandler(
     properties: ForwardHandlerProperties,
     private val botProperties: BotProperties,
     private val cacheService: CacheService,
+    private val configService: ConfigService,
 ) : QQHandler {
 
     private val log = KotlinLogging.logger {}
@@ -166,7 +169,7 @@ class QQForwardHandler(
         val atAccount = AtomicLong(-100)
         var content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
 
-        val isMaster = ContextHolder.qqBot.id == senderId || ContextHolder.masterOfQQ.contains(senderId)
+        val isMaster = group.bot.id == senderId || ContextHolder.masterOfQQ.contains(senderId)
 
         if (isMaster && changeMsgFormatCmd(content)) {
             val demoContent = "demo msg."
@@ -419,14 +422,19 @@ class QQForwardHandler(
         return if (msg is At) {
             val target = msg.target
             if (target == atAccount.get()) return "" else atAccount.set(target)
-            var name = bindingName[target]
-                ?: ContextHolder.qqBot.getFriend(target)?.remarkOrNick
-                ?: group.getMember(target)?.remarkOrNameCardOrNick?.let { BotUtil.formatUsername(it) }
-                ?: target.toString()
-            if (!name.startsWith("@")) {
-                name = "@$name"
+            val name = if (target == group.bot.id) {
+                configService.get(BotConfigKey.MASTER_USERNAME) ?: group.bot.nameCardOrNick
+            } else {
+                bindingName[target]
+                    ?: ContextHolder.qqBot.getFriend(target)?.remarkOrNick
+                    ?: group.getMember(target)?.remarkOrNameCardOrNick?.let { BotUtil.formatUsername(it) }
+                    ?: target.toString()
             }
-            " $name "
+            if (!name.startsWith("@")) {
+                " @$name "
+            } else {
+                " $name "
+            }
         } else {
             msg.contentToString()
         }

@@ -42,7 +42,7 @@ class MultiPartDownloader(
             val sizeOfMb = length / 1024.0 / 1024
             val timeOfSeconds = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) / 1000.0
             val speed = sizeOfMb / timeOfSeconds
-            log.info {
+            log.debug {
                 "Downloaded ${file.name} part of $offset-$rightOffset ${String.format("%.3f", sizeOfMb)} MB in ${String.format("%.2f", timeOfSeconds)} s (${
                     String.format(
                         "%.2f",

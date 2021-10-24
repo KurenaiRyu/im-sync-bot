@@ -56,26 +56,21 @@ class PrivateChatHandler(
 //                client.execute(EditMessageMedia())
             }
             is FriendMessageSyncEvent -> {
-                onFriendMessage(event.friend, event.message)
+                onFriendMessage(event.friend, event.message, true)
             }
         }
 
         return END
     }
 
-    suspend fun onFriendMessage(friend: Friend, message: MessageChain, isSync: Boolean = false) {
+    suspend fun onFriendMessage(friend: Friend, chain: MessageChain, isSync: Boolean = false) {
+        //FIX: 私聊无法引用消息
         val client = ContextHolder.telegramBotClient
-        var messageId = message[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
-        if (messageId == null) {
-            synchronized(newChannelLock) {
-                log.debug { "Locked by ${friend.id}" }
-                messageId = message[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
-                if (messageId == null) {
-                    messageId = newChannel(friend) ?: return
-                }
-            }
+        var replyMsgId = chain[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
+        if (replyMsgId == null) {
+            replyMsgId = getFirstMsg(friend) ?: return
         }
-        for (msg in message) {
+        for (msg in chain) {
             when (msg) {
                 is Image -> {
                     try {
@@ -97,14 +92,14 @@ class PrivateChatHandler(
                         }
                         if (sendByFile) {
                             client.send(SendDocument(privateChat.toString(), inputFile).apply {
-                                replyToMessageId = messageId
+                                replyToMessageId = replyMsgId
                                 if (isSync) {
                                     caption = "同步消息"
                                 }
                             })
                         } else {
                             client.send(SendPhoto(privateChat.toString(), inputFile).apply {
-                                replyToMessageId = messageId
+                                replyToMessageId = replyMsgId
                                 if (isSync) {
                                     caption = "同步消息"
                                 }
@@ -115,7 +110,7 @@ class PrivateChatHandler(
                         var content = "[图片](${msg.queryUrl()})"
                         if (isSync) content = "同步消息\n\n$content"
                         client.send(SendMessage(privateChat.toString(), content).apply {
-                            replyToMessageId = messageId
+                            replyToMessageId = replyMsgId
                             parseMode = ParseMode.MARKDOWNV2
                         })
                     }
@@ -124,13 +119,13 @@ class PrivateChatHandler(
                     var content = "文件 ${msg.name}\n\n暂不支持私聊文件上传下载"
                     if (isSync) content = "同步消息\n\n$content"
                     client.send(SendMessage(privateChat.toString(), content).apply {
-                        replyToMessageId = messageId
+                        replyToMessageId = replyMsgId
                     })
                 }
                 is OnlineAudio -> {
                     val file = BotUtil.downloadFile(msg.filename, msg.urlForDownload)
                     client.send(SendVoice(privateChat.toString(), InputFile(file)).apply {
-                        replyToMessageId = messageId
+                        replyToMessageId = replyMsgId
                         if (isSync) {
                             caption = "同步消息"
                         }
@@ -140,12 +135,12 @@ class PrivateChatHandler(
                     msg.contentToString().takeIf { it.isNotEmpty() }?.let {
                         val content = if (isSync) "同步消息\n\n$it" else it
                         client.send(SendMessage(privateChat.toString(), content).apply {
-                            replyToMessageId = messageId
+                            replyToMessageId = replyMsgId
                         })
                     }
                 }
             }?.let { rec ->
-                message[OnlineMessageSource.Key]?.let { source ->
+                chain[OnlineMessageSource.Key]?.let { source ->
                     cacheService.cache(source, rec)
                 }
             }
@@ -157,26 +152,38 @@ class PrivateChatHandler(
         if (update.message.from.id == 777000L && update.message.forwardFromChat.id == privateChatChannel) {
             onChannelForward(update)
         } else if (update.message.isReply) {
-            //TODO: 无法回复
             val bot = ContextHolder.qqBot
             val client = ContextHolder.telegramBotClient
             val message = update.message
-            val friendId = cacheService.getFriendId(getRootReplyMessageId(message)) ?: return
-            val friend = bot.getFriend(friendId) ?: return
+            val rootReplyMessageId = getRootReplyMessageId(message)
+            val quoteMsgSource = message.replyToMessage?.messageId?.let(cacheService::getByTg)
+            val friendId = cacheService.getFriendId(rootReplyMessageId) ?: run {
+                client.send(SendMessage(privateChat.toString(), "无法通过引用消息找到qq好友: $rootReplyMessageId").apply {
+                    replyToMessageId = update.message.messageId
+                })
+                return
+            }
+            val friend = bot.getFriend(friendId) ?: run {
+                client.send(SendMessage(privateChat.toString(), "找不到qq好友: $friendId").apply {
+                    replyToMessageId = update.message.messageId
+                })
+                return
+            }
             val builder = MessageChainBuilder()
+            quoteMsgSource?.let { builder.add(QuoteReply(it)) }
             when {
                 message.hasVoice() -> {
-                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送语音。").apply {
+                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送语音").apply {
                         replyToMessageId = update.message.messageId
                     })
                 }
                 message.hasAudio() -> {
-                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送音频。").apply {
+                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送音频").apply {
                         replyToMessageId = update.message.messageId
                     })
                 }
                 message.hasVideo() -> {
-                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送视频。").apply {
+                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送视频").apply {
                         replyToMessageId = update.message.messageId
                     })
                 }
@@ -189,7 +196,7 @@ class PrivateChatHandler(
                     }
                 }
                 message.hasDocument() -> {
-                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送文件。").apply {
+                    client.send(SendMessage(privateChat.toString(), "暂不支持私聊发送文件").apply {
                         replyToMessageId = update.message.messageId
                     })
                     return
@@ -210,26 +217,29 @@ class PrivateChatHandler(
         }
     }
 
-    fun newChannel(friend: Friend): Int? {
+    fun getFirstMsg(friend: Friend): Int? {
         val client = ContextHolder.telegramBotClient
         val bot = ContextHolder.qqBot
         var messageId = cacheService.getPrivateChannelMessageId(friend.id)
-        if (messageId == null) {
-            val rec = bot.getFriend(friend.id)?.let {
-                client.execute(SendPhoto(privateChatChannel.toString(), InputFile(bot.getFriend(friend.id)?.avatarUrl)).apply {
-                    caption = "昵称：#${friend.nick}\n备注：#${friend.remark}\n#id${friend.id}\n"
-                })
-            } ?: client.execute(SendMessage(privateChatChannel.toString(), "昵称：${friend.nick}\n备注：${friend.remark}\n#id${friend.id}\n")) as Message
+        synchronized(newChannelLock) {
+            log.debug { "Locked by ${friend.id}" }
+            if (messageId == null) {
+                val rec = bot.getFriend(friend.id)?.let {
+                    client.execute(SendPhoto(privateChatChannel.toString(), InputFile(bot.getFriend(friend.id)?.avatarUrl)).apply {
+                        caption = "昵称：#${friend.nick}\n备注：#${friend.remark}\n#id${friend.id}\n"
+                    })
+                } ?: client.execute(SendMessage(privateChatChannel.toString(), "昵称：${friend.nick}\n备注：${friend.remark}\n#id${friend.id}\n")) as Message
 
-            val lock = Object()
-            locks[rec.messageId] = lock
-            synchronized(lock) {
-                log.debug { "Wait ${rec.messageId}" }
-                lock.wait(10 * 1000L)
+                val lock = Object()
+                locks[rec.messageId] = lock
+                synchronized(lock) {
+                    log.debug { "Wait ${rec.messageId}" }
+                    lock.wait(10 * 1000L)
+                }
+                log.debug { "Wake up ${rec.messageId}, receive ${msgIds[rec.messageId]}" }
+                messageId = msgIds.remove(rec.messageId) ?: return null
+                cacheService.cachePrivateChat(friend.id, messageId!!)
             }
-            log.debug { "Wake up ${rec.messageId}, receive ${msgIds[rec.messageId]}" }
-            messageId = msgIds.remove(rec.messageId) ?: return null
-            cacheService.cachePrivateChat(friend.id, messageId)
         }
         return messageId
     }

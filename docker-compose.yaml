@@ -8,6 +8,8 @@ services:
     environment:
       #      BASE_URL: "http://api:8081/bot"
       REDIS_HOST: "redis"
+    # 调整时区
+    # entrypoint: ["java", "-jar", "-Dspring.config.location=config.yaml", "-XX:+UseZGC", "-Duser.timezone=GMT+08", "./bot.jar"]
     logging:
       driver: "json-file"
       options:

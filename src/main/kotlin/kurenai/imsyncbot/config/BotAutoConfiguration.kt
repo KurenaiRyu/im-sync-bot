@@ -5,7 +5,6 @@ import io.github.kurenairyu.cache.CacheFactory
 import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.handler.Handler
 import kurenai.imsyncbot.qq.QQBotProperties
-import kurenai.imsyncbot.repository.BotConfigRepository
 import kurenai.imsyncbot.telegram.ProxyProperties
 import kurenai.imsyncbot.telegram.TelegramBotProperties
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties
@@ -39,8 +38,8 @@ class BotAutoConfiguration {
     }
 
     @Bean
-    fun botInitializer(botConfigRepository: BotConfigRepository): BotInitializer {
-        return BotInitializer(botConfigRepository)
+    fun botInitializer(): BotInitializer {
+        return BotInitializer()
     }
 
     @Bean

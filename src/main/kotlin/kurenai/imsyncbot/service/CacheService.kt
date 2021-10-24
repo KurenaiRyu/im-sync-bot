@@ -7,13 +7,13 @@ import mu.KotlinLogging
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceBuilder
 import net.mamoe.mirai.message.data.OnlineMessageSource
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Service
 import org.telegram.telegrambots.meta.api.methods.GetMessageInfo
 import org.telegram.telegrambots.meta.api.objects.Message
 import java.util.concurrent.TimeUnit
 
 
-@Component
+@Service
 class CacheService(
     private val cache: io.github.kurenairyu.cache.Cache,
 ) {

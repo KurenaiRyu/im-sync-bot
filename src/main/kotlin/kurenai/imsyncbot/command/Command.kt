@@ -13,6 +13,10 @@ interface Command {
         return true
     }
 
+    fun match(update: Update): Boolean {
+        return match(update.message.text)
+    }
+
     fun match(text: String): Boolean
 
     fun getHelp(): String {

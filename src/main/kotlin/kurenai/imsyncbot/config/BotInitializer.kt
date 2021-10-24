@@ -1,8 +1,5 @@
 package kurenai.imsyncbot.config
 
-import kurenai.imsyncbot.BotConfigConstant
-import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.repository.BotConfigRepository
 import mu.KotlinLogging
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.filefilter.AgeFileFilter
@@ -13,20 +10,13 @@ import java.io.File
 import java.util.*
 import kotlin.concurrent.timerTask
 
-class BotInitializer(
-    private val botConfigRepository: BotConfigRepository,
-) : InitializingBean {
+class BotInitializer : InitializingBean {
 
     private val log = KotlinLogging.logger {}
     private val largeFileSize = 1 * 1024 * 1024L
     private val largeDirSize = 1 * 1024 * 1024 * 1024L
 
     override fun afterPropertiesSet() {
-        if (botConfigRepository.existsById(BotConfigConstant.MASTER_CHAT_ID)) {
-            botConfigRepository.getById(BotConfigConstant.MASTER_CHAT_ID).value.takeIf { it.isNotBlank() }?.let {
-                ContextHolder.masterChatId = it.toLong()
-            }
-        }
         val cacheDir = File("./cache")
         val clearCacheTimer = Timer("ClearCache", true)
         clearCacheTimer.scheduleAtFixedRate(timerTask {

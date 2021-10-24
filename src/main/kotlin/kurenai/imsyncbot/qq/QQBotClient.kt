@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.launch
+import kurenai.imsyncbot.BotConfigKey
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.config.BotProperties
@@ -13,6 +14,7 @@ import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.handler.qq.QQForwardHandler
+import kurenai.imsyncbot.service.ConfigService
 import kurenai.imsyncbot.utils.BotUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
@@ -22,6 +24,7 @@ import net.mamoe.mirai.event.GlobalEventChannel
 import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.PlainText
+import org.springframework.beans.factory.DisposableBean
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
@@ -33,7 +36,8 @@ class QQBotClient(
     private val forwardHandlerProperties: ForwardHandlerProperties,
     private val handlerHolder: HandlerHolder,
     private val privateChatHandler: PrivateChatHandler,
-) : InitializingBean {
+    private val configService: ConfigService
+) : InitializingBean, DisposableBean {
 
     private val log = KotlinLogging.logger {}
     private val forwardHandler = handlerHolder.currentQQHandlerList.filterIsInstance<QQForwardHandler>()[0]
@@ -149,7 +153,10 @@ class QQBotClient(
         try {
             val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
             ContextHolder.telegramBotClient.send(
-                SendMessage(BotUtil.getTgChatByQQ(event.group.id).toString(), "#提醒 #id${event.sender.id} #group${event.group.id}\n @${forwardHandlerProperties.masterNameOfTg} $content")
+                SendMessage(
+                    BotUtil.getTgChatByQQ(event.group.id).toString(),
+                    "#提醒 #id${event.sender.id} #group${event.group.id}\n @${configService.get(BotConfigKey.MASTER_USERNAME) ?: event.bot.nameCardOrNick} $content"
+                )
             )
         } catch (e: Exception) {
             log.error(e) { "Send tg message by string fail." }
@@ -167,4 +174,16 @@ class QQBotClient(
     private suspend fun doSubscribe(event: MessageEvent) {
         handle(event)
     }
+
+    /**
+     * Invoked by the containing `BeanFactory` on destruction of a bean.
+     * @throws Exception in case of shutdown errors. Exceptions will get logged
+     * but not rethrown to allow other beans to release their resources as well.
+     */
+    override fun destroy() {
+        log.info { "Close qq-bot ${bot.nick}(${bot.id})." }
+        bot.close()
+    }
+
+
 }
