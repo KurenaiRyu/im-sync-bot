@@ -236,9 +236,7 @@ class QQForwardHandler(
                         if (!rejectPic) {
                             if (!file.exists() || !file.isFile) {
                                 val url: String = image.queryUrl()
-                                withContext(Dispatchers.IO) {
-                                    HttpUtil.download(url, file)
-                                }
+                                HttpUtil.download(url, file)
                             }
                         }
                         imageSize = file.length()
@@ -318,9 +316,7 @@ class QQForwardHandler(
             voice?.urlForDownload?.let { url ->
                 val file = File(url)
                 if (!file.exists() || !file.isFile) {
-                    withContext(Dispatchers.IO) {
-                        HttpUtil.download(url, file)
-                    }
+                    HttpUtil.download(url, file)
                 }
                 try {
                     client.send(SendVoice.builder().chatId(chatId).voice(InputFile(file)).build())

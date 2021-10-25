@@ -1,6 +1,6 @@
 package kurenai.imsyncbot
 
-class ImSyncBotException(
+class ImSyncBotRuntimeException(
     message: String,
     cause: Throwable? = null
-) : Exception(message, cause)
+) : RuntimeException(message, cause)

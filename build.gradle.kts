@@ -49,7 +49,7 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
-    implementation("org.apache.httpcomponents", "httpclient")
+    implementation("com.squareup.okhttp3:okhttp:4.9.2")
     implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")
     implementation("com.fasterxml.jackson.dataformat", "jackson-dataformat-xml")
     implementation("org.apache.commons", "commons-lang3")
