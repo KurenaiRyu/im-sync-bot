@@ -167,7 +167,7 @@ class QQForwardHandler(
         val source = messageChain[OnlineMessageSource.Key]
         val replyId = messageChain[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
         val atAccount = AtomicLong(-100)
-        var content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
+        var content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it, replyId != null) }
 
         val isMaster = group.bot.id == senderId || ContextHolder.masterOfQQ.contains(senderId)
 
@@ -414,11 +414,11 @@ class QQForwardHandler(
         ContextHolder.telegramBotClient.send(SendMessage(chatId.toString(), msg).apply { parseMode = ParseMode.MARKDOWNV2 })
     }
 
-    private fun getSingleContent(group: Group, atAccount: AtomicLong, msg: SingleMessage): String {
+    private fun getSingleContent(group: Group, atAccount: AtomicLong, msg: SingleMessage, hasReply: Boolean = true): String {
         return if (msg is At) {
             val target = msg.target
             if (target == atAccount.get()) return "" else atAccount.set(target)
-            val name = if (target == group.bot.id) {
+            val name = if (target == group.bot.id && !hasReply) {
                 configService.get(BotConfigKey.MASTER_USERNAME) ?: group.bot.nameCardOrNick
             } else {
                 bindingName[target]
