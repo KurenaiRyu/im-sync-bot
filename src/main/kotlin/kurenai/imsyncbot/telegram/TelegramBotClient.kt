@@ -78,7 +78,11 @@ class TelegramBotClient(
 
     suspend fun onUpdateReceivedSuspend(update: Update) {
         log.debug("onUpdateReceived: {}", mapper.writeValueAsString(update))
-        val message = update.message ?: update.editedMessage ?: update.callbackQuery.message
+        val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message
+        if (message == null) {
+            log.debug { "No message" }
+            return
+        }
 
         if (botProperties.ban.member.contains(message.from.id)) {
             log.debug("Ignore this message by ban member [${message.from.id}]")
