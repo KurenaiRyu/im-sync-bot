@@ -10,6 +10,8 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.ExecutionException
+import javax.imageio.ImageIO
+
 
 object BotUtil {
 
@@ -113,28 +115,29 @@ object BotUtil {
                 ContextHolder.telegramBotClient.downloadFile(file, webpFile)
             }
         }
-        val future =
-            Runtime.getRuntime().exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
-        future.get()
+//        val future =
+//            Runtime.getRuntime().exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
+//        future.get()
+        val webp = ImageIO.read(webpFile)
+        ImageIO.write(webp, "png", pngFile)
         return pngFile
     }
 
     fun mp42gif(id: String, tgFile: org.telegram.telegrambots.meta.api.objects.File): File? {
         val gifFile = File(getImagePath("$id.gif"))
         if (gifFile.exists()) return gifFile
-        var mp4File = File(tgFile.filePath)
-        if (!mp4File.exists()) mp4File = ContextHolder.telegramBotClient.downloadFile(tgFile)
+        val mp4File = File(tgFile.filePath)
+        if (!mp4File.exists()) ContextHolder.telegramBotClient.downloadFile(tgFile, mp4File)
         gifFile.parentFile.mkdirs()
         try {
             val future =
                 Runtime.getRuntime().exec(String.format(MP4_TO_GIF_CMD_PATTERN, mp4File.path, gifFile.path).replace("\\", "\\\\")).onExit()
             if (future.get().exitValue() >= 0 || gifFile.exists()) return gifFile
-        } catch (e: IOException) {
+            else gifFile.delete()
+        } catch (e: Exception) {
             log.error(e) { e.message }
-        } catch (e: ExecutionException) {
-            log.error(e) { e.message }
-        } catch (e: InterruptedException) {
-            log.error(e) { e.message }
+            gifFile.delete()
+            throw e
         }
         return null
     }

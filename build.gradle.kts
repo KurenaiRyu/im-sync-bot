@@ -49,6 +49,7 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
+    implementation("org.sejda.imageio:webp-imageio:0.1.6")
     implementation("com.squareup.okhttp3:okhttp:4.9.2")
     implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")
     implementation("com.fasterxml.jackson.dataformat", "jackson-dataformat-xml")

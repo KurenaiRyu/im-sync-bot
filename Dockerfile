@@ -1,6 +1,6 @@
 FROM adoptopenjdk:11-jre-hotspot as actual-image
 MAINTAINER kurenai233@yahoo.com
-RUN apt update -y && apt install ffmpeg webp -y
+RUN apt update -y && apt install ffmpeg -y
 
 FROM gradle:7.1.1-jdk11-hotspot as builder
 WORKDIR /usr/src/java-code
