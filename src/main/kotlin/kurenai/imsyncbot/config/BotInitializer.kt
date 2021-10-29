@@ -37,7 +37,7 @@ class BotInitializer : InitializingBean {
                 val filesToDelete = ArrayList<File>()
                 cacheDir.listFiles()?.forEach { file ->
                     if (file.isDirectory) {
-                        filesToDelete.addAll(FileUtils.listFiles(file, SizeFileFilter(largeFileSize), null))
+                        filesToDelete.addAll(FileUtils.listFiles(file, SizeFileFilter(largeFileSize), null).filter { !it.name.endsWith(".part") })
                     }
                 }
                 doDeleteCacheFile(filesToDelete)
