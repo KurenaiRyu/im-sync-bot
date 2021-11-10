@@ -1,13 +1,13 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.springframework.boot") version "2.5.4"
+    id("org.springframework.boot") version "2.5.6"
     id("io.spring.dependency-management") version "1.0.11.RELEASE"
-    kotlin("jvm") version "1.5.10"
-    kotlin("plugin.spring") version "1.5.10"
-    kotlin("plugin.allopen") version "1.5.10"
-    kotlin("plugin.noarg") version "1.5.10"
-    kotlin("kapt") version "1.5.10"
+    kotlin("jvm") version "1.5.31"
+    kotlin("plugin.spring") version "1.5.31"
+    kotlin("plugin.allopen") version "1.5.31"
+    kotlin("plugin.noarg") version "1.5.31"
+    kotlin("kapt") version "1.5.31"
 }
 
 group = "kurenai.mybot"
@@ -24,8 +24,9 @@ repositories {
 
 dependencies {
 
-    val miraiVersion = "2.8.0-M1"
+    val miraiVersion = "2.8.0"
 
+    //mirai
     implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {
         exclude("net.mamoe", "mirai-core-api")
         exclude("net.mamoe", "mirai-core-utils")
@@ -35,20 +36,23 @@ dependencies {
     }
     implementation("net.mamoe", "mirai-core-utils-jvm", miraiVersion)
 
+    //telegram
     implementation("org.telegram", "telegrambots-spring-boot-starter", "5.3.0") {
         exclude("org.telegram", "telegrambots-meta")
     }
     implementation("org.telegram", "telegrambots-meta", "5.3.0.10")
 
+    //spring
     implementation("org.springframework.boot", "spring-boot-starter")
     implementation("org.springframework.boot", "spring-boot-starter-data-jpa")
-    implementation("org.springframework.boot:spring-boot-starter-json:2.5.5")
-    implementation("org.springframework.boot", "spring-boot-gradle-plugin", "2.5.4")
-    kapt("org.springframework.boot", "spring-boot-configuration-processor")
+    implementation("org.springframework.boot", "spring-boot-starter-json")
+//    implementation("org.springframework.boot", "spring-boot-gradle-plugin", "2.5.4")
 
+    //kotlin
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
+    //tool kit
     implementation("org.sejda.imageio:webp-imageio:0.1.6")
     implementation("com.squareup.okhttp3:okhttp:4.9.2")
     implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")
