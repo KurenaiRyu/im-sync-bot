@@ -1,11 +1,8 @@
 package kurenai.imsyncbot
 
-enum class BotConfigKey(
-    val value: String,
-    val description: String = ""
-) {
+object BotConfigKey {
 
-    MASTER_ID("masterId"),
-    MASTER_USERNAME("masterUsername"),
-    MASTER_CHAT_ID("masterChatId"),
+    const val MASTER_ID = "masterId"
+    const val MASTER_USERNAME = "masterUsername"
+    const val MASTER_CHAT_ID = "masterChatId"
 }

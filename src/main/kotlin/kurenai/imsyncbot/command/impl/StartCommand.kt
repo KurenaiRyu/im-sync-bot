@@ -10,9 +10,12 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import org.telegram.telegrambots.meta.api.objects.Update
 
 @Component
-class StartCommand(val configService: ConfigService) : Command {
+class StartCommand(val configService: ConfigService) : Command() {
 
-    override suspend fun execute(update: Update): Boolean {
+    override val help = "/start 触发机器人初始化一些参数，如记录主人聊天id等"
+    override val command = "start"
+
+    override fun execute(update: Update): Boolean {
         if (update.hasMessage()) {
             val message = update.message
             if (message.isUserMessage && ContextHolder.masterOfTg.contains(message.from.id)) {
@@ -30,14 +33,6 @@ class StartCommand(val configService: ConfigService) : Command {
                 )
             }
         }
-        return false
-    }
-
-    override fun match(text: String): Boolean {
-        return text.startsWith("/start")
-    }
-
-    override fun getHelp(): String {
-        return "/start 触发机器人初始化一些参数，如记录主人聊天id等"
+        return true
     }
 }

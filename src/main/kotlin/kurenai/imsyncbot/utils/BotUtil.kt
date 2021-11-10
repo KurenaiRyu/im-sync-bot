@@ -6,10 +6,10 @@ import net.mamoe.mirai.contact.Contact
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import org.telegram.telegrambots.meta.api.methods.GetFile
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.File
 import java.io.IOException
-import java.util.concurrent.ExecutionException
 import javax.imageio.ImageIO
 
 
@@ -86,22 +86,12 @@ object BotUtil {
             .replace("/", "-")
     }
 
-    fun webp2png(id: String, webpFile: File): File? {
-        val pngFile = File(getImagePath("$id.png"))
-        if (pngFile.exists()) return pngFile
-        pngFile.parentFile.mkdirs()
-        try {
-            val future =
-                Runtime.getRuntime().exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
-            if (future.get().exitValue() >= 0 || pngFile.exists()) return pngFile
-        } catch (e: IOException) {
-            log.error(e) { e.message }
-        } catch (e: ExecutionException) {
-            log.error(e) { e.message }
-        } catch (e: InterruptedException) {
-            log.error(e) { e.message }
+    fun buildInlineMarkup(dataList: List<Map<String, String>>): List<List<InlineKeyboardButton>> {
+        return dataList.map { row ->
+            row.map { column ->
+                InlineKeyboardButton(column.key).apply { callbackData = column.value }
+            }
         }
-        return null
     }
 
     fun webp2png(file: org.telegram.telegrambots.meta.api.objects.File): File {

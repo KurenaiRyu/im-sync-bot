@@ -38,11 +38,6 @@ class BotAutoConfiguration {
     }
 
     @Bean
-    fun botInitializer(): BotInitializer {
-        return BotInitializer()
-    }
-
-    @Bean
     fun cache(properties: RedisProperties): Cache {
         return CacheFactory.create(properties.host, properties.port)
     }

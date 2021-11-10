@@ -64,11 +64,10 @@ class PrivateChatHandler(
     }
 
     suspend fun onFriendMessage(friend: Friend, chain: MessageChain, isSync: Boolean = false) {
-        //FIX: 私聊无法引用消息
         val client = ContextHolder.telegramBotClient
         var replyMsgId = chain[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
         if (replyMsgId == null) {
-            replyMsgId = getFirstMsg(friend) ?: return
+            replyMsgId = getStartMsg(friend) ?: return
         }
         for (msg in chain) {
             when (msg) {
@@ -148,7 +147,6 @@ class PrivateChatHandler(
     }
 
     suspend fun onPrivateChat(update: Update) {
-        log.debug { "${this::class.java}#onPrivateChat" }
         if (update.message.from.id == 777000L && update.message.forwardFromChat.id == privateChatChannel) {
             onChannelForward(update)
         } else if (update.message.isReply) {
@@ -217,7 +215,7 @@ class PrivateChatHandler(
         }
     }
 
-    fun getFirstMsg(friend: Friend): Int? {
+    fun getStartMsg(friend: Friend): Int? {
         val client = ContextHolder.telegramBotClient
         val bot = ContextHolder.qqBot
         var messageId = cacheService.getPrivateChannelMessageId(friend.id)

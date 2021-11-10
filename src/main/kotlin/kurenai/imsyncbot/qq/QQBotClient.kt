@@ -71,8 +71,8 @@ class QQBotClient(
                         }.also {
 
                             val list = event.message.filterIsInstance<At>()
-                            if (!it && list.isNotEmpty() && forwardHandlerProperties.masterOfQq.contains(list[0].target)) {
-                                sendTgMsgString(event)
+                            if (!it && list.isNotEmpty() && bot.id == list[0].target) {
+                                sendRemindMsg(event)
                             }
                         }
                     }
@@ -149,7 +149,7 @@ class QQBotClient(
         }
     }
 
-    private suspend fun sendTgMsgString(event: GroupAwareMessageEvent) {
+    private suspend fun sendRemindMsg(event: GroupAwareMessageEvent) {
         try {
             val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
             ContextHolder.telegramBotClient.send(
@@ -159,7 +159,7 @@ class QQBotClient(
                 )
             )
         } catch (e: Exception) {
-            log.error(e) { "Send tg message by string fail." }
+            log.error(e) { "Send remind message fail." }
         }
     }
 

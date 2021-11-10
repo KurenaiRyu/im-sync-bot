@@ -15,37 +15,31 @@ import org.telegram.telegrambots.meta.api.objects.Update
 @Component
 class BindGroupCommand(
     private val repository: BindingGroupRepository,
-) : Command {
+) : Command() {
 
     private val log = KotlinLogging.logger {}
     private val errorMsg = "Command error.\nexample command: /bindGroup rm 123456"
+    override val command = "bindGroup"
+    override val help = "/bindGroup 显示当前绑定列表\n/bindGroup <qqGroupId>:<tgGroupId(chatId)> 增加一对绑定关系\n/bindGroup rm <qqGroupId(tgGroupId)> 移除该id关联绑定(可以是qq或者tg)"
 
-    override suspend fun execute(update: Update): Boolean {
+    override fun execute(update: Update): Boolean {
         if (!ContextHolder.masterOfTg.contains(update.message.from.id)) {
             ContextHolder.telegramBotClient.send(
                 SendMessage.builder().chatId(update.message.chatId.toString()).text("Only for master.")
                     .replyToMessageId(update.message.messageId).build()
             )
-            return false
+            return true
         }
 
         doExec(update)
+        return true
+    }
+
+    override fun execute(event: MessageEvent): Boolean {
         return false
     }
 
-    override suspend fun execute(event: MessageEvent): Boolean {
-        return false
-    }
-
-    override fun match(text: String): Boolean {
-        return text.startsWith("/bindGroup", true)
-    }
-
-    override fun getHelp(): String {
-        return "/bindGroup 显示当前绑定列表\n/bindGroup <qqGroupId>:<tgGroupId(chatId)> 增加一对绑定关系\n/bindGroup rm <qqGroupId(tgGroupId)> 移除该id关联绑定(可以是qq或者tg)"
-    }
-
-    private suspend fun doExec(update: Update) {
+    private fun doExec(update: Update) {
         val text = update.message.text
         val content = text.substring(10).trim()
         val rec = if (content.isEmpty()) {
@@ -74,12 +68,12 @@ class BindGroupCommand(
                 val group = content.substring(2).trim().toLong()
                 var removed = ContextHolder.qqTgBinding.remove(group)
                 if (removed != null) {
-                    repository.deleteByQq(group)
+                    repository.removeByQq(group)
                     ContextHolder.tgQQBinding.remove(removed)
                 } else {
                     removed = ContextHolder.tgQQBinding.remove(group)
                     if (removed != null) {
-                        repository.deleteByTg(group)
+                        repository.removeByTg(group)
                         ContextHolder.qqTgBinding.remove(removed)
                     }
                 }

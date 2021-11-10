@@ -1,6 +1,5 @@
 package kurenai.imsyncbot.domain
 
-import kurenai.imsyncbot.BotConfigKey
 import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
@@ -24,14 +23,14 @@ class BotConfig {
 
     constructor()
 
-    constructor(key: BotConfigKey, value: String) {
-        this.key = key.value
+    constructor(key: String, value: String) {
+        this.key = key
         this.value = value
         valid()
     }
 
-    constructor(key: BotConfigKey, value: Any) {
-        this.key = key.value
+    constructor(key: String, value: Any) {
+        this.key = key
         this.value = value.toString()
         valid()
     }

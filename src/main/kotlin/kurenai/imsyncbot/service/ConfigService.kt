@@ -1,6 +1,5 @@
 package kurenai.imsyncbot.service
 
-import kurenai.imsyncbot.BotConfigKey
 import kurenai.imsyncbot.domain.BotConfig
 import kurenai.imsyncbot.repository.ConfigRepository
 import mu.KotlinLogging
@@ -13,24 +12,32 @@ class ConfigService(
 
     private val log = KotlinLogging.logger {}
 
-    fun get(key: BotConfigKey): String? {
+    fun get(key: String): String? {
         return try {
-            configRepository.getById(key.value).value
+            configRepository.getById(key).value
         } catch (e: Exception) {
             log.error(e) { "Get config error: ${e.message}" }
             null
         }
     }
 
-    fun exist(key: BotConfigKey): Boolean {
-        return configRepository.existsById(key.value)
+    fun exist(key: String): Boolean {
+        return configRepository.existsById(key)
     }
 
-    fun save(key: BotConfigKey, value: Any) {
+    fun save(key: String, value: Any) {
         configRepository.save(BotConfig(key, value))
     }
 
     fun saveAll(configs: List<BotConfig>) {
         configRepository.saveAll(configs)
+    }
+
+    fun findAll(): MutableList<BotConfig> {
+        return configRepository.findAll()
+    }
+
+    fun delete(key: String) {
+        configRepository.deleteById(key)
     }
 }

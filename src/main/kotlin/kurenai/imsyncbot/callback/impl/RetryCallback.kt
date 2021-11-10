@@ -14,14 +14,13 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 
 @Component
-class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwardHandler) : Callback {
+class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwardHandler) : Callback() {
 
     private val log = KotlinLogging.logger {}
 
-    override suspend fun handle(update: Update, message: Message): Boolean {
-        if ("retry" != update.callbackQuery.data) {
-            return false
-        }
+    override val method: String = "retry"
+
+    override fun handle0(update: Update, message: Message): Int {
         val client = ContextHolder.telegramBotClient
 
         val originMessage = cacheService.getTg(message.chatId, message.replyToMessage.messageId)
@@ -30,7 +29,7 @@ class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwar
                 this.chatId = chatId
                 this.messageId = messageId
             })
-            return true
+            return END
         }
 
         val messageId = message.messageId
@@ -42,7 +41,9 @@ class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwar
         })
 
         try {
-            forwardHandler.onMessage(originMessage)
+            suspend {
+                forwardHandler.onMessage(originMessage)
+            }
             client.send(DeleteMessage(chatId, messageId))
         } catch (e: Exception) {
             log.error(e) { e.message }
@@ -56,6 +57,6 @@ class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwar
             })
         }
 
-        return true
+        return END
     }
 }

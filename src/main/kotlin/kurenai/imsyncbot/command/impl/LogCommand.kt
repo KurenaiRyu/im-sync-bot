@@ -12,11 +12,13 @@ import org.telegram.telegrambots.meta.api.objects.Update
 import java.io.File
 
 @Component
-class LogCommand : Command {
+class LogCommand : Command() {
 
     private val log = KotlinLogging.logger {}
+    override val help: String = "/log 获取日志文件"
+    override val command: String = "log"
 
-    override suspend fun execute(update: Update): Boolean {
+    override fun execute(update: Update): Boolean {
         try {
             val file = File(BotConstant.LOG_FILE_PATH)
             ContextHolder.telegramBotClient.send(SendDocument(update.message.chatId.toString(), InputFile(file)))
@@ -28,13 +30,5 @@ class LogCommand : Command {
         }
 
         return false
-    }
-
-    override fun match(text: String): Boolean {
-        return text.startsWith("/log")
-    }
-
-    override fun getHelp(): String {
-        return "/log 获取日志文件"
     }
 }

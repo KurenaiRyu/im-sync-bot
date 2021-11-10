@@ -1,22 +1,44 @@
 package kurenai.imsyncbot.config
 
+import kurenai.imsyncbot.domain.BindingGroup
+import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
+import kurenai.imsyncbot.repository.BindingGroupRepository
 import mu.KotlinLogging
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.filefilter.AgeFileFilter
 import org.apache.commons.io.filefilter.SizeFileFilter
 import org.apache.commons.lang3.time.DateUtils
 import org.springframework.beans.factory.InitializingBean
+import org.springframework.stereotype.Component
 import java.io.File
 import java.util.*
 import kotlin.concurrent.timerTask
 
-class BotInitializer : InitializingBean {
+@Component
+class BotInitializer(
+    val forwardHandlerProperties: ForwardHandlerProperties,
+    val bindingGroupRepository: BindingGroupRepository
+) : InitializingBean {
 
     private val log = KotlinLogging.logger {}
     private val largeFileSize = 1 * 1024 * 1024L
     private val largeDirSize = 1 * 1024 * 1024 * 1024L
 
     override fun afterPropertiesSet() {
+        updateBindingGroup()
+        setUpTimer()
+    }
+
+    private fun updateBindingGroup() {
+        val qqTelegram = forwardHandlerProperties.group.qqTelegram
+        val founds = bindingGroupRepository.findAll()
+        for (found in founds) {
+            qqTelegram.remove(found.qq)
+        }
+        bindingGroupRepository.saveAll(qqTelegram.map { BindingGroup(it.key, it.value) })
+    }
+
+    private fun setUpTimer() {
         val cacheDir = File("./cache")
         val clearCacheTimer = Timer("ClearCache", true)
         clearCacheTimer.scheduleAtFixedRate(timerTask {

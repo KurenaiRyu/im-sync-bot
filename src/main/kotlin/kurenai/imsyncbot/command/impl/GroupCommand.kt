@@ -12,9 +12,12 @@ import org.telegram.telegrambots.meta.api.objects.Update
 @Component
 class GroupCommand(
     private val repository: BindingGroupRepository,
-) : Command {
+) : Command() {
 
-    override suspend fun execute(update: Update): Boolean {
+    override val help: String = "/group <id> 显示qq或者tg群信息(该bot已加入的)"
+    override val command: String = "group"
+
+    override fun execute(update: Update): Boolean {
         if (!ContextHolder.masterOfTg.contains(update.message.from.id)) {
             ContextHolder.telegramBotClient.send(
                 SendMessage.builder().chatId(update.message.chatId.toString()).text("Only for master.")
@@ -31,20 +34,12 @@ class GroupCommand(
         return false
     }
 
-    override suspend fun execute(event: MessageEvent): Boolean {
+    override fun execute(event: MessageEvent): Boolean {
         doExec(event.message.contentToString())
         return false
     }
 
-    override fun match(text: String): Boolean {
-        return text.startsWith("/group", true)
-    }
-
-    override fun getHelp(): String {
-        return "/group <id> 显示qq或者tg群信息(该bot已加入的)"
-    }
-
-    private suspend fun doExec(text: String): String {
+    private fun doExec(text: String): String {
         val content = text.substring(6).trim()
         return if (content.isEmpty()) {
             "command error.\nexample command: /group 123456"

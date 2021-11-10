@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository
 @Repository
 interface BindingGroupRepository : JpaRepository<BindingGroup, Long> {
 
-    fun deleteByQq(qq: Long)
+    fun removeByQq(qq: Long)
 
-    fun deleteByTg(tg: Long)
+    fun removeByTg(tg: Long)
 }

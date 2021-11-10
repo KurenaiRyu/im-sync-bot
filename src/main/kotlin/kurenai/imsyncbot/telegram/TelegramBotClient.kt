@@ -3,6 +3,7 @@ package kurenai.imsyncbot.telegram
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
@@ -20,6 +21,7 @@ import org.telegram.telegrambots.bots.DefaultBotOptions
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod
 import org.telegram.telegrambots.meta.api.methods.send.*
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageMedia
 import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.Update
@@ -27,6 +29,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.Serializable
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.function.Supplier
 
@@ -47,6 +50,9 @@ class TelegramBotClient(
     private val privateChatHandler: PrivateChatHandler,
     private val configService: ConfigService
 ) : TelegramLongPollingBot(options) {
+
+    val nextMsgUpdate: ConcurrentHashMap<Long, Update> = ConcurrentHashMap()
+    val nextMsgLock: ConcurrentHashMap<Long, Object> = ConcurrentHashMap()
 
     private val log = KotlinLogging.logger {}
     private val mapper: ObjectMapper = ObjectMapper()
@@ -93,11 +99,27 @@ class TelegramBotClient(
             return
         }
 
-        if (update.hasCallbackQuery()) {
-            for (callback in callbacks) {
-                if (callback.handle(update, message)) {
-                    return
+        if (message.isUserMessage) {
+            nextMsgLock.remove(message.chatId)?.let {
+                nextMsgUpdate.putIfAbsent(message.chatId, update)
+                synchronized(it) {
+                    it.notify()
                 }
+            }
+        }
+
+        if (update.hasCallbackQuery()) {
+            try {
+                for (callback in callbacks) {
+                    if (callback.match(update) && callback.handle(update, message) == Callback.END) {
+                        return
+                    }
+                }
+            } catch (e: Exception) {
+                log.error(e) { e.message }
+                send(SendMessage(message.chatId.toString(), e.message!!).apply {
+                    replyToMessageId = message.messageId
+                })
             }
         }
 
@@ -107,22 +129,29 @@ class TelegramBotClient(
                 val sb = StringBuilder("Command list")
                 for (command in commands) {
                     sb.append("\n----------------\n")
-                    sb.append("${command.getName()}\n")
-                    sb.append(command.getHelp())
+                    sb.append("/${command.command} ${command.name}\n")
+                    sb.append(command.help)
                 }
                 send(
                     SendMessage.builder().chatId(message.chatId.toString()).replyToMessageId(message.messageId)
                         .text(sb.toString()).build()
                 )
+                return
             } else {
+                var matched = false
                 for (command in commands) {
-                    if (command.match(update)) {
-                        if (command.execute(update)) {
-                            break
-                        } else {
-                            return
-                        }
+                    if (command.match(update) && command.execute(update)) {
+                        matched = true
                     }
+                }
+                if (!matched) {
+                    val reply = send(SendMessage(message.chatId.toString(), "没有匹配的命令").apply {
+                        replyToMessageId = update.message.messageId
+                    })
+                    delay(5000)
+                    send(DeleteMessage(message.chatId.toString(), reply.messageId))
+                } else {
+                    return
                 }
             }
         }
@@ -147,7 +176,7 @@ class TelegramBotClient(
         }
     }
 
-    suspend fun reportError(update: Update, e: Throwable) {
+    suspend fun reportError(update: Update, e: Throwable, topic: String = "#转发失败") {
         log.error(e) { e.message }
         try {
             val message = update.message ?: update.editedMessage ?: update.callbackQuery.message
@@ -167,7 +196,7 @@ class TelegramBotClient(
 //                send(EditMessageText.builder().chatId(it).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
 //            }
 
-            send(SendMessage(msgChatId, "#转发失败\n${e.message}").apply {
+            send(SendMessage(msgChatId, "topic\n${e.message}").apply {
                 this.replyToMessageId = msgId
                 this.replyMarkup =
                     InlineKeyboardMarkup().apply {
