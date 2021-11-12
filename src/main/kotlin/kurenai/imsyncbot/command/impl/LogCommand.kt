@@ -15,7 +15,7 @@ import java.io.File
 class LogCommand : Command() {
 
     private val log = KotlinLogging.logger {}
-    override val help: String = "/log 获取日志文件"
+    override val help: String = "获取日志文件"
     override val command: String = "log"
 
     override fun execute(update: Update): Boolean {

@@ -8,7 +8,8 @@ abstract class Command {
     open val help: String = "No help information."
     open val name: String = this.javaClass.simpleName
     open val command: String = ""
-    open val onlyUserMessage: Boolean = false
+    open val onlyUserMessage: Boolean = true
+    open val onlyMaster: Boolean = true
 
     open fun execute(update: Update): Boolean {
         return false

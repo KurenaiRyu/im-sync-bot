@@ -3,7 +3,6 @@ package kurenai.imsyncbot.telegram
 import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
@@ -21,7 +20,6 @@ import org.telegram.telegrambots.bots.DefaultBotOptions
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod
 import org.telegram.telegrambots.meta.api.methods.send.*
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageMedia
 import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.Update
@@ -123,37 +121,48 @@ class TelegramBotClient(
             }
         }
 
-        if (update.hasMessage() && message.isCommand) {
-            val text = message.text
-            if (text.startsWith("/help") && message.isUserMessage) {
-                val sb = StringBuilder("Command list")
-                for (command in commands) {
-                    sb.append("\n----------------\n")
-                    sb.append("/${command.command} ${command.name}\n")
-                    sb.append(command.help)
-                }
-                send(
-                    SendMessage.builder().chatId(message.chatId.toString()).replyToMessageId(message.messageId)
-                        .text(sb.toString()).build()
-                )
-                return
-            } else {
-                var matched = false
-                for (command in commands) {
-                    if (command.match(update) && command.execute(update)) {
-                        matched = true
+        if (message.isCommand) {
+            if (update.hasMessage() && message.hasText()) {
+                val text = message.text
+                if (text.startsWith("/help") && message.isUserMessage) {
+                    val sb = StringBuilder("Command list")
+                    for (command in commands) {
+                        sb.append("\n----------------\n")
+                        sb.append("/${command.command} ${command.name}\n")
+                        sb.append(command.help)
+                    }
+                    send(
+                        SendMessage.builder().chatId(message.chatId.toString()).replyToMessageId(message.messageId)
+                            .text(sb.toString()).build()
+                    )
+                    return
+                } else {
+                    for (command in commands) {
+                        if (command.match(update)) {
+                            if (command.onlyMaster) {
+                                if (ContextHolder.masterOfTg.isEmpty()) {
+                                    sendMessage(message.chatId, "请先私聊发送/start初始化信息", message.messageId)
+                                    return
+                                }
+                                if (!ContextHolder.masterOfTg.contains(message.from.id) && ContextHolder.masterChatId != message.chatId) {
+                                    continue
+                                }
+                            }
+
+                            if (command.onlyUserMessage) {
+                                if (message.isUserMessage && command.execute(update)) {
+                                    return
+                                }
+                            } else {
+                                if (command.execute(update)) {
+                                    return
+                                }
+                            }
+                        }
                     }
                 }
-                if (!matched) {
-                    val reply = send(SendMessage(message.chatId.toString(), "没有匹配的命令").apply {
-                        replyToMessageId = update.message.messageId
-                    })
-                    delay(5000)
-                    send(DeleteMessage(message.chatId.toString(), reply.messageId))
-                } else {
-                    return
-                }
             }
+            return
         }
 
         if (message.chatId.equals(privateChatHandler.privateChat)) {
@@ -196,7 +205,7 @@ class TelegramBotClient(
 //                send(EditMessageText.builder().chatId(it).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
 //            }
 
-            send(SendMessage(msgChatId, "topic\n${e.message}").apply {
+            send(SendMessage(msgChatId, "$topic\n${e.message}").apply {
                 this.replyToMessageId = msgId
                 this.replyMarkup =
                     InlineKeyboardMarkup().apply {
@@ -235,6 +244,15 @@ class TelegramBotClient(
                 reportError(update, e)
             }
         }
+    }
+
+    fun sendMessage(chatId: Long, message: String, replyMessageId: Int? = null, parseMode: String? = null) {
+        send(SendMessage(chatId.toString(), message).apply {
+            this.replyToMessageId = replyMessageId
+            parseMode?.let {
+                this.parseMode = it
+            }
+        })
     }
 
     @Throws(TelegramApiException::class)
