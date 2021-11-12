@@ -1,6 +1,5 @@
 package kurenai.imsyncbot.callback.impl
 
-import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.repository.BindingGroupRepository
 import mu.KotlinLogging
@@ -30,8 +29,6 @@ class BindingGroupDelete(
         if (found != null) {
             repository.delete(found)
         }
-        val tg = ContextHolder.qqTgBinding.remove(qq)
-        ContextHolder.tgQQBinding.remove(tg)
         bindingGroupConfig.changeToConfigs(message.messageId, message.chatId)
         return END
     }

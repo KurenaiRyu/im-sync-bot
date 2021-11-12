@@ -10,10 +10,6 @@ class ForwardHandlerInitializer(
 ) : InitializingBean {
 
     override fun afterPropertiesSet() {
-        properties.group.qqTelegram.forEach {
-            ContextHolder.qqTgBinding.putIfAbsent(it.key, it.value)
-            ContextHolder.tgQQBinding.putIfAbsent(it.value, it.key)
-        }
         groupBindingGroupRepository.findAll().forEach {
             ContextHolder.qqTgBinding.putIfAbsent(it.qq, it.tg)
             ContextHolder.tgQQBinding.putIfAbsent(it.tg, it.qq)

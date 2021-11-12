@@ -2,6 +2,7 @@ package kurenai.imsyncbot.callback.impl
 
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.callback.Callback
+import kurenai.imsyncbot.domain.BindingGroup
 import kurenai.imsyncbot.repository.BindingGroupRepository
 import kurenai.imsyncbot.utils.BotUtil
 import org.springframework.stereotype.Component
@@ -16,6 +17,8 @@ class BindingGroupConfig(
     val repository: BindingGroupRepository
 ) : Callback() {
 
+    val lock = Object()
+
     companion object {
         const val methodStr = "bindingGroupConfig"
     }
@@ -29,7 +32,7 @@ class BindingGroupConfig(
 
     fun changeToConfigs(messageId: Int, chatId: Long) {
         val all = repository.findAll()
-
+        flushBinding(all)
 
         val markup = ArrayList<List<InlineKeyboardButton>>()
         markup.addAll(
@@ -55,6 +58,18 @@ class BindingGroupConfig(
             this.chatId = chatId.toString()
             replyMarkup = InlineKeyboardMarkup(markup)
         })
+    }
 
+    fun flushBinding(all: MutableList<BindingGroup>) {
+        synchronized(lock) {
+            val tgQQBinding = ContextHolder.tgQQBinding
+            val qqTgBinding = ContextHolder.qqTgBinding
+            tgQQBinding.clear()
+            qqTgBinding.clear()
+            for (bindingGroup in all) {
+                tgQQBinding[bindingGroup.tg] = bindingGroup.qq
+                qqTgBinding[bindingGroup.qq] = bindingGroup.tg
+            }
+        }
     }
 }

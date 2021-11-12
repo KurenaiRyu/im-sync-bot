@@ -115,52 +115,55 @@ class TelegramBotClient(
                 }
             } catch (e: Exception) {
                 log.error(e) { e.message }
-                send(SendMessage(message.chatId.toString(), e.message!!).apply {
-                    replyToMessageId = message.messageId
-                })
+                reportError(update, e, "执行回调失败")
             }
         }
 
         if (message.isCommand) {
-            if (update.hasMessage() && message.hasText()) {
-                val text = message.text
-                if (text.startsWith("/help") && message.isUserMessage) {
-                    val sb = StringBuilder("Command list")
-                    for (command in commands) {
-                        sb.append("\n----------------\n")
-                        sb.append("/${command.command} ${command.name}\n")
-                        sb.append(command.help)
-                    }
-                    send(
-                        SendMessage.builder().chatId(message.chatId.toString()).replyToMessageId(message.messageId)
-                            .text(sb.toString()).build()
-                    )
-                    return
-                } else {
-                    for (command in commands) {
-                        if (command.match(update)) {
-                            if (command.onlyMaster) {
-                                if (ContextHolder.masterOfTg.isEmpty()) {
-                                    sendMessage(message.chatId, "请先私聊发送/start初始化信息", message.messageId)
-                                    return
+            try {
+                if (update.hasMessage() && message.hasText()) {
+                    val text = message.text
+                    if (text.startsWith("/help") && message.isUserMessage) {
+                        val sb = StringBuilder("Command list")
+                        for (command in commands) {
+                            sb.append("\n----------------\n")
+                            sb.append("/${command.command} ${command.name}\n")
+                            sb.append(command.help)
+                        }
+                        send(
+                            SendMessage.builder().chatId(message.chatId.toString()).replyToMessageId(message.messageId)
+                                .text(sb.toString()).build()
+                        )
+                        return
+                    } else {
+                        for (command in commands) {
+                            if (command.match(update)) {
+                                if (command.onlyMaster) {
+                                    if (ContextHolder.masterOfTg.isEmpty()) {
+                                        sendMessage(message.chatId, "请先私聊发送/start初始化信息", message.messageId)
+                                        return
+                                    }
+                                    if (!ContextHolder.masterOfTg.contains(message.from.id) && ContextHolder.masterChatId != message.chatId) {
+                                        continue
+                                    }
                                 }
-                                if (!ContextHolder.masterOfTg.contains(message.from.id) && ContextHolder.masterChatId != message.chatId) {
-                                    continue
-                                }
-                            }
 
-                            if (command.onlyUserMessage) {
-                                if (message.isUserMessage && command.execute(update)) {
-                                    return
-                                }
-                            } else {
-                                if (command.execute(update)) {
-                                    return
+                                if (command.onlyUserMessage) {
+                                    if (message.isUserMessage && command.execute(update)) {
+                                        return
+                                    }
+                                } else {
+                                    if (command.execute(update)) {
+                                        return
+                                    }
                                 }
                             }
                         }
                     }
                 }
+            } catch (e: Exception) {
+                log.error(e) { e.message }
+                reportError(update, e, "执行命令失败")
             }
             return
         }
@@ -185,7 +188,7 @@ class TelegramBotClient(
         }
     }
 
-    suspend fun reportError(update: Update, e: Throwable, topic: String = "#转发失败") {
+    suspend fun reportError(update: Update, e: Throwable, topic: String = "转发失败") {
         log.error(e) { e.message }
         try {
             val message = update.message ?: update.editedMessage ?: update.callbackQuery.message
@@ -205,7 +208,7 @@ class TelegramBotClient(
 //                send(EditMessageText.builder().chatId(it).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
 //            }
 
-            send(SendMessage(msgChatId, "$topic\n${e.message}").apply {
+            send(SendMessage(msgChatId, "#$topic\n${e.message}").apply {
                 this.replyToMessageId = msgId
                 this.replyMarkup =
                     InlineKeyboardMarkup().apply {

@@ -26,6 +26,7 @@ class StartCommand(val configService: ConfigService) : Command() {
                 BotConfig(BotConfigKey.MASTER_CHAT_ID, chatId)
             )
         )
+        ContextHolder.masterChatId = update.message.chatId
         client.send(
             SendMessage.builder().chatId(chatId)
                 .text("Hello, my master! \n\n现已记录主人的聊天id，之后tg上的错误将会转发至这个私聊当中。\n另外可以使用 /help 查看各个命令的帮助。").build()

@@ -12,7 +12,6 @@ class ForwardHandlerProperties {
     var tgMsgFormat = "\$name: \$msg"
     var qqMsgFormat = "\$name: \$msg"
     var masterOfTg = emptyList<Long>()
-    var masterNameOfTg = ""
     var masterOfQq = emptyList<Long>()
     var group = Group()
     var member = Member()
@@ -24,8 +23,6 @@ class ForwardHandlerProperties {
     class Group {
         var defaultQQ: Long = 0
         var defaultTelegram: Long = 0
-        var qqTelegram: MutableMap<Long, Long> = Collections.emptyMap()
-        var telegramQq: MutableMap<Long, Long> = Collections.emptyMap()
     }
 
     class Member {

@@ -1,6 +1,5 @@
 package kurenai.imsyncbot.config
 
-import kurenai.imsyncbot.domain.BindingGroup
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.repository.BindingGroupRepository
 import mu.KotlinLogging
@@ -25,17 +24,7 @@ class BotInitializer(
     private val largeDirSize = 1 * 1024 * 1024 * 1024L
 
     override fun afterPropertiesSet() {
-        updateBindingGroup()
         setUpTimer()
-    }
-
-    private fun updateBindingGroup() {
-        val qqTelegram = forwardHandlerProperties.group.qqTelegram
-        val founds = bindingGroupRepository.findAll()
-        for (found in founds) {
-            qqTelegram.remove(found.qq)
-        }
-        bindingGroupRepository.saveAll(qqTelegram.map { BindingGroup(it.key, it.value) })
     }
 
     private fun setUpTimer() {
