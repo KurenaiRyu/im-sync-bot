@@ -128,7 +128,7 @@ class TelegramBotClient(
                 }
             } catch (e: Exception) {
                 log.error(e) { e.message }
-                reportError(update, e, "执行回调失败")
+                reportError(update, e, "执行回调失败", false)
             }
         }
 
@@ -176,7 +176,7 @@ class TelegramBotClient(
                 }
             } catch (e: Exception) {
                 log.error(e) { e.message }
-                reportError(update, e, "执行命令失败")
+                reportError(update, e, "执行命令失败", false)
             }
             return
         }
@@ -201,7 +201,7 @@ class TelegramBotClient(
         }
     }
 
-    suspend fun reportError(update: Update, e: Throwable, topic: String = "转发失败") {
+    suspend fun reportError(update: Update, e: Throwable, topic: String = "转发失败", canRetry: Boolean = true) {
         log.error(e) { e.message }
         try {
             val message = update.message ?: update.editedMessage ?: update.callbackQuery.message
