@@ -1,4 +1,4 @@
-FROM adoptopenjdk:11-jre-hotspot as actual-image
+FROM eclipse-temurin:17-jdk-focal as actual-image
 MAINTAINER kurenai233@yahoo.com
 RUN apt update -y && apt install ffmpeg -y
 
