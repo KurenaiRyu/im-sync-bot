@@ -37,10 +37,7 @@ dependencies {
     implementation("net.mamoe", "mirai-core-utils-jvm", miraiVersion)
 
     //telegram
-    implementation("org.telegram", "telegrambots-spring-boot-starter", "5.3.0") {
-        exclude("org.telegram", "telegrambots-meta")
-    }
-    implementation("org.telegram", "telegrambots-meta", "5.3.0.10")
+    implementation("org.telegram", "telegrambots-spring-boot-starter", "5.4.0.10")
 
     //spring
     implementation("org.springframework.boot", "spring-boot-starter")
