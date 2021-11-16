@@ -53,7 +53,7 @@ class PicSourceHandler(
             event.subject.sendMessage(builder.build())
         }
         if (!matched) return CONTINUE
-        val chartId = forwardProperties.group.qqTelegram[event.subject.id] ?: ContextHolder.defaultTgGroup
+        val chartId = ContextHolder.qqTgBinding[event.subject.id] ?: ContextHolder.defaultTgGroup
         val caption = "[SAUCE\\_NAO](${sauce_nao})\n[ASCII2D](${asscii2d})"
         try {
             ContextHolder.telegramBotClient.send(
