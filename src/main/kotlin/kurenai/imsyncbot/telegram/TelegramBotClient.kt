@@ -15,6 +15,7 @@ import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.service.ConfigService
 import kurenai.imsyncbot.utils.RateLimiter
 import mu.KotlinLogging
+import org.springframework.beans.factory.DisposableBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.bots.DefaultBotOptions
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
@@ -30,6 +31,7 @@ import java.io.Serializable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.function.Supplier
+import kotlin.system.exitProcess
 
 /**
  * 机器人实例
@@ -47,7 +49,7 @@ class TelegramBotClient(
     private val cacheService: CacheService,
     private val privateChatHandler: PrivateChatHandler,
     private val configService: ConfigService
-) : TelegramLongPollingBot(options) {
+) : TelegramLongPollingBot(options), DisposableBean {
 
     val nextMsgUpdate: ConcurrentHashMap<Long, Update> = ConcurrentHashMap()
     val nextMsgLock: ConcurrentHashMap<Long, Object> = ConcurrentHashMap()
@@ -68,6 +70,16 @@ class TelegramBotClient(
         return telegramBotProperties.token
     }
 
+    /**
+     * Invoked by the containing `BeanFactory` on destruction of a bean.
+     * @throws Exception in case of shutdown errors. Exceptions will get logged
+     * but not rethrown to allow other beans to release their resources as well.
+     */
+    override fun destroy() {
+        this.onClosing()
+        exitProcess(0)
+    }
+
     override fun onUpdatesReceived(updates: MutableList<Update>) {
         CoroutineScope(Dispatchers.Default).launch {
             updates.forEach { update ->
@@ -79,6 +91,7 @@ class TelegramBotClient(
             }
         }
     }
+
 
     suspend fun onUpdateReceivedSuspend(update: Update) {
         log.debug("onUpdateReceived: {}", mapper.writeValueAsString(update))

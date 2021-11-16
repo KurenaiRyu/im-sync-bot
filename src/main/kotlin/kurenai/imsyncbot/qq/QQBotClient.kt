@@ -28,6 +28,7 @@ import org.springframework.beans.factory.DisposableBean
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
+import kotlin.system.exitProcess
 
 @Component
 class QQBotClient(
@@ -183,6 +184,7 @@ class QQBotClient(
     override fun destroy() {
         log.info { "Close qq-bot ${bot.nick}(${bot.id})." }
         bot.close()
+        exitProcess(0)
     }
 
 
