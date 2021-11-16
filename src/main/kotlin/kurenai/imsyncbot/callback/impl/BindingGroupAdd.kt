@@ -39,11 +39,11 @@ class BindingGroupAdd(
         waitForMsg(update, message)?.let { rec ->
             if (rec.hasMessage()) {
                 val params = rec.message.text.split(":")
-                val qq = params[0].toLong()
-                val tg = params[1].toLong()
+                val qq = params[0].trim().toLong()
+                val tg = params[1].trim().toLong()
                 val found = repository.findAll().takeIf { it.isNotEmpty() }?.first { it.qq == qq || it.tg == tg }
                 if (found == null) {
-                    repository.save(BindingGroup(qq, params[1].toLong()))
+                    repository.save(BindingGroup(qq, tg))
                 } else {
                     found.qq = qq
                     found.tg = tg
