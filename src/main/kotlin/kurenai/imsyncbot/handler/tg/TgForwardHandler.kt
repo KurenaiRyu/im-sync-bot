@@ -10,14 +10,12 @@ import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.Group
-import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.MessageChainBuilder
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import net.mamoe.mirai.utils.RemoteFile.Companion.sendFile
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.GetFile
 import org.telegram.telegrambots.meta.api.objects.Message
@@ -116,8 +114,8 @@ class TgForwardHandler(
             message.hasDocument() -> {
                 val document = message.document
                 val file = getTgFile(document.fileId, document.fileUniqueId)
-                val rec = uploadAndSend(message, group, file, document.fileName)
-                if (!isMaster) rec.quoteReply("Upload by $senderName.")
+                uploadAndSend(message, group, file, document.fileName)
+                if (!isMaster) group.sendMessage("Upload by $senderName.")
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
@@ -146,7 +144,7 @@ class TgForwardHandler(
         group: Group,
         file: org.telegram.telegrambots.meta.api.objects.File,
         fileName: String = "${file.fileId.substring(0, 40)}.${BotUtil.getSuffix(file.filePath)}",
-    ): MessageReceipt<Group> {
+    ) {
         var cacheFile = File(file.filePath)
         if (!cacheFile.exists() || !cacheFile.isFile) {
             cacheFile = File(BotUtil.getDocumentPath(fileName))
@@ -156,9 +154,9 @@ class TgForwardHandler(
         }
 
         return withContext(Dispatchers.IO) {
-            val rec = group.sendFile("/$fileName", cacheFile)
-            cacheService.cache(rec.source, message)
-            return@withContext rec
+            cacheFile.toExternalResource().use { group.files.uploadNewFile("/$fileName", it) }
+//            cacheService.cache(rec.source, message)
+//            return@withContext rec.toMessage()
         }
     }
 
