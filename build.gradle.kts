@@ -1,18 +1,18 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.springframework.boot") version "2.5.6"
+    id("org.springframework.boot") version "2.6.1"
     id("io.spring.dependency-management") version "1.0.11.RELEASE"
-    kotlin("jvm") version "1.5.31"
-    kotlin("plugin.spring") version "1.5.31"
-    kotlin("plugin.allopen") version "1.5.31"
-    kotlin("plugin.noarg") version "1.5.31"
-    kotlin("kapt") version "1.5.31"
+    kotlin("jvm") version "1.6.0"
+    kotlin("plugin.spring") version "1.6.0"
+    kotlin("plugin.allopen") version "1.6.0"
+    kotlin("plugin.noarg") version "1.6.0"
+    kotlin("kapt") version "1.6.0"
 }
 
-group = "kurenai.mybot"
+group = "moe.kurenai.bot"
 version = "0.0.1-SNAPSHOT"
-java.sourceCompatibility = JavaVersion.VERSION_11
+java.sourceCompatibility = JavaVersion.VERSION_17
 
 repositories {
     mavenLocal()
@@ -45,6 +45,9 @@ dependencies {
     implementation("org.springframework.boot", "spring-boot-starter-json")
 //    implementation("org.springframework.boot", "spring-boot-gradle-plugin", "2.5.4")
 
+    //logging
+    implementation("org.apache.logging.log4j:log4j-to-slf4j:2.15.0")
+
     //kotlin
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
@@ -66,8 +69,8 @@ dependencies {
 
 tasks.withType<KotlinCompile> {
     kotlinOptions {
-        freeCompilerArgs = listOf("-Xjsr305=strict")
-        jvmTarget = "11"
+        freeCompilerArgs = listOf("-Xjsr305=strict", "-XX:+UseZGC")
+        jvmTarget = "17"
     }
 }
 
