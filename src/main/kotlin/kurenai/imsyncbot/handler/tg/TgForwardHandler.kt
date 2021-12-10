@@ -230,9 +230,9 @@ class TgForwardHandler(
 
     private fun getSenderName(message: Message): String {
         val from = message.from
-        if (from.userName.equals("GroupAnonymousBot", true)) {
+        if (from.userName.equals("Channel_Bot", true)) {
             return message.authorSignature ?: ""    // 匿名用头衔作为前缀，空头衔将会不添加前缀
-        } else if (message.isChannelMessage || from.id == 777000L) { //tg 频道以及tg官方id不加前缀
+        } else if (message.isChannelMessage || from.id == 136817688L) { //tg 频道以及tg官方id不加前缀
             return ""
         } else {
             return bindingName[from.id] ?: let {
