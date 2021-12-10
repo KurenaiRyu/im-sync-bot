@@ -19,6 +19,7 @@ import kurenai.imsyncbot.utils.HttpUtil
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.*
+import net.mamoe.mirai.contact.file.AbsoluteFileFolder.Companion.extension
 import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
@@ -54,7 +55,7 @@ class QQForwardHandler(
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
     private var enableRecall = properties.enableRecall
-    private var singleContext = newSingleThreadContext("SingleContext")
+    private var groupForwardContext = newSingleThreadContext("GroupForward")
 
     init {
         bindingName = properties.member.bindingName
@@ -289,18 +290,18 @@ class QQForwardHandler(
                 }
             }
         } else if (messageChain.contains(FileMessage.Key)) {
-            val downloadInfo = messageChain[FileMessage.Key]!!.toRemoteFile(group)?.getDownloadInfo() ?: return CONTINUE
-            val url: String = downloadInfo.url
+            val absoluteFile = messageChain[FileMessage.Key]!!.toAbsoluteFile(group) ?: return CONTINUE
+            val url: String = absoluteFile.getUrl() ?: return CONTINUE
             try {
-                val file = File(BotUtil.getDocumentPath(downloadInfo.filename))
+                val file = File(BotUtil.getDocumentPath(absoluteFile.name))
                 if (!file.exists() || !file.isFile) withContext(Dispatchers.IO) {
                     HttpUtil.download(url, file)
                 }
                 val inputFile = InputFile(file)
-                val filename: String = downloadInfo.filename.lowercase()
-                if (filename.endsWith(".mkv") || filename.endsWith(".mp4")) {
+                val extension: String = absoluteFile.extension.lowercase()
+                if (listOf("mp4", "mkv").contains(extension)) {
                     client.send(SendVideo.builder().video(inputFile).chatId(chatId).caption(msg).build())
-                } else if (filename.endsWith(".bmp") || filename.endsWith(".jpeg") || filename.endsWith(".jpg") || filename.endsWith(".png")) {
+                } else if (listOf("bmp", "jpeg", "jpg", "png").contains(extension)) {
                     client.send(
                         SendDocument.builder().document(inputFile).thumb(InputFile(url)).chatId(chatId).caption(msg).build()
                     )
@@ -309,7 +310,7 @@ class QQForwardHandler(
                 }
             } catch (e: Exception) {
                 log.error(e) { e.message }
-                sendSimpleMedia(chatId, replyId, listOf(url), msg, source, downloadInfo.filename)
+                sendSimpleMedia(chatId, replyId, listOf(url), msg, source, absoluteFile.name)
             }
         } else if (messageChain.contains(OnlineAudio.Key)) {
             val voice = messageChain[OnlineAudio.Key]
@@ -342,7 +343,7 @@ class QQForwardHandler(
         chatId: String,
         senderName: String,
     ): Int {
-        return withContext(singleContext) {
+        return withContext(groupForwardContext) {
             for ((senderId, _, forwardSenderName, messageChain) in msg.nodeList) {
                 try {
                     handleGroupMessage(

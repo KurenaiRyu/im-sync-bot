@@ -14,6 +14,7 @@ import net.mamoe.mirai.event.events.FriendMessageEvent
 import net.mamoe.mirai.event.events.FriendMessageSyncEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
+import okhttp3.internal.notifyAll
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.ParseMode
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument
@@ -38,7 +39,7 @@ class PrivateChatHandler(
 
     val privateChat = forwardHandlerProperties.privateChat
     val privateChatChannel = forwardHandlerProperties.privateChatChannel
-    val locks = ConcurrentHashMap<Int, Object>()
+    val locks = ConcurrentHashMap<Int, Any>()
     val newChannelLock = Object()
     val msgIds = HashMap<Int, Int>()
     private val picToFileSize = forwardHandlerProperties.picToFileSize * 1024 * 1024

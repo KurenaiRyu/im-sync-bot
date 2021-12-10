@@ -28,6 +28,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMa
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.Serializable
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.function.Supplier
@@ -111,6 +112,7 @@ class TelegramBotClient(
         }
 
         if (message.isUserMessage) {
+            //TODO 还需要加入之前的用户，不然别的用户发送信息则会出问题
             nextMsgLock.remove(message.chatId)?.let {
                 nextMsgUpdate.putIfAbsent(message.chatId, update)
                 synchronized(it) {
@@ -340,11 +342,15 @@ class TelegramBotClient(
         return execute(Supplier { super.execute(method) })
     }
 
+    fun <T : Serializable, Method : BotApiMethod<T>> sendAsync(method: Method): CompletableFuture<T> {
+        return execute(Supplier { super.executeAsync(method) })
+    }
+
     private fun <T> executeFile(isNew: Boolean = true, size: Int = 1, supplier: Supplier<T>): T {
         return awareErrorHandler {
             if (isNew) {
 //                fileRateLimiter.acquire(size) {
-                    supplier.get()
+                supplier.get()
 //                }
             } else {
 //                rateLimiter.acquire(size)

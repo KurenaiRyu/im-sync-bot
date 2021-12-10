@@ -1,10 +1,6 @@
 package kurenai.imsyncbot.qq
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.channels.actor
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kurenai.imsyncbot.BotConfigKey
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
@@ -12,7 +8,6 @@ import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
-import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.handler.qq.QQForwardHandler
 import kurenai.imsyncbot.service.ConfigService
 import kurenai.imsyncbot.utils.BotUtil
@@ -28,13 +23,13 @@ import org.springframework.beans.factory.DisposableBean
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
+import java.util.concurrent.LinkedBlockingDeque
 import kotlin.system.exitProcess
 
 @Component
 class QQBotClient(
     private val properties: QQBotProperties,
     private val botProperties: BotProperties,
-    private val forwardHandlerProperties: ForwardHandlerProperties,
     private val handlerHolder: HandlerHolder,
     private val privateChatHandler: PrivateChatHandler,
     private val configService: ConfigService
@@ -42,9 +37,9 @@ class QQBotClient(
 
     private val log = KotlinLogging.logger {}
     private val forwardHandler = handlerHolder.currentQQHandlerList.filterIsInstance<QQForwardHandler>()[0]
-//    @OptIn(ObsoleteCoroutinesApi::class)
-//    private val eventChannels = ConcurrentHashMap<Long, SendChannel<MessageEvent>>()
+    private val eventDeque = LinkedBlockingDeque<Event>()
 
+    private val scope = CoroutineScope(Dispatchers.Default)
     val bot = BotFactory.newBot(properties.account, properties.password) {
         fileBasedDeviceInfo() // 使用 device.json 存储设备信息
         protocol = properties.protocol // 切换协议
@@ -55,7 +50,7 @@ class QQBotClient(
     }
 
     override fun afterPropertiesSet() {
-        CoroutineScope(Dispatchers.Default).launch {
+        scope.launch {
             log.info { "Login qq bot..." }
             bot.login()
             log.info { "Started qq-bot ${bot.nick}(${bot.id})" }
@@ -77,6 +72,10 @@ class QQBotClient(
                             }
                         }
                     }
+                    is BotOfflineEvent.Dropped -> {
+                        log.warn { "QQ bot dropped." }
+                        false
+                    }
                     else -> {
                         true
                     }
@@ -84,7 +83,23 @@ class QQBotClient(
             }
 
             filter.subscribeAlways<Event> { event ->
-                CoroutineScope(Dispatchers.Default).launch {
+                if (eventDeque.remainingCapacity() <= 0) {
+                    synchronized(eventDeque) {
+                        if (eventDeque.remainingCapacity() <= 0) {
+                            runBlocking { delay(500) }
+                        }
+                    }
+                }
+                try {
+                    eventDeque.push(event)
+                } catch (e: IllegalStateException) {
+                    log.error { "QQ event queue is full, dropped. $event" }
+                }
+            }
+            val handlerScope = CoroutineScope(Dispatchers.IO)
+            handlerScope.launch {
+                while (isActive) {
+                    val event = eventDeque.take()
                     when (event) {
                         is FriendEvent -> {
                             privateChatHandler.onFriendEvent(event)
@@ -99,12 +114,12 @@ class QQBotClient(
                             forwardHandler.onGroupEvent(event)
                         }
                         else -> {
-                            log.debug { "未支持事件 ${event.javaClass} 的处理" }
+                            log.trace { "未支持事件 ${event.javaClass} 的处理" }
                         }
                     }
                 }
+                log.error { "QQ handler scope is inactive." }
             }
-            bot.join()
         }
     }
 
@@ -142,7 +157,7 @@ class QQBotClient(
                     master.sendMessage(message).quote()
                         .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
                 )
-                ContextHolder.telegramBotClient.send(
+                ContextHolder.telegramBotClient.sendAsync(
                     SendMessage.builder().chatId(BotUtil.getTgChatByQQ(event.group.id).toString()).text(event.message.contentToString())
                         .build()
                 )
@@ -150,10 +165,10 @@ class QQBotClient(
         }
     }
 
-    private suspend fun sendRemindMsg(event: GroupAwareMessageEvent) {
+    private fun sendRemindMsg(event: GroupAwareMessageEvent) {
         try {
             val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
-            ContextHolder.telegramBotClient.send(
+            ContextHolder.telegramBotClient.sendAsync(
                 SendMessage(
                     BotUtil.getTgChatByQQ(event.group.id).toString(),
                     "#提醒 #id${event.sender.id} #group${event.group.id}\n @${configService.get(BotConfigKey.MASTER_USERNAME) ?: event.bot.nameCardOrNick} $content"
@@ -164,26 +179,14 @@ class QQBotClient(
         }
     }
 
-    private fun buildSendChannel(): SendChannel<MessageEvent> {
-        return CoroutineScope(Dispatchers.Default).actor {
-            for (event in channel) {
-                doSubscribe(event)
-            }
-        }
-    }
-
-    private suspend fun doSubscribe(event: MessageEvent) {
-        handle(event)
-    }
-
     /**
      * Invoked by the containing `BeanFactory` on destruction of a bean.
      * @throws Exception in case of shutdown errors. Exceptions will get logged
      * but not rethrown to allow other beans to release their resources as well.
      */
     override fun destroy() {
+        scope.cancel()
         log.info { "Close qq-bot ${bot.nick}(${bot.id})." }
-        bot.close()
         exitProcess(0)
     }
 
