@@ -99,23 +99,28 @@ class QQBotClient(
             val handlerScope = CoroutineScope(Dispatchers.IO)
             handlerScope.launch {
                 while (isActive) {
-                    val event = eventDeque.take()
-                    when (event) {
-                        is FriendEvent -> {
-                            privateChatHandler.onFriendEvent(event)
+                    try {
+                        when (val event = eventDeque.take()) {
+                            is FriendEvent -> {
+                                privateChatHandler.onFriendEvent(event)
+                            }
+                            is MessageEvent -> {
+                                handle(event)
+                            }
+                            is MessageRecallEvent.GroupRecall -> {
+                                forwardHandler.onRecall(event)
+                            }
+                            is GroupEvent -> {
+                                forwardHandler.onGroupEvent(event)
+                            }
+                            else -> {
+                                log.trace { "未支持事件 ${event.javaClass} 的处理" }
+                            }
                         }
-                        is MessageEvent -> {
-                            handle(event)
-                        }
-                        is MessageRecallEvent.GroupRecall -> {
-                            forwardHandler.onRecall(event)
-                        }
-                        is GroupEvent -> {
-                            forwardHandler.onGroupEvent(event)
-                        }
-                        else -> {
-                            log.trace { "未支持事件 ${event.javaClass} 的处理" }
-                        }
+                    } catch (e: CancellationException) {
+                        log.error(e) { "Coroutine was canceled: ${e.message}" }
+                    } catch (e: Exception) {
+                        log.error(e) { e.message }
                     }
                 }
                 log.error { "QQ handler scope is inactive." }
