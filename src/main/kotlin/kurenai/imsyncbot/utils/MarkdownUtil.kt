@@ -9,7 +9,7 @@ object MarkdownUtil {
     private fun format(target: String): String {
         var result = target
         for (c in formatChar) {
-            result = target.replace(c.toString(), "\\$c")
+            result = result.replace(c.toString(), "\\$c")
         }
         return result
     }
