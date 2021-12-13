@@ -343,6 +343,7 @@ class QQForwardHandler(
         chatId: String,
         senderName: String,
     ): Int {
+        if (msg.nodeList.map { it.messageChain }.count { it.contains(Image) } > 20) return END
         return withContext(groupForwardContext) {
             for ((senderId, _, forwardSenderName, messageChain) in msg.nodeList) {
                 try {
