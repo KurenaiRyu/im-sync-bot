@@ -44,9 +44,9 @@ class QQBotClient(
         fileBasedDeviceInfo() // 使用 device.json 存储设备信息
         protocol = properties.protocol // 切换协议
         highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
-        val file = File(BotConstant.LOG_FILE_PATH)
-        redirectBotLogToFile(file)
-        redirectNetworkLogToFile(file)
+//        val file = File(BotConstant.LOG_FILE_PATH)
+//        redirectBotLogToFile(file)
+//        redirectNetworkLogToFile(file)
     }
 
     override fun afterPropertiesSet() {
