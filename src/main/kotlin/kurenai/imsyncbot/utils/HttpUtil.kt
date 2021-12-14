@@ -1,5 +1,8 @@
 package kurenai.imsyncbot.utils
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ImSyncBotRuntimeException
 import kurenai.imsyncbot.utils.downloader.DefaultDownloader
 import kurenai.imsyncbot.utils.downloader.MultiPartDownloader
@@ -23,14 +26,15 @@ object HttpUtil {
     const val UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:89.0) Gecko/20100101 Firefox/89.0"
     private const val filePartLength = 500 * 1024L
     private val client = OkHttpClient()
-    private val pool = Executors.newScheduledThreadPool(Runtime.getRuntime().availableProcessors() * 2, object : ThreadFactory {
+    private val pool = Executors.newScheduledThreadPool(10, object : ThreadFactory {
         private val counter = AtomicInteger(0)
         override fun newThread(r: Runnable): Thread {
-            return Thread(r, "Download Thread#${counter.getAndIncrement()}").also {
+            return Thread(r, "DownloadThread#${counter.getAndIncrement()}").also {
                 it.isDaemon = true
             }
         }
     })
+    private val downloadScope = CoroutineScope(pool.asCoroutineDispatcher())
 
     fun download(url: String): ByteArray {
         return client.newCall(Request.Builder().url(url).build()).execute().use { response ->
@@ -47,11 +51,13 @@ object HttpUtil {
         val originPath = file.path
         file.renameTo(File("$originPath.part"))
         val start = System.nanoTime()
-        getRemoteFileSize(url)?.let {
-            multiPartDownload(url, file, it)
-        } ?: run {
-            createFile(file)
-            DefaultDownloader(url, file, client).run()
+        downloadScope.launch {
+            getRemoteFileSize(url)?.let {
+                multiPartDownload(url, file, it)
+            } ?: run {
+                createFile(file)
+                DefaultDownloader(url, file, client).start()
+            }
         }
         if (file.length() <= 0) throw ImSyncBotRuntimeException("File is null: $url")
         file.renameTo(File(originPath))
@@ -64,7 +70,7 @@ object HttpUtil {
     private fun multiPartDownload(url: String, file: File, size: Long) {
         createFile(file, size)
         val partLength = if (size <= filePartLength) {
-            return DefaultDownloader(url, file, client).run()
+            return DefaultDownloader(url, file, client).start()
         } else if (size > filePartLength * 20) {
             filePartLength * 4
         } else {
