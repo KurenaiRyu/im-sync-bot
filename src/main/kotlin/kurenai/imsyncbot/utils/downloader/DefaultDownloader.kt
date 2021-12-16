@@ -11,15 +11,13 @@ class DefaultDownloader(
     url: String,
     file: File,
     private val httpClient: OkHttpClient,
-    private val countDownLatch: CountDownLatch? = null,
+    private val countDownLatch: CountDownLatch,
 ) : Downloader(url, file) {
 
     override fun run() {
-        httpClient.newCall(Request.Builder().url(url).build()).execute().use {
-            it.body?.let { body ->
-                writeToFile(body.byteStream())
-            } ?: throw ImSyncBotRuntimeException("Body is null: ${HttpUtil.getResponseInfo(it)}")
+        httpClient.newCall(Request.Builder().url(url).build()).execute().use { response ->
+            writeToFile(response.body?.byteStream() ?: throw ImSyncBotRuntimeException("Body is null: ${HttpUtil.getResponseInfo(response)}"))
+            countDownLatch.countDown()
         }
-        countDownLatch?.countDown()
     }
 }

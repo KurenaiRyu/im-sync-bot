@@ -82,7 +82,7 @@ class TelegramBotClient(
     }
 
     override fun onUpdatesReceived(updates: MutableList<Update>) {
-        CoroutineScope(Dispatchers.Default).launch {
+        CoroutineScope(Dispatchers.IO).launch {
             updates.forEach { update ->
                 try {
                     onUpdateReceivedSuspend(update)
@@ -368,20 +368,21 @@ class TelegramBotClient(
     }
 
     private fun <T> awareErrorHandler(executor: () -> T): T {
-        return try {
-            executor()
-        } catch (e: TelegramApiException) {
-            val message = e.message
-            if (message != null && message.contains("Too Many Requests: retry after")) {
-                synchronized(manyRequestsLock) {
-                    val manyRequestsWaitTime = message.substring(message.length - 2).trim().toLong() * 1000
-                    log.debug { "Wait for many requests ${manyRequestsWaitTime / 1000}s" }
-                    time = rateLimiter.now() + manyRequestsWaitTime
-                    manyRequestsLock.wait(manyRequestsWaitTime)
+        while (true) {
+            try {
+                return executor()
+            } catch (e: TelegramApiException) {
+                val message = e.message
+                if (message != null && message.contains("Too Many Requests: retry after")) {
+                    synchronized(manyRequestsLock) {
+                        val manyRequestsWaitTime = message.substring(message.length - 2).trim().toLong() * 1000
+                        log.debug { "Wait for many requests ${manyRequestsWaitTime / 1000}s" }
+                        time = rateLimiter.now() + manyRequestsWaitTime
+                        manyRequestsLock.wait(manyRequestsWaitTime)
+                    }
+                } else {
+                    throw e
                 }
-                awareErrorHandler(executor)
-            } else {
-                throw e
             }
         }
     }

@@ -2,9 +2,7 @@ package kurenai.imsyncbot.handler.qq
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.newSingleThreadContext
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import kurenai.imsyncbot.BotConfigKey
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.BotProperties
@@ -160,7 +158,7 @@ class QQForwardHandler(
         senderId: Long,
         senderName: String,
     ): Int {
-        log.info { "${group.name}(${group.id}) - $senderName($senderId): ${messageChain.contentToString()}" }
+//        log.info { "${group.name}(${group.id}) - $senderName($senderId): ${messageChain.contentToString()}" }
         val rejectPic = botProperties.ban.picGroup.contains(group.id)
         if (rejectPic) log.debug { "Reject picture" }
 
@@ -290,27 +288,29 @@ class QQForwardHandler(
                 }
             }
         } else if (messageChain.contains(FileMessage.Key)) {
-            val absoluteFile = messageChain[FileMessage.Key]!!.toAbsoluteFile(group) ?: return CONTINUE
-            val url: String = absoluteFile.getUrl() ?: return CONTINUE
-            try {
-                val file = File(BotUtil.getDocumentPath(absoluteFile.name))
-                if (!file.exists() || !file.isFile) withContext(Dispatchers.IO) {
-                    HttpUtil.download(url, file)
+            CoroutineScope(Dispatchers.IO).launch {
+                val absoluteFile = messageChain[FileMessage.Key]!!.toAbsoluteFile(group) ?: return@launch
+                val url: String = absoluteFile.getUrl() ?: return@launch
+                try {
+                    val file = File(BotUtil.getDocumentPath(absoluteFile.name))
+                    if (!file.exists() || !file.isFile) withContext(Dispatchers.IO) {
+                        HttpUtil.download(url, file)
+                    }
+                    val inputFile = InputFile(file)
+                    val extension: String = absoluteFile.extension.lowercase()
+                    if (listOf("mp4", "mkv").contains(extension)) {
+                        client.send(SendVideo.builder().video(inputFile).chatId(chatId).caption(msg).build())
+                    } else if (listOf("bmp", "jpeg", "jpg", "png").contains(extension)) {
+                        client.send(
+                            SendDocument.builder().document(inputFile).thumb(InputFile(url)).chatId(chatId).caption(msg).build()
+                        )
+                    } else {
+                        client.send(SendDocument.builder().document(inputFile).chatId(chatId).caption(msg).build())
+                    }
+                } catch (e: Exception) {
+                    log.error(e) { e.message }
+                    sendSimpleMedia(chatId, replyId, listOf(url), msg, source, absoluteFile.name)
                 }
-                val inputFile = InputFile(file)
-                val extension: String = absoluteFile.extension.lowercase()
-                if (listOf("mp4", "mkv").contains(extension)) {
-                    client.send(SendVideo.builder().video(inputFile).chatId(chatId).caption(msg).build())
-                } else if (listOf("bmp", "jpeg", "jpg", "png").contains(extension)) {
-                    client.send(
-                        SendDocument.builder().document(inputFile).thumb(InputFile(url)).chatId(chatId).caption(msg).build()
-                    )
-                } else {
-                    client.send(SendDocument.builder().document(inputFile).chatId(chatId).caption(msg).build())
-                }
-            } catch (e: Exception) {
-                log.error(e) { e.message }
-                sendSimpleMedia(chatId, replyId, listOf(url), msg, source, absoluteFile.name)
             }
         } else if (messageChain.contains(OnlineAudio.Key)) {
             val voice = messageChain[OnlineAudio.Key]

@@ -24,7 +24,7 @@ object HttpUtil {
     private val log = KotlinLogging.logger {}
 
     const val UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:89.0) Gecko/20100101 Firefox/89.0"
-    private const val filePartLength = 500 * 1024L
+    private const val filePartLength = 2 * 1024 * 1024L
     private val client = OkHttpClient()
     private val pool = Executors.newScheduledThreadPool(10, object : ThreadFactory {
         private val counter = AtomicInteger(0)
@@ -36,29 +36,21 @@ object HttpUtil {
     })
     private val downloadScope = CoroutineScope(pool.asCoroutineDispatcher())
 
-    fun download(url: String): ByteArray {
-        return client.newCall(Request.Builder().url(url).build()).execute().use { response ->
-            if (response.isSuccessful) {
-                response.body?.bytes()
-                    ?: throw ImSyncBotRuntimeException("Body is null: ${getResponseInfo(response)}")
-            } else {
-                throw ImSyncBotRuntimeException("Request fail: ${getResponseInfo(response)}")
-            }
-        }
-    }
-
     fun download(url: String, file: File) {
         val originPath = file.path
         file.renameTo(File("$originPath.part"))
         val start = System.nanoTime()
+        val countDown = CountDownLatch(1)
         downloadScope.launch {
             getRemoteFileSize(url)?.let {
-                multiPartDownload(url, file, it)
+                if (it < 1024 * 1024 * 100) multiPartDownload(url, file, it, countDown)
+                else throw ImSyncBotRuntimeException("The file is too large: $it")
             } ?: run {
                 createFile(file)
-                DefaultDownloader(url, file, client).start()
+                pool.execute(DefaultDownloader(url, file, client, countDown))
             }
         }
+        countDown.await()
         if (file.length() <= 0) throw ImSyncBotRuntimeException("File is null: $url")
         file.renameTo(File(originPath))
         val sizeOfMb = file.length() / 1024.0 / 1024
@@ -67,10 +59,11 @@ object HttpUtil {
         log.info { "Downloaded ${file.name} ${String.format("%.3f", sizeOfMb)} MB in ${String.format("%.2f", timeOfSeconds)} s (${String.format("%.2f", speed)} MB/s)" }
     }
 
-    private fun multiPartDownload(url: String, file: File, size: Long) {
+    private fun multiPartDownload(url: String, file: File, size: Long, upstreamCount: CountDownLatch) {
         createFile(file, size)
         val partLength = if (size <= filePartLength) {
-            return DefaultDownloader(url, file, client).start()
+            pool.execute(DefaultDownloader(url, file, client, upstreamCount))
+            return
         } else if (size > filePartLength * 20) {
             filePartLength * 4
         } else {
@@ -89,6 +82,7 @@ object HttpUtil {
             pool.execute(MultiPartDownloader(url, file, offset, client, countDownLatch))
         }
         countDownLatch.await()
+        upstreamCount.countDown()
     }
 
     fun get(url: String): String {
