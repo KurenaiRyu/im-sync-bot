@@ -405,7 +405,7 @@ class QQForwardHandler(
                 }
             }
             is MemberSpecialTitleChangeEvent -> {
-                "\\#头衔 #id${event.member.id}\n`${event.member.remarkOrNameCardOrNick.format2Markdown()})`获得头衔`${event.new.format2Markdown()}`"
+                "\\#头衔 \\#id${event.member.id}\n`${event.member.remarkOrNameCardOrNick.format2Markdown()})`获得头衔`${event.new.format2Markdown()}`"
             }
             else -> {
                 log.debug { "未支持群事件 ${event.javaClass} 的处理" }
@@ -494,7 +494,7 @@ class QQForwardHandler(
         for (url in urls) {
             urlStr += "[${mask.format2Markdown()}](${url.format2Markdown()})\n"
         }
-        return ContextHolder.telegramBotClient.send(SendMessage(chatId, "$urlStr${msg?.format2Markdown()}").apply {
+        return ContextHolder.telegramBotClient.send(SendMessage(chatId, "${msg?.format2Markdown()}$urlStr").apply {
             this.replyToMessageId = replyId
             this.parseMode = ParseMode.MARKDOWNV2
         }).let { rec ->
