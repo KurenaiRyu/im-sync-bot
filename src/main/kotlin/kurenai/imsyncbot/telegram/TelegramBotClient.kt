@@ -7,12 +7,11 @@ import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.callback.Callback
-import kurenai.imsyncbot.command.Command
+import kurenai.imsyncbot.command.DelegatingCommand
 import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.service.ConfigService
 import kurenai.imsyncbot.utils.RateLimiter
 import mu.KotlinLogging
 import org.springframework.beans.factory.DisposableBean
@@ -20,6 +19,7 @@ import org.springframework.stereotype.Component
 import org.telegram.telegrambots.bots.DefaultBotOptions
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
 import org.telegram.telegrambots.meta.api.methods.BotApiMethod
+import org.telegram.telegrambots.meta.api.methods.GetMessageInfo
 import org.telegram.telegrambots.meta.api.methods.send.*
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageMedia
 import org.telegram.telegrambots.meta.api.objects.Message
@@ -45,11 +45,9 @@ class TelegramBotClient(
     private val telegramBotProperties: TelegramBotProperties, //初始化时处理器列表
     private val botProperties: BotProperties,
     private val handlerHolder: HandlerHolder,
-    private val commands: List<Command>,
     private val callbacks: List<Callback>,
     private val cacheService: CacheService,
     private val privateChatHandler: PrivateChatHandler,
-    private val configService: ConfigService
 ) : TelegramLongPollingBot(options), DisposableBean {
 
     val nextMsgUpdate: ConcurrentHashMap<Long, Update> = ConcurrentHashMap()
@@ -135,60 +133,10 @@ class TelegramBotClient(
         }
 
         if (message.isCommand) {
-            try {
-                if (update.hasMessage() && message.hasText()) {
-                    val text = message.text
-                    if (text.startsWith("/help") && message.isUserMessage) {
-                        val sb = StringBuilder("Command list")
-                        for (command in commands) {
-                            sb.append("\n----------------\n")
-                            sb.append("/${command.command} ${command.name}\n")
-                            sb.append(command.help)
-                        }
-                        send(
-                            SendMessage.builder().chatId(message.chatId.toString()).replyToMessageId(message.messageId)
-                                .text(sb.toString()).build()
-                        )
-                        return
-                    } else {
-                        for (command in commands) {
-                            if (command.match(update)) {
-                                if (command.onlyMaster) {
-                                    if (ContextHolder.masterOfTg.isEmpty()) {
-                                        sendMessage(message.chatId, "请先私聊发送/start初始化信息", message.messageId)
-                                        return
-                                    }
-                                    if (!ContextHolder.masterOfTg.contains(message.from.id) && ContextHolder.masterChatId != message.chatId) {
-                                        continue
-                                    }
-                                }
-
-                                if (command.onlyUserMessage) {
-                                    if (message.isUserMessage && command.execute(update)) {
-                                        return
-                                    }
-                                } else {
-                                    if (command.execute(update)) {
-                                        return
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                log.error(e) { e.message }
-                reportError(update, e, "执行命令失败", false)
-            }
-            return
-        }
-
-        if (message.chatId.equals(privateChatHandler.privateChat)) {
+            DelegatingCommand.execute(update, message)
+        } else if (message.chatId.equals(privateChatHandler.privateChat)) {
             privateChatHandler.onPrivateChat(update)
-            return
-        }
-
-        if (update.hasMessage() && (message.isGroupMessage || message.isSuperGroupMessage) ||
+        } else if (update.hasMessage() && (message.isGroupMessage || message.isSuperGroupMessage) ||
             update.hasEditedMessage() && (update.editedMessage.isSuperGroupMessage || update.editedMessage.isGroupMessage)
         ) {
             if (update.hasMessage()) {
@@ -262,6 +210,10 @@ class TelegramBotClient(
                 reportError(update, e)
             }
         }
+    }
+
+    fun getMessageInfo(chatId: Long, messageId: Int): Message {
+        return send(GetMessageInfo(chatId.toString(), messageId))
     }
 
     fun sendMessage(chatId: Long, message: String, replyMessageId: Int? = null, parseMode: String? = null) {
@@ -386,4 +338,9 @@ class TelegramBotClient(
             }
         }
     }
+}
+
+fun String.params(): List<String> = this.split(" ").filter { it.isNotBlank() }
+fun Message.replyInfo(): Message {
+    return ContextHolder.telegramBotClient.getMessageInfo(chatId, replyToMessage.messageId)
 }

@@ -3,7 +3,7 @@ package kurenai.imsyncbot.utils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
-import kurenai.imsyncbot.ImSyncBotRuntimeException
+import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import kurenai.imsyncbot.utils.downloader.DefaultDownloader
 import kurenai.imsyncbot.utils.downloader.MultiPartDownloader
 import mu.KotlinLogging

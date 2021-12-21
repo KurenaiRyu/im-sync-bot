@@ -2,7 +2,6 @@ package kurenai.imsyncbot.handler.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.ConstructorBinding
-import java.util.*
 
 @ConstructorBinding
 @ConfigurationProperties(prefix = "bot.handler.forward")
@@ -13,8 +12,8 @@ class ForwardHandlerProperties {
     var qqMsgFormat = "\$name: \$msg"
     var masterOfTg = emptyList<Long>()
     var masterOfQq = emptyList<Long>()
+    var masterNameOfTg = "masterUsername"
     var group = Group()
-    var member = Member()
     var privateChat = 0L
     var privateChatChannel = 0L
     var picToFileSize = 10L
@@ -23,9 +22,5 @@ class ForwardHandlerProperties {
     class Group {
         var defaultQQ: Long = 0
         var defaultTelegram: Long = 0
-    }
-
-    class Member {
-        var bindingName: MutableMap<Long, String> = Collections.emptyMap()
     }
 }

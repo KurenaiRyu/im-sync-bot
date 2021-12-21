@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.handler.qq
 
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
@@ -53,7 +54,7 @@ class PicSourceHandler(
             event.subject.sendMessage(builder.build())
         }
         if (!matched) return CONTINUE
-        val chartId = ContextHolder.qqTgBinding[event.subject.id] ?: ContextHolder.defaultTgGroup
+        val chartId = qqTg[event.subject.id] ?: ContextHolder.defaultTgGroup
         val caption = "[SAUCE\\_NAO](${sauce_nao})\n[ASCII2D](${asscii2d})"
         try {
             ContextHolder.telegramBotClient.send(

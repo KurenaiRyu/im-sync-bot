@@ -1,4 +1,4 @@
-package kurenai.imsyncbot.domain
+package kurenai.imsyncbot.entity
 
 class FileCache {
 

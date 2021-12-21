@@ -1,4 +1,4 @@
-package kurenai.imsyncbot
+package kurenai.imsyncbot.exception
 
 class ImSyncBotRuntimeException(
     message: String,

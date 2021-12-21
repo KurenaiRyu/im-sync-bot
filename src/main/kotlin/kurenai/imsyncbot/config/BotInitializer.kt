@@ -1,7 +1,5 @@
 package kurenai.imsyncbot.config
 
-import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
-import kurenai.imsyncbot.repository.BindingGroupRepository
 import mu.KotlinLogging
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.filefilter.AgeFileFilter
@@ -14,10 +12,7 @@ import java.util.*
 import kotlin.concurrent.timerTask
 
 @Component
-class BotInitializer(
-    val forwardHandlerProperties: ForwardHandlerProperties,
-    val bindingGroupRepository: BindingGroupRepository
-) : InitializingBean {
+class BotInitializer : InitializingBean {
 
     private val log = KotlinLogging.logger {}
     private val largeFileSize = 1 * 1024 * 1024L

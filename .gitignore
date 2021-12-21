@@ -33,7 +33,7 @@ build/
 .vscode/
 
 ### bot ###
-device.json
+config/device.json
 device.json.*
 cache
 
@@ -43,7 +43,6 @@ cache
 logs
 
 ## config ##
-config.yaml
-device.json
+config/
 src/main/resources/application*
 *.db

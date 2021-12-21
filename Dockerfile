@@ -14,4 +14,4 @@ WORKDIR /im-sync-bot
 COPY --from=builder /usr/src/java-code/build/libs/im-sync-bot-kt*.jar ./bot.jar
 # 修改为上海时区,不需要则删除
 RUN cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-ENTRYPOINT ["java", "-jar", "-Dspring.config.location=config.yaml", "./bot.jar"]
+ENTRYPOINT ["java", "-jar", "-Dspring.config.location=./config/config.yaml", "./bot.jar"]

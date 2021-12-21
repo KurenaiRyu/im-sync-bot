@@ -1,16 +1,16 @@
 package kurenai.imsyncbot.qq
 
 import kotlinx.coroutines.*
-import kurenai.imsyncbot.BotConfigKey
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
-import kurenai.imsyncbot.ImSyncBotRuntimeException
 import kurenai.imsyncbot.config.BotProperties
+import kurenai.imsyncbot.config.GroupConfig
+import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
+import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.handler.qq.QQForwardHandler
-import kurenai.imsyncbot.service.ConfigService
 import kurenai.imsyncbot.utils.BotUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
@@ -25,7 +25,6 @@ import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import java.util.concurrent.LinkedBlockingDeque
-import kotlin.system.exitProcess
 import kotlin.system.measureTimeMillis
 
 @Component
@@ -34,21 +33,70 @@ class QQBotClient(
     private val botProperties: BotProperties,
     private val handlerHolder: HandlerHolder,
     private val privateChatHandler: PrivateChatHandler,
-    private val configService: ConfigService
+    private val forwardHandlerProperties: ForwardHandlerProperties
 ) : InitializingBean, DisposableBean {
 
     private val log = KotlinLogging.logger {}
     private val forwardHandler = handlerHolder.currentQQHandlerList.filterIsInstance<QQForwardHandler>()[0]
-    private val eventDeque = LinkedBlockingDeque<Event>()
+    private val eventDeque = LinkedBlockingDeque<Event>(500)
+    private val handlerThread: Thread
+    private val isRunning = true
 
     private val scope = CoroutineScope(Dispatchers.Default)
     val bot = BotFactory.newBot(properties.account, properties.password) {
-        fileBasedDeviceInfo() // 使用 device.json 存储设备信息
+        fileBasedDeviceInfo("./config/device.json") // 使用 device.json 存储设备信息
         protocol = properties.protocol // 切换协议
         highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
 //        val file = File(BotConstant.LOG_FILE_PATH)
 //        redirectBotLogToFile(file)
 //        redirectNetworkLogToFile(file)
+    }
+
+    init {
+        handlerThread = Thread {
+            var count = 0
+            while (bot.isActive && isRunning) {
+                try {
+                    count = count % 10000 + 1
+                    val c = count
+                    log.debug { "${Thread.currentThread().name}-$c take queue" }
+                    val event = eventDeque.take()
+                    log.debug { "${Thread.currentThread().name}-$c queue: $event" }
+                    CoroutineScope(Dispatchers.IO).launch {
+                        measureTimeMillis {
+                            when (event) {
+                                is FriendEvent -> {
+                                    privateChatHandler.onFriendEvent(event)
+                                }
+                                is MessageEvent -> {
+                                    handle(event)
+                                }
+                                is MessageRecallEvent.GroupRecall -> {
+                                    forwardHandler.onRecall(event)
+                                }
+                                is GroupEvent -> {
+                                    forwardHandler.onGroupEvent(event)
+                                }
+                                else -> {
+                                    log.trace { "未支持事件 ${event.javaClass} 的处理" }
+                                }
+                            }
+                        }.let {
+                            log.debug { "${Thread.currentThread().name}-$c ${it}ms" }
+                        }
+                    }
+                } catch (e: CancellationException) {
+                    log.error(e) { "Coroutine was canceled: ${e.message}" }
+                } catch (e: Exception) {
+                    log.error(e) { e.message }
+                }
+            }
+            log.error { "QQ handler thread is inactive." }
+        }.apply {
+            isDaemon = true
+            name = "HandlerThread"
+        }
+        handlerThread.start()
     }
 
     override fun afterPropertiesSet() {
@@ -62,7 +110,7 @@ class QQBotClient(
                 return@filter when (event) {
                     is GroupAwareMessageEvent -> {
                         val groupId = event.group.id
-                        if (properties.filter.group.isNotEmpty() && !properties.filter.group.contains(groupId)) {
+                        if (GroupConfig.filterGroups.isNotEmpty() && !GroupConfig.filterGroups.contains(groupId)) {
                             false
                         } else {
                             !botProperties.ban.group.contains(groupId) && !botProperties.ban.member.contains(event.sender.id)
@@ -90,47 +138,6 @@ class QQBotClient(
                 } catch (e: IllegalStateException) {
                     log.error { "QQ event queue is full, dropped. $event" }
                 }
-            }
-            val handlerScope = CoroutineScope(Dispatchers.IO)
-            var count = 0
-            handlerScope.launch {
-                while (isActive) {
-                    count = count % 10000 + 1
-                    val c = count
-                    log.debug { "${Thread.currentThread().name}-$c take queue" }
-                    val event = eventDeque.take()
-                    log.debug { "${Thread.currentThread().name}-$c queue: $event" }
-                    handlerScope.launch {
-                        try {
-                            measureTimeMillis {
-                                when (event) {
-                                    is FriendEvent -> {
-                                        privateChatHandler.onFriendEvent(event)
-                                    }
-                                    is MessageEvent -> {
-                                        handle(event)
-                                    }
-                                    is MessageRecallEvent.GroupRecall -> {
-                                        forwardHandler.onRecall(event)
-                                    }
-                                    is GroupEvent -> {
-                                        forwardHandler.onGroupEvent(event)
-                                    }
-                                    else -> {
-                                        log.trace { "未支持事件 ${event.javaClass} 的处理" }
-                                    }
-                                }
-                            }.let {
-                                log.debug { "${Thread.currentThread().name}-$c ${it}ms" }
-                            }
-                        } catch (e: CancellationException) {
-                            log.error(e) { "Coroutine was canceled: ${e.message}" }
-                        } catch (e: Exception) {
-                            log.error(e) { e.message }
-                        }
-                    }
-                }
-                log.error { "QQ handler scope is inactive." }
             }
         }
     }
@@ -185,7 +192,7 @@ class QQBotClient(
             ContextHolder.telegramBotClient.sendAsync(
                 SendMessage(
                     BotUtil.getTgChatByQQ(event.group.id).toString(),
-                    "#提醒 #id${event.sender.id} #group${event.group.id}\n @${configService.get(BotConfigKey.MASTER_USERNAME) ?: event.bot.nameCardOrNick} $content"
+                    "#提醒 #id${event.sender.id} #group${event.group.id}\n @${ContextHolder.masterUsername} $content"
                 )
             )
         } catch (e: Exception) {
@@ -199,9 +206,13 @@ class QQBotClient(
      * but not rethrown to allow other beans to release their resources as well.
      */
     override fun destroy() {
-        scope.cancel()
-        log.info { "Close qq-bot ${bot.nick}(${bot.id})." }
-        exitProcess(0)
+        try {
+            log.info { "Close qq bot..." }
+            bot.close()
+            log.info { "QQ bot closed." }
+        } catch (e: Exception) {
+            log.error(e) { "Close qq bot error." }
+        }
     }
 
 

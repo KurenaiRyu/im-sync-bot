@@ -16,10 +16,9 @@ services:
         max-size: "200m"
         max-file: "3"
     volumes:
-      - ./api-data:/var/lib/telegram-bot-api/
-      - ./device.json:/im-sync-bot/device.json
+      - ./api-data/:/var/lib/telegram-bot-api/
+      - ./config/:/im-sync-bot/config/
       - ./cache:/im-sync-bot/cache
-      - ./config.yaml:/im-sync-bot/config.yaml
       - ./logs:/im-sync-bot/logs
 
   redis:

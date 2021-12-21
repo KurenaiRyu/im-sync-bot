@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.handler.qq
 
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
@@ -28,7 +29,7 @@ class PixivHandler(private val forwardProperties: ForwardHandlerProperties) : QQ
         val content = event.message.serializeToMiraiCode()
         val matcher = pattern.matcher(content)
         if (matcher.find()) {
-            val chartId = ContextHolder.qqTgBinding.getOrDefault(event.subject.id, ContextHolder.defaultTgGroup).toString()
+            val chartId = qqTg.getOrDefault(event.subject.id, ContextHolder.defaultTgGroup).toString()
             val id = content.substring(6)
             val artUrl = PIXIV_ART_PREFIX + id
             val userUrl = PIXIV_USER_PREFIX + id

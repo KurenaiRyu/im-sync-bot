@@ -41,12 +41,10 @@ dependencies {
 
     //spring
     implementation("org.springframework.boot", "spring-boot-starter")
-    implementation("org.springframework.boot", "spring-boot-starter-data-jpa")
     implementation("org.springframework.boot", "spring-boot-starter-json")
-//    implementation("org.springframework.boot", "spring-boot-gradle-plugin", "2.5.4")
 
     //logging
-    implementation("org.apache.logging.log4j:log4j-to-slf4j:2.15.0")
+    implementation("org.apache.logging.log4j:log4j-to-slf4j:2.16.0")
 
     //kotlin
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
@@ -54,7 +52,7 @@ dependencies {
 
     //tool kit
     implementation("org.sejda.imageio:webp-imageio:0.1.6")
-    implementation("com.squareup.okhttp3:okhttp:4.9.2")
+    implementation("com.squareup.okhttp3:okhttp:4.9.3")
     implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")
     implementation("com.fasterxml.jackson.dataformat", "jackson-dataformat-xml")
     implementation("org.apache.commons", "commons-lang3")
@@ -62,9 +60,8 @@ dependencies {
     implementation("com.esotericsoftware", "kryo", "5.1.1")
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
     implementation("io.github.kurenairyu", "simple-cache", "1.1.0")
-    runtimeOnly("com.h2database:h2:1.4.200")
 
-    testImplementation("org.springframework.boot:spring-boot-starter-test:2.5.5")
+    testImplementation("org.springframework.boot:spring-boot-starter-test:2.6.1")
 }
 
 tasks.withType<KotlinCompile> {

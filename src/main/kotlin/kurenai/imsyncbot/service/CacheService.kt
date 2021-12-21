@@ -1,8 +1,8 @@
 package kurenai.imsyncbot.service
 
 import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.domain.FileCache
-import kurenai.imsyncbot.domain.MessageSourceCache
+import kurenai.imsyncbot.entity.FileCache
+import kurenai.imsyncbot.entity.MessageSourceCache
 import mu.KotlinLogging
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceBuilder
@@ -32,7 +32,7 @@ class CacheService(
 
     fun cache(source: OnlineMessageSource, message: Message) {
         val qqMsgId: Int = source.ids[0]
-        val tgMsgId: Int = message.messageId
+        val tgMsgId: String = message.cacheId()
 
         cache.put(QQ_TG_MSG_ID_CACHE_KEY, qqMsgId, tgMsgId, TTL)
         cache.put(TG_QQ_MSG_ID_CACHE_KEY, tgMsgId, qqMsgId, TTL)
@@ -55,15 +55,23 @@ class CacheService(
     }
 
     fun cache(message: Message) {
-        cache.put(TG_MSG_CACHE_KEY, message.messageId, message, TTL)
+        cache.put(TG_MSG_CACHE_KEY, message.cacheId(), message, TTL)
     }
 
-    fun getIdByTg(id: Int): Int? {
-        return cache.get(TG_QQ_MSG_ID_CACHE_KEY, id)
+    fun getQQIdByTg(message: Message): Int? {
+        return getQQIdByTg(message.chatId, message.messageId)
     }
 
-    fun getIdByQQ(id: Int): Int? {
-        return cache.get(QQ_TG_MSG_ID_CACHE_KEY, id)
+    fun getQQIdByTg(chatId: Long, messageId: Int): Int? {
+        return cache.get(TG_QQ_MSG_ID_CACHE_KEY, getTgCacheId(chatId, messageId))
+    }
+
+    fun getTelegramIdByQQ(id: Int): TelegramId? {
+        return cache.get<Int, String?>(QQ_TG_MSG_ID_CACHE_KEY, id)?.let { cacheId ->
+            val split = cacheId.split("/")
+            return if (split.size != 2) null
+            else TelegramId(split[0].toLong(), split[1].toInt())
+        }
     }
 
     fun getQQ(id: Int): MessageSource? {
@@ -87,18 +95,32 @@ class CacheService(
         }
     }
 
-    fun getByTg(id: Int): MessageSource? {
-        val msgId = getIdByTg(id)
+    fun getQQByTg(message: Message): MessageSource? {
+        val msgId = getQQIdByTg(message.chatId, message.messageId)
         return if (msgId == null) {
-            log.debug { "QQ msg id not found by $id" }
+            log.debug { "QQ msg id not found by ${message.chatId}/${message.messageId}" }
             null
         } else {
             getQQ(msgId)
         }
     }
 
-    fun getTg(chatId: Long?, messageId: Int): Message? {
-        return cache.get(TG_MSG_CACHE_KEY, messageId) ?: getOnlineTg(chatId.toString(), messageId)
+    fun getQQByTg(chatId: Long, messageId: Int): MessageSource? {
+        val msgId = getQQIdByTg(chatId, messageId)
+        return if (msgId == null) {
+            log.debug { "QQ msg id not found by $msgId" }
+            null
+        } else {
+            getQQ(msgId)
+        }
+    }
+
+    fun getTg(message: Message): Message? {
+        return getTg(message.chatId, message.messageId)
+    }
+
+    fun getTg(chatId: Long, messageId: Int): Message? {
+        return cache.get(TG_MSG_CACHE_KEY, getTgCacheId(chatId, messageId)) ?: getOnlineTg(chatId.toString(), messageId)
     }
 
     fun getOnlineTg(chatId: String?, messageId: Int): Message? {
@@ -108,9 +130,9 @@ class CacheService(
         }
     }
 
-    fun getByQQ(group: Long, id: Int): Message? {
-        return getIdByQQ(id)?.let {
-            getTg(ContextHolder.qqTgBinding[group], it)
+    fun getTgByQQ(group: Long, id: Int): Message? {
+        return getTelegramIdByQQ(id)?.let { telegramId ->
+            getTg(telegramId.chatId, telegramId.messageId)
         }
     }
 
@@ -121,4 +143,18 @@ class CacheService(
     fun getFriendId(messageId: Int): Long? {
         return cache.get(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId)
     }
+
+    private fun getTgCacheId(chatId: Long, messageId: Int): String {
+        return "${chatId}/${messageId}"
+    }
+
+}
+
+data class TelegramId(
+    val chatId: Long,
+    val messageId: Int
+)
+
+fun Message.cacheId(): String {
+    return "${chatId}/${messageId}"
 }

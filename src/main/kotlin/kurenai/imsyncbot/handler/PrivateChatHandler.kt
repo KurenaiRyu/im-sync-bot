@@ -66,7 +66,7 @@ class PrivateChatHandler(
 
     suspend fun onFriendMessage(friend: Friend, chain: MessageChain, isSync: Boolean = false) {
         val client = ContextHolder.telegramBotClient
-        var replyMsgId = chain[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
+        var replyMsgId = chain[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getTelegramIdByQQ(it) }?.messageId
         if (replyMsgId == null) {
             replyMsgId = getStartMsg(friend) ?: return
         }
@@ -155,7 +155,7 @@ class PrivateChatHandler(
             val client = ContextHolder.telegramBotClient
             val message = update.message
             val rootReplyMessageId = getRootReplyMessageId(message)
-            val quoteMsgSource = message.replyToMessage?.messageId?.let(cacheService::getByTg)
+            val quoteMsgSource = message.replyToMessage?.let(cacheService::getQQByTg)
             val friendId = cacheService.getFriendId(rootReplyMessageId) ?: run {
                 client.send(SendMessage(privateChat.toString(), "无法通过引用消息找到qq好友: $rootReplyMessageId").apply {
                     replyToMessageId = update.message.messageId

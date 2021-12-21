@@ -3,15 +3,16 @@ package kurenai.imsyncbot.handler.qq
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import kotlinx.coroutines.*
-import kurenai.imsyncbot.BotConfigKey
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.BotProperties
-import kurenai.imsyncbot.domain.FileCache
+import kurenai.imsyncbot.config.GroupConfig.qqTg
+import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.entity.FileCache
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.service.ConfigService
+import kurenai.imsyncbot.service.TelegramId
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
@@ -38,17 +39,15 @@ import kotlin.math.min
 
 @Component
 class QQForwardHandler(
-    properties: ForwardHandlerProperties,
+    val properties: ForwardHandlerProperties,
     private val botProperties: BotProperties,
     private val cacheService: CacheService,
-    private val configService: ConfigService,
 ) : QQHandler {
 
     private val log = KotlinLogging.logger {}
 
     private val xmlMapper = XmlMapper()
     private val jsonMapper = ObjectMapper()
-    private val bindingName: Map<Long, String>
     private val picToFileSize = properties.picToFileSize * 1024 * 1024
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
@@ -56,7 +55,6 @@ class QQForwardHandler(
     private var groupForwardContext = newSingleThreadContext("GroupForward")
 
     init {
-        bindingName = properties.member.bindingName
         if (properties.tgMsgFormat.contains("\$msg")) tgMsgFormat = properties.tgMsgFormat
         if (properties.qqMsgFormat.contains("\$msg")) qqMsgFormat = properties.qqMsgFormat
     }
@@ -66,13 +64,13 @@ class QQForwardHandler(
         val group = event.group
         val sender = event.sender
         val senderName = BotUtil.formatUsername(
-            bindingName[sender.id] ?: ContextHolder.qqBot.getFriend(sender.id)?.remarkOrNick
+            UserConfig.idBindings[sender.id] ?: ContextHolder.qqBot.getFriend(sender.id)?.remarkOrNick
             ?: (sender as Member).remarkOrNameCardOrNick
         )
         val messageChain = event.message
         val atAccount = AtomicLong(-100)
         val content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
-        val chatId = ContextHolder.qqTgBinding[group.id] ?: ContextHolder.defaultTgGroup
+        val chatId = qqTg[group.id] ?: ContextHolder.defaultTgGroup
 
         return if (content.startsWith("<?xml version='1.0'")) {
             handleRichMessage(event, chatId, senderName)
@@ -92,7 +90,7 @@ class QQForwardHandler(
 
     @Throws(TelegramApiException::class)
     override suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {
-        val message = cacheService.getByQQ(event.group.id, event.messageIds[0])
+        val message = cacheService.getTgByQQ(event.group.id, event.messageIds[0])
         message?.let {
             if (enableRecall) {
                 ContextHolder.telegramBotClient.send(
@@ -164,7 +162,7 @@ class QQForwardHandler(
 
         val client = ContextHolder.telegramBotClient
         val source = messageChain[OnlineMessageSource.Key]
-        val replyId = messageChain[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getIdByQQ(it) }
+        val replyId = messageChain[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getTelegramIdByQQ(it) }
         val atAccount = AtomicLong(-100)
         var content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it, replyId != null) }
 
@@ -252,7 +250,7 @@ class QQForwardHandler(
                         sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, source)
                     } else if (image.imageId.endsWith(".gif")) {
                         val builder = SendAnimation.builder()
-                        replyId?.let(builder::replyToMessageId)
+                        replyId?.messageId?.let(builder::replyToMessageId)
                         client.send(
                             builder
                                 .chatId(chatId)
@@ -263,13 +261,13 @@ class QQForwardHandler(
                     } else {
                         if (sendByFile) {
                             val builder = SendDocument.builder()
-                            replyId?.let(builder::replyToMessageId)
+                            replyId?.messageId?.let(builder::replyToMessageId)
                             client.send(
                                 builder.caption(msg).chatId(chatId).document(inputFile).thumb(inputFile).build()
                             )
                         } else {
                             val builder = SendPhoto.builder()
-                            replyId?.let(builder::replyToMessageId)
+                            replyId?.messageId?.let(builder::replyToMessageId)
                             client.send(builder.caption(msg).chatId(chatId).photo(inputFile).build())
                         }
                     }
@@ -300,6 +298,8 @@ class QQForwardHandler(
                     val extension: String = absoluteFile.extension.lowercase()
                     if (listOf("mp4", "mkv").contains(extension)) {
                         client.send(SendVideo.builder().video(inputFile).chatId(chatId).caption(msg).build())
+                    } else if (extension == "gif") {
+                        client.send(SendAnimation.builder().animation(inputFile).chatId(chatId).caption(msg).build())
                     } else if (listOf("bmp", "jpeg", "jpg", "png").contains(extension)) {
                         client.send(
                             SendDocument.builder().document(inputFile).thumb(InputFile(url)).chatId(chatId).caption(msg).build()
@@ -327,7 +327,7 @@ class QQForwardHandler(
             }
         } else {
             val builder = SendMessage.builder()
-            replyId?.let(builder::replyToMessageId)
+            replyId?.messageId?.let(builder::replyToMessageId)
             client.send(builder.chatId(chatId).text(msg).build())
                 .let { m ->
                     source?.let { cacheService.cache(source, m) }
@@ -368,10 +368,10 @@ class QQForwardHandler(
                 val tag = "\\#入群 \\#id${event.member.id} \\#group${event.group.id}\n"
                 when (event) {
                     is MemberJoinEvent.Active -> {
-                        "$tag`${event.member.remarkOrNameCardOrNick.format2Markdown()}`主动入群`${event.group.name}`"
+                        "$tag`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`入群`${event.group.name}`"
                     }
                     is MemberJoinEvent.Invite -> {
-                        "$tag`${event.member.remarkOrNameCardOrNick.format2Markdown()}`通过`${event.invitor.remarkOrNameCardOrNick.format2Markdown()}` \\#id${event.invitor.id}\\ 的邀请入群`${event.group.name}`"
+                        "$tag`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`通过`${(UserConfig.idBindings[event.invitor.id] ?: event.invitor.remarkOrNameCardOrNick).format2Markdown()}` \\#id${event.invitor.id}\\ 的邀请入群`${event.group.name}`"
                     }
                     else -> return
                 }
@@ -380,50 +380,52 @@ class QQForwardHandler(
                 val tag = "\\#退群 \\#id${event.member.id} \\#group${event.group.id}\n"
                 when (event) {
                     is MemberLeaveEvent.Kick -> {
-                        "$tag`${event.member.remarkOrNameCardOrNick.format2Markdown()}`被踢出群`${event.group.name}`"
+                        "$tag`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`被踢出群`${event.group.name}`"
                     }
                     is MemberLeaveEvent.Quit -> {
-                        "$tag`${event.member.remarkOrNameCardOrNick.format2Markdown()}`主动退群`${event.group.name}`"
+                        "$tag`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`退出群`${event.group.name}`"
                     }
                     else -> return
                 }
             }
             is MemberMuteEvent -> {
-                "\\#禁言 \\#id${event.member.id}\n`${event.member.remarkOrNameCardOrNick.format2Markdown()}`被禁言${event.durationSeconds / 60}分钟"
+                "\\#禁言\n\\#id${event.member.id}\n`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`被禁言${event.durationSeconds / 60}分钟"
             }
             is GroupMuteAllEvent -> {
-                "\\#禁言\n`${event.operator?.remarkOrNameCardOrNick?.format2Markdown()}` \\#id${event.operator?.id} 禁言了所有人"
+                "\\#禁言\n`${(UserConfig.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.format2Markdown() ?: "?"}` \\#id${event.operator?.id ?: "?"} 禁言了所有人"
             }
             is MemberUnmuteEvent -> {
-                "\\#禁言\n`${event.member.remarkOrNameCardOrNick.format2Markdown()}` \\#${event.member.id} 被`${event.operator?.remarkOrNameCardOrNick?.format2Markdown()})` \\#id${event.operator?.id} 解除禁言"
+                "\\#禁言\n`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}` \\#id${event.member.id} 被`${(UserConfig.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.format2Markdown() ?: "?"})` \\#id${event.operator?.id ?: "?"} 解除禁言"
             }
             is MemberCardChangeEvent -> {
                 if (event.new.isNotEmpty()) {
-                    "\\#名称 \\#id${event.member.id}\n`${event.origin.format2Markdown()}`改为`${event.new.format2Markdown()}`"
+                    "\\#名称 \\#id${event.member.id}\n`${(UserConfig.idBindings[event.member.id] ?: event.origin).format2Markdown()}`名称改为`${event.new.format2Markdown()}`"
                 } else {
                     return
                 }
             }
             is MemberSpecialTitleChangeEvent -> {
-                "\\#头衔 \\#id${event.member.id}\n`${event.member.remarkOrNameCardOrNick.format2Markdown()})`获得头衔`${event.new.format2Markdown()}`"
+                "\\#头衔 \\#id${event.member.id}\n`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()})`获得头衔`${event.new.format2Markdown()}`"
             }
             else -> {
                 log.debug { "未支持群事件 ${event.javaClass} 的处理" }
                 return
             }
         }
-        val chatId = ContextHolder.qqTgBinding[event.group.id] ?: ContextHolder.defaultTgGroup
+        val chatId = qqTg[event.group.id] ?: ContextHolder.defaultTgGroup
         ContextHolder.telegramBotClient.send(SendMessage(chatId.toString(), msg).apply { parseMode = ParseMode.MARKDOWNV2 })
     }
 
+    //TODO: 优化
     private fun getSingleContent(group: Group, atAccount: AtomicLong, msg: SingleMessage, hasReply: Boolean = true): String {
         return if (msg is At) {
             val target = msg.target
+            if (hasReply && target == group.bot.id) return ""
             if (target == atAccount.get()) return "" else atAccount.set(target)
             val name = if (target == group.bot.id && !hasReply) {
-                configService.get(BotConfigKey.MASTER_USERNAME) ?: group.bot.nameCardOrNick
+                ContextHolder.masterUsername
             } else {
-                bindingName[target]
+                UserConfig.idBindings[target]
                     ?: ContextHolder.qqBot.getFriend(target)?.remarkOrNick
                     ?: group.getMember(target)?.remarkOrNameCardOrNick?.let { BotUtil.formatUsername(it) }
                     ?: target.toString()
@@ -438,7 +440,7 @@ class QQForwardHandler(
         }
     }
 
-    private suspend fun sendGroupMedias(chatId: String, replyId: Int?, medias: List<InputMediaPhoto>, source: OnlineMessageSource?) {
+    private suspend fun sendGroupMedias(chatId: String, replyId: TelegramId?, medias: List<InputMediaPhoto>, source: OnlineMessageSource?) {
         if (medias.isEmpty()) return
         val mediaGroups = ArrayList<List<InputMediaPhoto>>()
         var offset = 0
@@ -458,7 +460,7 @@ class QQForwardHandler(
             try {
                 if (list.size > 1) {
                     val builder = SendMediaGroup.builder()
-                    replyId?.let(builder::replyToMessageId)
+                    replyId?.messageId?.let(builder::replyToMessageId)
                     client.send(
                         builder
                             .medias(list)
@@ -469,7 +471,7 @@ class QQForwardHandler(
                     }
                 } else if (list.size == 1) {
                     val builder = SendPhoto.builder()
-                    replyId?.let(builder::replyToMessageId)
+                    replyId?.messageId?.let(builder::replyToMessageId)
                     val file = list[0].newMediaFile
                     client.send(
                         builder
@@ -489,13 +491,13 @@ class QQForwardHandler(
         }
     }
 
-    private suspend fun sendSimpleMedia(chatId: String, replyId: Int?, urls: List<String>, msg: String?, source: OnlineMessageSource?, mask: String = "图片"): Message {
+    private suspend fun sendSimpleMedia(chatId: String, replyId: TelegramId?, urls: List<String>, msg: String?, source: OnlineMessageSource?, mask: String = "图片"): Message {
         var urlStr = ""
         for (url in urls) {
             urlStr += "[${mask.format2Markdown()}](${url.format2Markdown()})\n"
         }
         return ContextHolder.telegramBotClient.send(SendMessage(chatId, "${msg?.format2Markdown()}$urlStr").apply {
-            this.replyToMessageId = replyId
+            this.replyToMessageId = replyId?.messageId
             this.parseMode = ParseMode.MARKDOWNV2
         }).let { rec ->
             source?.let { source -> cacheService.cache(source, rec) }

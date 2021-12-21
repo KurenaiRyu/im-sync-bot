@@ -3,6 +3,8 @@ package kurenai.imsyncbot.handler.tg
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.config.GroupConfig.tgQQ
+import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
@@ -32,18 +34,16 @@ class TgForwardHandler(
 
     private val log = KotlinLogging.logger {}
 
-    private val bindingName: Map<Long, String>
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
 
     init {
-        bindingName = properties.member.bindingName
         if (properties.tgMsgFormat.contains("\$msg")) tgMsgFormat = properties.tgMsgFormat
         if (properties.qqMsgFormat.contains("\$msg")) qqMsgFormat = properties.qqMsgFormat
     }
 
     override suspend fun onEditMessage(message: Message): Int {
-        message.messageId?.let { cacheService.getByTg(it) ?: cacheService.getQQ(it) }?.recall()
+        cacheService.getQQByTg(message)?.recall()
         return onMessage(message)
     }
 
@@ -56,10 +56,10 @@ class TgForwardHandler(
         val chatId = message.chatId
         val bot = ContextHolder.qqBot
         val quoteMsgSource =
-            message.replyToMessage?.messageId?.let {
-                cacheService.getByTg(it)
+            message.replyToMessage?.let {
+                cacheService.getQQByTg(it)
             }
-        val groupId = quoteMsgSource?.targetId ?: ContextHolder.tgQQBinding.getOrDefault(chatId, ContextHolder.defaultQQGroup)
+        val groupId = quoteMsgSource?.targetId ?: tgQQ.getOrDefault(chatId, ContextHolder.defaultQQGroup)
         if (groupId == 0L) return CONTINUE
         val group = bot.getGroup(groupId)
         if (null == group) {
@@ -235,10 +235,12 @@ class TgForwardHandler(
         } else if (message.isChannelMessage || from.id == 136817688L) { //tg 频道以及tg官方id不加前缀
             return ""
         } else {
-            return bindingName[from.id] ?: let {
-                val username = "${from.firstName} ${from.lastName ?: ""}"
-                return username.ifBlank { from.userName ?: "none" }
-            }
+            return UserConfig.idBindings[from.id]
+                ?: UserConfig.usernameBindings[from.userName]
+                ?: let {
+                    val username = "${from.firstName} ${from.lastName ?: ""}"
+                    return username.ifBlank { from.userName ?: "none" }
+                }
         }
     }
 

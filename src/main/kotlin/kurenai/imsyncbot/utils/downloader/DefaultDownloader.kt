@@ -1,6 +1,6 @@
 package kurenai.imsyncbot.utils.downloader
 
-import kurenai.imsyncbot.ImSyncBotRuntimeException
+import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import kurenai.imsyncbot.utils.HttpUtil
 import okhttp3.OkHttpClient
 import okhttp3.Request

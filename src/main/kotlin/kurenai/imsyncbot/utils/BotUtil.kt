@@ -1,6 +1,8 @@
 package kurenai.imsyncbot.utils
 
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.config.GroupConfig.qqTg
+import kurenai.imsyncbot.config.GroupConfig.tgQQ
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.Contact
 import net.mamoe.mirai.message.data.Image
@@ -133,11 +135,11 @@ object BotUtil {
     }
 
     fun getQQGroupByTg(id: Long): Long {
-        return ContextHolder.tgQQBinding[id] ?: ContextHolder.defaultQQGroup
+        return tgQQ[id] ?: ContextHolder.defaultQQGroup
     }
 
     fun getTgChatByQQ(id: Long): Long {
-        return ContextHolder.qqTgBinding[id] ?: ContextHolder.defaultTgGroup
+        return qqTg[id] ?: ContextHolder.defaultTgGroup
     }
 
 }
