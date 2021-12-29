@@ -17,9 +17,9 @@ services:
         max-file: "3"
     volumes:
       - ./api-data/:/var/lib/telegram-bot-api/
-      - ./config/:/im-sync-bot/config/
-      - ./cache:/im-sync-bot/cache
-      - ./logs:/im-sync-bot/logs
+      - ./config/:/workspace/config/
+      - ./cache:/workspace/cache
+      - ./logs:/workspace/logs
 
   redis:
     image: redis:alpine

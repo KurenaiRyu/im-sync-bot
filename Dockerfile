@@ -10,7 +10,7 @@ COPY src src
 RUN gradle bootJar -i --stacktrace && rm /usr/src/java-code/build/libs/im-sync-bot-kt*-plain.jar
 
 FROM actual-image
-WORKDIR /im-sync-bot
+WORKDIR /workspace
 COPY --from=builder /usr/src/java-code/build/libs/im-sync-bot-kt*.jar ./bot.jar
 # 修改为上海时区,不需要则删除
 RUN cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
