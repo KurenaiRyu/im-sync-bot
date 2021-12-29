@@ -34,6 +34,11 @@ import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.File
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
 
@@ -52,7 +57,16 @@ class QQForwardHandler(
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
     private var enableRecall = properties.enableRecall
-    private var groupForwardContext = newSingleThreadContext("GroupForward")
+    private var groupForwardContext = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+        LinkedBlockingQueue(20),
+        object : ThreadFactory {
+            private val counter = AtomicInteger(0)
+            override fun newThread(r: Runnable): Thread {
+                return Thread(r, "QQForwardMsg#${counter.getAndIncrement()}").also {
+                    it.isDaemon = true
+                }
+            }
+        }).asCoroutineDispatcher()
 
     init {
         if (properties.tgMsgFormat.contains("\$msg")) tgMsgFormat = properties.tgMsgFormat

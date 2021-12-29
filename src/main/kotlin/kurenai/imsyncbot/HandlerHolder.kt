@@ -5,7 +5,7 @@ import kurenai.imsyncbot.handler.qq.QQHandler
 import kurenai.imsyncbot.handler.tg.TgForwardHandler
 import mu.KotlinLogging
 
-open class HandlerHolder(
+class HandlerHolder(
 //初始化时处理器列表
     handlerList: List<Handler>,
 ) {

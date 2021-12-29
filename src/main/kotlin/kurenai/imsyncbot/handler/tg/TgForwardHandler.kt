@@ -1,7 +1,5 @@
 package kurenai.imsyncbot.handler.tg
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.GroupConfig.tgQQ
 import kurenai.imsyncbot.config.UserConfig
@@ -43,6 +41,9 @@ class TgForwardHandler(
     }
 
     override suspend fun onEditMessage(message: Message): Int {
+        if (!tgQQ.containsKey(message.chatId)) {
+            return CONTINUE
+        }
         cacheService.getQQByTg(message)?.recall()
         return onMessage(message)
     }
@@ -50,6 +51,9 @@ class TgForwardHandler(
     @Throws(Exception::class)
     override suspend fun onMessage(message: Message): Int {
         if (message.isCommand) {
+            return CONTINUE
+        }
+        if (!tgQQ.containsKey(message.chatId)) {
             return CONTINUE
         }
 
@@ -153,11 +157,7 @@ class TgForwardHandler(
             }
         }
 
-        return withContext(Dispatchers.IO) {
-            cacheFile.toExternalResource().use { group.files.uploadNewFile("/$fileName", it) }
-//            cacheService.cache(rec.source, message)
-//            return@withContext rec.toMessage()
-        }
+        return cacheFile.toExternalResource().use { group.files.uploadNewFile("/$fileName", it) }
     }
 
     private fun formatMsgAndQuote(

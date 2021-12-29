@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
 import kurenai.imsyncbot.command.AbstractCommand
-import kurenai.imsyncbot.config.AdminConfig
+import kurenai.imsyncbot.config.UserConfig
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.objects.Message
@@ -19,7 +19,7 @@ class RemoveAdminCommand : AbstractCommand() {
 
     override fun execute(update: Update, message: Message): String {
         val user = message.replyToMessage.from
-        AdminConfig.remove(user.id)
+        UserConfig.removeAdmin(user.id)
         return "移除管理员成功"
     }
 

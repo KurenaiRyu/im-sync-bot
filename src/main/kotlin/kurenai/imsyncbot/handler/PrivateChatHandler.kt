@@ -46,7 +46,6 @@ class PrivateChatHandler(
     private val contextMap = HashMap<Long, ExecutorCoroutineDispatcher>()
 
     suspend fun onFriendEvent(event: FriendEvent): Int {
-//        val client = ContextHolder.telegramBotClient
         when (event) {
             is FriendMessageEvent -> {
                 onFriendMessage(event.friend, event.message)
@@ -57,7 +56,9 @@ class PrivateChatHandler(
 //                client.execute(EditMessageMedia())
             }
             is FriendMessageSyncEvent -> {
-                onFriendMessage(event.friend, event.message, true)
+                if (event.friend.id != ContextHolder.masterOfQQ[0]) {
+                    onFriendMessage(event.friend, event.message, true)
+                }
             }
         }
 

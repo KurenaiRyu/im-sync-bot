@@ -34,6 +34,7 @@ class BotAutoConfiguration {
         botOptions.proxyType = proxyProperties.type
         botOptions.proxyHost = proxyProperties.host
         botOptions.proxyPort = proxyProperties.port
+        botOptions.maxThreads = Runtime.getRuntime().availableProcessors() * 2
         return botOptions
     }
 

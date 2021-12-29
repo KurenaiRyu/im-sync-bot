@@ -1,13 +1,15 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.springframework.boot") version "2.6.1"
+    id("org.springframework.boot") version "2.6.2"
     id("io.spring.dependency-management") version "1.0.11.RELEASE"
-    kotlin("jvm") version "1.6.0"
-    kotlin("plugin.spring") version "1.6.0"
-    kotlin("plugin.allopen") version "1.6.0"
-    kotlin("plugin.noarg") version "1.6.0"
-    kotlin("kapt") version "1.6.0"
+//    id("org.springframework.experimental.aot") version "0.11.1"
+    kotlin("jvm") version "1.6.10"
+    kotlin("plugin.spring") version "1.6.10"
+    kotlin("plugin.allopen") version "1.6.10"
+    kotlin("plugin.noarg") version "1.6.10"
+    kotlin("kapt") version "1.6.10"
+    application
 }
 
 group = "moe.kurenai.bot"
@@ -16,15 +18,16 @@ java.sourceCompatibility = JavaVersion.VERSION_17
 
 repositories {
     mavenLocal()
-//    maven { url = uri("https://maven.aliyun.com/repository/public/") }
-//    maven { url = uri("https://maven.aliyun.com/repository/spring/") }
+    maven { url = uri("https://maven.aliyun.com/repository/public/") }
+    maven { url = uri("https://maven.aliyun.com/repository/spring/") }
+    maven { url = uri("https://repo.spring.io/release") }
     maven { url = uri("https://github.com/KurenaiRyu/maven-repo/raw/release/") }
     mavenCentral()
 }
 
 dependencies {
 
-    val miraiVersion = "2.8.2"
+    val miraiVersion = "2.9.0-RC2"
 
     //mirai
     implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {
@@ -37,14 +40,16 @@ dependencies {
     implementation("net.mamoe", "mirai-core-utils-jvm", miraiVersion)
 
     //telegram
-    implementation("org.telegram", "telegrambots-spring-boot-starter", "5.4.0.10")
+    implementation("org.telegram", "telegrambots-spring-boot-starter", "5.5.0")
 
     //spring
     implementation("org.springframework.boot", "spring-boot-starter")
     implementation("org.springframework.boot", "spring-boot-starter-json")
 
     //logging
-    implementation("org.apache.logging.log4j:log4j-to-slf4j:2.16.0")
+    implementation("org.apache.logging.log4j:log4j-to-slf4j:2.17.0")
+
+    implementation("io.netty", "netty-tcnative-boringssl-static", "2.0.0.Final")
 
     //kotlin
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
@@ -64,9 +69,13 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test:2.6.1")
 }
 
+application {
+    applicationDefaultJvmArgs = listOf("-Dspring.config.location=./config/config.yaml", "-Duser.timezone=GMT+08")
+}
+
 tasks.withType<KotlinCompile> {
     kotlinOptions {
-        freeCompilerArgs = listOf("-Xjsr305=strict", "-XX:+UseZGC")
+        freeCompilerArgs = listOf("-Xjsr305=strict")
         jvmTarget = "17"
     }
 }
@@ -79,22 +88,28 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-//allOpen {
-//    annotation("javax.persistence.Entity")
-//    annotation("javax.persistence.Embeddable")
-//    annotation("javax.persistence.MappedSuperclass")
-//}
-
-//tasks {
-//    register("createPom") {
-//
-//        doLast {
-//            val io.spring.gradle.dependencymanagement.internal.pom.Pom {
-//                withXml(dependencyManagement.pomConfigurer)
-//            }.writeTo("build/resources/main/META-INF/maven/${project.group}/${project.name}/pom.xml")
-//        }
-//    }
-//    jar {
-//        dependsOn("createPom")
-//    }
+//tasks.getByName<BootBuildImage>("bootBuildImage") {
+//    imageName = "kurenai9/im-sync-bot:test"
+//    builder = "paketobuildpacks/builder:base"
+//    isVerboseLogging = true
+//    environment = mapOf(
+//        "BP_NATIVE_IMAGE_BUILD_ARGUMENTS" to "  --initialize-at-run-time=io.netty.channel.epoll.Epoll\n" +
+//                " --initialize-at-run-time=io.netty.channel.kqueue.KQueue\n" +
+//                "  --initialize-at-run-time=io.netty.channel.epoll.Native\n" +
+//                "  --initialize-at-run-time=io.netty.channel.epoll.EpollEventLoop\n" +
+//                "  --initialize-at-run-time=io.netty.channel.epoll.EpollEventArray\n" +
+//                "  --initialize-at-run-time=io.netty.channel.DefaultFileRegion\n" +
+//                "  --initialize-at-run-time=io.netty.channel.kqueue.KQueueEventArray\n" +
+//                "  --initialize-at-run-time=io.netty.channel.kqueue.KQueueEventLoop\n" +
+//                "  --initialize-at-run-time=io.netty.channel.kqueue.Native\n" +
+//                "  --initialize-at-run-time=io.netty.channel.unix.Errors\n" +
+//                "  --initialize-at-run-time=io.netty.channel.unix.IovArray\n" +
+//                "  --initialize-at-run-time=io.netty.channel.unix.Limits\n" +
+//                "  --initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger\n" +
+//                "  --initialize-at-run-time=io.netty.handler.ssl.JdkNpnApplicationProtocolNegotiator\n" +
+//                "  --initialize-at-run-time=io.netty.handler.ssl.JettyNpnSslEngine",
+//        "BP_NATIVE_IMAGE" to "true",
+//        "HTTP_PROXY" to "http://10.0.0.9:7890",
+//        "HTTPS_PROXY" to "http://10.0.0.9:7890"
+//    )
 //}

@@ -1,8 +1,5 @@
 package kurenai.imsyncbot.utils
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.launch
 import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import kurenai.imsyncbot.utils.downloader.DefaultDownloader
 import kurenai.imsyncbot.utils.downloader.MultiPartDownloader
@@ -13,10 +10,7 @@ import okhttp3.Response
 import org.apache.http.HttpHeaders
 import java.io.File
 import java.io.RandomAccessFile
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.ThreadFactory
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 
 object HttpUtil {
@@ -26,31 +20,30 @@ object HttpUtil {
     const val UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:89.0) Gecko/20100101 Firefox/89.0"
     private const val filePartLength = 2 * 1024 * 1024L
     private val client = OkHttpClient()
-    private val pool = Executors.newScheduledThreadPool(10, object : ThreadFactory {
-        private val counter = AtomicInteger(0)
-        override fun newThread(r: Runnable): Thread {
-            return Thread(r, "DownloadThread#${counter.getAndIncrement()}").also {
-                it.isDaemon = true
+    private val pool = ThreadPoolExecutor(5, 10, 1L, TimeUnit.MINUTES,
+        LinkedBlockingQueue(20),
+        object : ThreadFactory {
+            private val counter = AtomicInteger(0)
+            override fun newThread(r: Runnable): Thread {
+                return Thread(r, "DownloadThread#${counter.getAndIncrement()}").also {
+                    it.isDaemon = true
+                }
             }
-        }
-    })
-    private val downloadScope = CoroutineScope(pool.asCoroutineDispatcher())
+        })
 
     fun download(url: String, file: File) {
         val originPath = file.path
         file.renameTo(File("$originPath.part"))
         val start = System.nanoTime()
         val countDown = CountDownLatch(1)
-        downloadScope.launch {
-            getRemoteFileSize(url)?.let {
-                if (it < 1024 * 1024 * 100) multiPartDownload(url, file, it, countDown)
-                else throw ImSyncBotRuntimeException("The file is too large: $it")
-            } ?: run {
-                createFile(file)
-                pool.execute(DefaultDownloader(url, file, client, countDown))
-            }
+        getRemoteFileSize(url)?.let {
+            if (it < 1024 * 1024 * 100) multiPartDownload(url, file, it, countDown)
+            else throw ImSyncBotRuntimeException("The file is too large: $it")
+        } ?: run {
+            createFile(file)
+            pool.execute(DefaultDownloader(url, file, client, countDown))
         }
-        countDown.await()
+        countDown.await(30, TimeUnit.SECONDS)
         if (file.length() <= 0) throw ImSyncBotRuntimeException("File is null: $url")
         file.renameTo(File(originPath))
         val sizeOfMb = file.length() / 1024.0 / 1024

@@ -2,7 +2,6 @@ package kurenai.imsyncbot.command.impl
 
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.command.AbstractCommand
-import kurenai.imsyncbot.config.AdminConfig
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.service.CacheService
@@ -31,11 +30,11 @@ class BindCommand(
                 if (user.userName == client.botUsername) {
                     val qqMsg = cacheService.getQQByTg(message.replyToMessage)
                     if (qqMsg != null) {
-                        UserConfig.add(qqMsg.fromId, qq = null, param)
+                        UserConfig.bindName(qqMsg.fromId, qq = null, param)
                         "qq[`${qqMsg.fromId}`] 绑定名称为 `$param`"
                     } else "找不到该qq信息"
                 } else {
-                    UserConfig.add(user.id, null, param, user.userName)
+                    UserConfig.bindName(user.id, null, param, user.userName)
                     "`${user.firstName}` 绑定名称为 `$param`"
                 }
             } else {
@@ -52,7 +51,7 @@ class BindCommand(
                     "转换qq群组id错误"
                 }
             }
-        } else if (message.isUserMessage && AdminConfig.superAdmin.contains(message.from.id)) {
+        } else if (message.isUserMessage && UserConfig.superAdmins.contains(message.from.id)) {
             val usernameBinds =
                 UserConfig.configs.filter { it.bindingName != null }.joinToString("\n") { "`${it.username?.format2Markdown() ?: it.tg}` \\<\\=\\> `${it.bindingName!!.format2Markdown()}`" }
             val groupBindings = GroupConfig.configs.joinToString("\n") { "`${it.tg}` \\<\\=\\> `${it.qq}` \\#${qqBot.getGroup(it.qq)?.name?.format2Markdown() ?: "找不到该QQ群"}" }

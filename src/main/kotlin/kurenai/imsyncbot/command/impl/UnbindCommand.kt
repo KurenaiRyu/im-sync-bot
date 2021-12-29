@@ -25,11 +25,11 @@ class UnbindCommand(
             if (user.userName == client.botUsername) {
                 val qqMsg = cacheService.getQQByTg(message.replyToMessage)
                 if (qqMsg != null) {
-                    UserConfig.remove(qqMsg.fromId)
+                    UserConfig.unbindUsername(qqMsg.fromId)
                     "qq[${qqMsg.fromId}] 解绑名称成功"
                 } else "找不到该qq信息"
             } else {
-                UserConfig.remove(user.id, user.userName)
+                UserConfig.unbindUsername(user.id, user.userName)
                 "${user.firstName} 解绑名称成功"
             }
         } else {

@@ -136,9 +136,7 @@ class TelegramBotClient(
             DelegatingCommand.execute(update, message)
         } else if (message.chatId.equals(privateChatHandler.privateChat)) {
             privateChatHandler.onPrivateChat(update)
-        } else if (update.hasMessage() && (message.isGroupMessage || message.isSuperGroupMessage) ||
-            update.hasEditedMessage() && (update.editedMessage.isSuperGroupMessage || update.editedMessage.isGroupMessage)
-        ) {
+        } else if ((message.isGroupMessage || message.isSuperGroupMessage)) {
             if (update.hasMessage()) {
                 for (handler in handlerHolder.currentTgHandlerList) {
                     if (handler.onMessage(message) == END) break

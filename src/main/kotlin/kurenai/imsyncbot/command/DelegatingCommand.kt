@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.command
 
 import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.config.AdminConfig
+import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.exception.BotException
 import net.mamoe.mirai.event.events.MessageEvent
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
@@ -24,11 +24,11 @@ object DelegatingCommand {
         var msg: String? = null
         for (handler in handlers) {
             if (handler.command == command) {
-                msg = if (handler.onlyMaster && !AdminConfig.master.contains(message.from.id)) {
+                msg = if (handler.onlyMaster && !ContextHolder.masterOfTg.contains(message.from.id)) {
                     "该命令只允许主人执行"
-                } else if (handler.onlySupperAdmin && !AdminConfig.superAdmin.contains(message.from.id)) {
+                } else if (handler.onlySupperAdmin && !UserConfig.superAdmins.contains(message.from.id)) {
                     "该命令只允许超级管理员执行"
-                } else if (handler.onlyAdmin && !AdminConfig.admin.contains(message.from.id)) {
+                } else if (handler.onlyAdmin && !UserConfig.admins.contains(message.from.id)) {
                     "该命令只允许管理员执行"
                 } else if (handler.onlyUserMessage && !message.isUserMessage) {
                     "该命令只允许私聊执行"
