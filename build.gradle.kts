@@ -27,7 +27,7 @@ repositories {
 
 dependencies {
 
-    val miraiVersion = "2.9.0-RC2"
+    val miraiVersion = "2.9.0"
 
     //mirai
     implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {
