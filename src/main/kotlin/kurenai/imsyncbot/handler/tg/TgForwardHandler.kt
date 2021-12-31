@@ -106,7 +106,7 @@ class TgForwardHandler(
                 val sticker = message.sticker
                 val builder = MessageChainBuilder()
                 if (sticker.isAnimated) {
-                    builder.add(sticker.emoji)
+                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, sticker.emoji, builder)
                 } else {
                     getImage(group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, "", builder)
