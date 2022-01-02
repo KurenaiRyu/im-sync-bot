@@ -11,10 +11,14 @@ import org.telegram.telegrambots.meta.api.objects.Update
 
 object DelegatingCommand {
 
-    val handlers = ArrayList<AbstractCommand>()
+    private val handlers = ArrayList<AbstractCommand>()
 
     fun execute(update: Update, message: Message) {
-        val command = message.entities.first { it.type == EntityType.BOTCOMMAND }.text.replace("/", "")
+        val command = message.entities
+            .first { it.type == EntityType.BOTCOMMAND }
+            .text
+            .replace("/", "")
+            .replace("@${ContextHolder.telegramBotClient.botUsername}", "")
         if (command == "help") {
             handleHelp(message)
             return

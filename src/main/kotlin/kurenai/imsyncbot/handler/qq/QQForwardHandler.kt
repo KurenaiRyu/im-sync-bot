@@ -44,7 +44,7 @@ import kotlin.math.min
 
 @Component
 class QQForwardHandler(
-    val properties: ForwardHandlerProperties,
+    final val properties: ForwardHandlerProperties,
     private val botProperties: BotProperties,
     private val cacheService: CacheService,
 ) : QQHandler {

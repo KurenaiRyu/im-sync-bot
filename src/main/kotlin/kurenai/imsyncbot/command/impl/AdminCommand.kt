@@ -19,11 +19,8 @@ class AdminCommand : AbstractCommand() {
     override fun execute(update: Update, message: Message): String {
         return if (message.isReply) {
             val user = message.replyToMessage.from
-            if (user.isBot) "机器人无法成为管理员"
-            else {
-                UserConfig.admin(user.id, username = user.userName)
-                "添加管理员成功"
-            }
+            UserConfig.admin(user.id, username = user.userName)
+            "添加管理员成功"
         } else {
             "需要引用一条消息来找到该用户"
         }

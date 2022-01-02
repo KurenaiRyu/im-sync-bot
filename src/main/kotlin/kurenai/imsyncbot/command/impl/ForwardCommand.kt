@@ -10,11 +10,11 @@ import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.Update
 
 @Component
-class UnbanCommand(
+class ForwardCommand(
     val cacheService: CacheService
 ) : AbstractCommand() {
 
-    override val command = "unban"
+    override val command = "fwd"
     override val help: String = "解除排除群或用户消息"
     override val onlyGroupMessage = true
     override val onlyAdmin = true
