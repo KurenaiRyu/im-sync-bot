@@ -1,15 +1,23 @@
 package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
-import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import okhttp3.internal.toImmutableList
 import okhttp3.internal.toImmutableMap
+import org.telegram.telegrambots.meta.api.objects.Message
 import java.io.File
 
 object UserConfig : AbstractConfig<User>() {
 
+    var masterTg: Long = 0
+    var masterQQ: Long = 0
+    var masterChatId: Long = 0
+    var masterUsername: String = ""
+
     var idBindings = emptyMap<Long, String>()
     var usernameBindings = emptyMap<String, String>()
+    var qqUsernames = emptyMap<Long, String>()
+    var links = emptyList<User>()
     var bannedIds = emptyList<Long>()
     var picBannedIds = emptyList<Long>()
     var admins = emptyList<Long>()
@@ -101,6 +109,27 @@ object UserConfig : AbstractConfig<User>() {
         afterUpdate()
     }
 
+    fun link(tg: Long, qq: Long, username: String) {
+        val list = configs.filter { it.tg == tg || it.qq == qq }
+        configs.removeIf { it.tg == tg || it.qq == qq }
+        val bindingName = list.mapNotNull { it.bindingName }.firstOrNull()
+        val status = if (list.isEmpty()) HashSet()
+        else list.map { it.status.toMutableList() }
+            .reduce { acc, item -> acc.also { it.addAll(item) } }
+            .distinct().toHashSet()
+        configs.add(User(tg, qq, username, bindingName, status = status))
+        afterUpdate()
+    }
+
+    fun unlink(user: User) {
+        configs.remove(user)
+        configs.add(User(user.tg, username = user.username, bindingName = user.bindingName, status = user.status))
+        user.qq?.let {
+            configs.add(User(qq = user.qq, bindingName = user.bindingName, status = user.status))
+        }
+        afterUpdate()
+    }
+
     fun unbindUsername(id: Long? = null, username: String? = null) {
         configs.removeIf { b ->
             if (id != null && id == b.tg || id == b.qq) {
@@ -122,18 +151,56 @@ object UserConfig : AbstractConfig<User>() {
         afterUpdate()
     }
 
+    fun master(message: Message) {
+        master(User(message.from.id, masterQQ, message.from.userName, chatId = message.chatId))
+    }
+
+    fun master(properties: ForwardHandlerProperties) {
+        master(User(properties.masterOfTg[0], properties.masterOfQq[0]))
+    }
+
+    fun master(user: User) {
+        if (!user.status.contains(UserStatus.MASTER)) user.status.add(UserStatus.MASTER)
+        val master = configs.firstOrNull { it.status.contains(UserStatus.MASTER) }
+        if (master == null) {
+            if (!user.status.contains(UserStatus.MASTER)) user.status.add(UserStatus.MASTER)
+            configs.add(user)
+        } else {
+            configs.remove(master)
+
+            for (s in master.status) {
+                if (!user.status.contains(s)) user.status.add(s)
+            }
+
+            configs.add(
+                User(
+                    user.tg ?: master.tg,
+                    user.qq ?: master.qq,
+                    user.username ?: master.username,
+                    user.bindingName ?: master.bindingName,
+                    user.chatId ?: master.chatId,
+                    user.status
+                )
+            )
+        }
+        afterUpdate()
+    }
+
     override fun refresh() {
         val ids = HashMap<Long, String>()
         val usernames = HashMap<String, String>()
+        val qqUsernames = HashMap<Long, String>()
+        val links = ArrayList<User>()
         val bannedIds = ArrayList<Long>()
         val picBannedIds = ArrayList<Long>()
         val admins = ArrayList<Long>()
         val superAdmins = ArrayList<Long>()
 
-        superAdmins.addAll(ContextHolder.masterOfTg)
-        admins.addAll(ContextHolder.masterOfTg)
-
         for (config in configs) {
+            if (config.tg != null && config.qq != null) links.add(config)
+            if (config.username?.isNotBlank() == true && config.qq != null) {
+                qqUsernames[config.qq] = config.username!!
+            }
             if (config.bindingName != null) {
                 config.tg?.let { ids[it] = config.bindingName!! }
                 config.qq?.let { ids[it] = config.bindingName!! }
@@ -163,11 +230,28 @@ object UserConfig : AbstractConfig<User>() {
                             superAdmins.add(it)
                         }
                     }
+                    UserStatus.MASTER -> {
+                        config.tg?.let {
+                            admins.add(it)
+                            superAdmins.add(it)
+                            masterTg = it
+                        }
+                        config.qq?.let {
+                            admins.add(it)
+                            superAdmins.add(it)
+                            masterQQ = it
+                        }
+                        config.username?.let { masterUsername = it }
+                        config.chatId?.let { masterChatId = it }
+                    }
                 }
             }
         }
+
         idBindings = ids.toImmutableMap()
         usernameBindings = usernames.toImmutableMap()
+        this.qqUsernames = qqUsernames.toImmutableMap()
+        this.links = links.toImmutableList()
         this.bannedIds = bannedIds.toImmutableList()
         this.picBannedIds = picBannedIds.toImmutableList()
         this.admins = admins.toImmutableList()
@@ -210,12 +294,14 @@ data class User(
     val qq: Long? = null,
     var username: String? = null,
     var bindingName: String? = null,
+    var chatId: Long? = null,
     var status: HashSet<UserStatus> = HashSet(),
 )
 
 enum class UserStatus {
     ADMIN,
     SUPER_ADMIN,
+    MASTER,
     BANNED,
     PIC_BANNED,
 }

@@ -11,8 +11,8 @@ abstract class AbstractCommand {
     open val onlyUserMessage: Boolean = false
     open val onlyGroupMessage: Boolean = false
     open val onlyMaster: Boolean = false
-    open val onlyAdmin: Boolean = true
-    open val onlySupperAdmin: Boolean = false
+    open val onlyAdmin: Boolean = false
+    open val onlySupperAdmin: Boolean = true
     open val onlyReply: Boolean = false
     open val parseMode: String? = null
     open val reply: Boolean = false

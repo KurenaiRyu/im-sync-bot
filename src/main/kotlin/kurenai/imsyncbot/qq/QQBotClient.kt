@@ -23,6 +23,7 @@ import org.springframework.beans.factory.DisposableBean
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
+import java.io.File
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
@@ -66,6 +67,7 @@ class QQBotClient(
     }
     private val handlerScope = handlerPool.asCoroutineDispatcher()
     val bot = BotFactory.newBot(properties.account, properties.password) {
+        cacheDir = File("./cache/${properties.account}")
         fileBasedDeviceInfo("./config/device.json") // 使用 device.json 存储设备信息
         protocol = properties.protocol // 切换协议
         highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
@@ -94,7 +96,7 @@ class QQBotClient(
                         }.also { result ->
                             if (!result) {
                                 event.message.filterIsInstance<At>()
-                                    .firstOrNull { it.target == ContextHolder.masterOfQQ[0] }
+                                    .firstOrNull { it.target == UserConfig.masterQQ }
                                     ?.let { handlerPool.execute { sendRemindMsg(event) } }
                             }
                         }
@@ -182,27 +184,26 @@ class QQBotClient(
             val message = event.message
             val sender = event.sender
             val group = event.group
-            for (qq in ContextHolder.masterOfQQ) {
-                val master = ContextHolder.qqBot.getFriend(qq)
-                master?.takeIf { it.id != 0L }?.sendMessage(
-                    master.sendMessage(message).quote()
-                        .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
-                )
-                ContextHolder.telegramBotClient.sendAsync(
-                    SendMessage.builder().chatId(BotUtil.getTgChatByQQ(event.group.id).toString()).text(event.message.contentToString())
-                        .build()
-                )
-            }
+            val master = ContextHolder.qqBot.getFriend(UserConfig.masterQQ)
+            master?.takeIf { it.id != 0L }?.sendMessage(
+                master.sendMessage(message).quote()
+                    .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
+            )
+            ContextHolder.telegramBotClient.sendAsync(
+                SendMessage.builder().chatId(BotUtil.getTgChatByQQ(event.group.id).toString()).text(event.message.contentToString())
+                    .build()
+            )
         }
     }
 
     private fun sendRemindMsg(event: GroupAwareMessageEvent) {
         try {
+            if (UserConfig.masterUsername.isBlank()) return
             val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
             ContextHolder.telegramBotClient.sendAsync(
                 SendMessage(
                     BotUtil.getTgChatByQQ(event.group.id).toString(),
-                    "#提醒 #id${event.sender.id} #group${event.group.id}\n @${ContextHolder.masterUsername} $content"
+                    "#提醒 #id${event.sender.id} #group${event.group.id}\n @${UserConfig.masterUsername} $content"
                 )
             )
         } catch (e: Exception) {

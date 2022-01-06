@@ -2,6 +2,7 @@ package kurenai.imsyncbot.handler
 
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
@@ -56,7 +57,7 @@ class PrivateChatHandler(
 //                client.execute(EditMessageMedia())
             }
             is FriendMessageSyncEvent -> {
-                if (event.friend.id != ContextHolder.masterOfQQ[0]) {
+                if (event.friend.id != UserConfig.masterQQ) {
                     onFriendMessage(event.friend, event.message, true)
                 }
             }

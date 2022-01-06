@@ -27,7 +27,7 @@ repositories {
 
 dependencies {
 
-    val miraiVersion = "2.9.0"
+    val miraiVersion = "2.9.2"
 
     //mirai
     implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {
@@ -40,7 +40,7 @@ dependencies {
     implementation("net.mamoe", "mirai-core-utils-jvm", miraiVersion)
 
     //telegram
-    implementation("org.telegram", "telegrambots-spring-boot-starter", "5.5.0")
+    implementation("org.telegram", "telegrambots-spring-boot-starter", "5.6.0")
 
     //spring
     implementation("org.springframework.boot", "spring-boot-starter")
@@ -66,7 +66,7 @@ dependencies {
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
     implementation("io.github.kurenairyu", "simple-cache", "1.1.0")
 
-    testImplementation("org.springframework.boot:spring-boot-starter-test:2.6.1")
+    testImplementation("org.springframework.boot:spring-boot-starter-test:2.6.2")
 }
 
 application {

@@ -15,6 +15,7 @@ import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.RateLimiter
 import mu.KotlinLogging
 import org.springframework.beans.factory.DisposableBean
+import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.bots.DefaultBotOptions
 import org.telegram.telegrambots.bots.TelegramLongPollingBot
@@ -48,7 +49,7 @@ class TelegramBotClient(
     private val callbacks: List<Callback>,
     private val cacheService: CacheService,
     private val privateChatHandler: PrivateChatHandler,
-) : TelegramLongPollingBot(options), DisposableBean {
+) : TelegramLongPollingBot(options), DisposableBean, InitializingBean {
 
     val nextMsgUpdate: ConcurrentHashMap<Long, Update> = ConcurrentHashMap()
     val nextMsgLock: ConcurrentHashMap<Long, Object> = ConcurrentHashMap()
@@ -67,6 +68,19 @@ class TelegramBotClient(
 
     override fun getBotToken(): String {
         return telegramBotProperties.token
+    }
+
+    /**
+     * Invoked by the containing `BeanFactory` after it has set all bean properties
+     * and satisfied [BeanFactoryAware], `ApplicationContextAware` etc.
+     *
+     * This method allows the bean instance to perform validation of its overall
+     * configuration and final initialization when all bean properties have been set.
+     * @throws Exception in the event of misconfiguration (such as failure to set an
+     * essential property) or if initialization fails for any other reason
+     */
+    override fun afterPropertiesSet() {
+//        GetChatMember(GroupConfig.tgQQ[0])
     }
 
     /**
@@ -341,4 +355,8 @@ class TelegramBotClient(
 fun String.params(): List<String> = this.split(" ").filter { it.isNotBlank() }
 fun Message.replyInfo(): Message {
     return ContextHolder.telegramBotClient.getMessageInfo(chatId, replyToMessage.messageId)
+}
+
+fun BotApiMethod<*>.send() {
+    ContextHolder.telegramBotClient.send(this)
 }

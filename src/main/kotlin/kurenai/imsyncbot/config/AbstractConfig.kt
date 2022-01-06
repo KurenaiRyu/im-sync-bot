@@ -35,8 +35,8 @@ abstract class AbstractConfig<T> {
 
     fun load() {
         if (file.exists()) {
-            val readValue = mapper.readValue(file, typeRef)
-            configs.addAll(readValue)
+            configs.clear()
+            configs.addAll(mapper.readValue(file, typeRef))
             refresh()
         }
     }

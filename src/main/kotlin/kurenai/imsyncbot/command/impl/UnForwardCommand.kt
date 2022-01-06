@@ -16,21 +16,20 @@ class UnForwardCommand(
 
     override val command = "unfwd"
     override val help: String = "排除群或用户消息（但事件仍会接受）"
-    override val onlyAdmin = true
     override val onlyGroupMessage = true
 
     override fun execute(update: Update, message: Message): String? {
         return if (message.isReply) {
-            val user = message.from
+            val user = message.replyToMessage.from
             if (user.isBot && user.userName == ContextHolder.telegramBotClient.botUsername) {
                 val qqMsg = cacheService.getQQByTg(message.replyToMessage)
                 if (qqMsg != null) {
-                    UserConfig.ban(qqMsg.fromId)
-                    "qq[`${qqMsg.fromId}`] 已排除转发"
+                    UserConfig.ban(qq = qqMsg.fromId)
+                    "qq[${qqMsg.fromId}] 已排除转发"
                 } else "找不到该qq信息"
             } else {
                 UserConfig.ban(user.id)
-                "`${user.firstName}` 已排除转发"
+                "${user.firstName} 已排除转发"
             }
         } else {
             GroupConfig.ban(message.chatId)

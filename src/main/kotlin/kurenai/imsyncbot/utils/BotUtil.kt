@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.utils
 
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.config.GroupConfig.tgQQ
 import mu.KotlinLogging
@@ -135,11 +136,11 @@ object BotUtil {
     }
 
     fun getQQGroupByTg(id: Long): Long {
-        return tgQQ[id] ?: ContextHolder.defaultQQGroup
+        return tgQQ[id] ?: GroupConfig.defaultQQGroup
     }
 
     fun getTgChatByQQ(id: Long): Long {
-        return qqTg[id] ?: ContextHolder.defaultTgGroup
+        return qqTg[id] ?: GroupConfig.defaultTgGroup
     }
 
 }

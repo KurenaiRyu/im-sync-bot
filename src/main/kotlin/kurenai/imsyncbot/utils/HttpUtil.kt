@@ -32,8 +32,6 @@ object HttpUtil {
         })
 
     fun download(url: String, file: File) {
-        val originPath = file.path
-        file.renameTo(File("$originPath.part"))
         val start = System.nanoTime()
         val countDown = CountDownLatch(1)
         getRemoteFileSize(url)?.let {
@@ -45,7 +43,6 @@ object HttpUtil {
         }
         countDown.await(30, TimeUnit.SECONDS)
         if (file.length() <= 0) throw ImSyncBotRuntimeException("File is null: $url")
-        file.renameTo(File(originPath))
         val sizeOfMb = file.length() / 1024.0 / 1024
         val timeOfSeconds = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) / 1000.0
         val speed = sizeOfMb / timeOfSeconds

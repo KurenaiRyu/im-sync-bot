@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.handler.config
 
-import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.config.GroupConfig
+import kurenai.imsyncbot.config.UserConfig
 import org.springframework.beans.factory.InitializingBean
 
 class ForwardHandlerInitializer(
@@ -8,10 +9,8 @@ class ForwardHandlerInitializer(
 ) : InitializingBean {
 
     override fun afterPropertiesSet() {
-        ContextHolder.defaultQQGroup = properties.group.defaultQQ
-        ContextHolder.defaultTgGroup = properties.group.defaultTelegram
-        ContextHolder.masterOfQQ = properties.masterOfQq
-        ContextHolder.masterOfTg = properties.masterOfTg
-        ContextHolder.masterUsername = properties.masterNameOfTg
+        GroupConfig.defaultQQGroup = properties.group.defaultQQ
+        GroupConfig.defaultTgGroup = properties.group.defaultTelegram
+        UserConfig.master(properties)
     }
 }

@@ -18,6 +18,8 @@ class BindCommand(
 
     override val command = "bind"
     override val help: String = "绑定群组或用户名"
+    override val onlyAdmin = true
+    override val onlySupperAdmin = false
     override val parseMode = ParseMode.MARKDOWNV2
 
     override fun execute(update: Update, message: Message): String? {
@@ -26,29 +28,35 @@ class BindCommand(
         val param = message.text.body().trim()
         return if (message.isGroupMessage || message.isSuperGroupMessage) {
             if (message.isReply) {
-                val user = message.replyToMessage.from
-                if (user.userName == client.botUsername) {
-                    val qqMsg = cacheService.getQQByTg(message.replyToMessage)
-                    if (qqMsg != null) {
-                        UserConfig.bindName(qqMsg.fromId, qq = null, param)
-                        "qq[`${qqMsg.fromId}`] 绑定名称为 `$param`"
-                    } else "找不到该qq信息"
+                if (param.isNotBlank()) {
+                    val user = message.replyToMessage.from
+                    if (user.userName == client.botUsername) {
+                        val qqMsg = cacheService.getQQByTg(message.replyToMessage) ?: return "找不到该qq信息"
+                        UserConfig.bindName(qq = qqMsg.fromId, bindingName = param)
+                        "qq`${qqMsg.fromId}` 绑定名称为 `${param.format2Markdown()}`"
+                    } else {
+                        UserConfig.bindName(user.id, null, param, user.userName)
+                        "`${user.firstName.format2Markdown()}` 绑定名称为 `${param.format2Markdown()}`"
+                    }
                 } else {
-                    UserConfig.bindName(user.id, null, param, user.userName)
-                    "`${user.firstName}` 绑定名称为 `$param`"
+                    "绑定名称不能为空"
                 }
             } else {
-                try {
-                    val qq = param.toLong()
-                    qqBot.getGroup(qq)?.let {
-                        GroupConfig.add(qq, message.chatId, message.chat.title)
-                        "绑定成功\n\n" +
-                                "绑定QQ群id: `${it.id}`\n" +
-                                "绑定QQ群名称: `${it.name.format2Markdown()}`\n" +
-                                "绑定QQ群主: `${it.owner.nick.format2Markdown()}`\\(`${it.owner.id}`\\)\n"
-                    } ?: "没有找到qq群$qq"
-                } catch (e: NumberFormatException) {
-                    "转换qq群组id错误"
+                if (UserConfig.superAdmins.contains(message.from.id)) {
+                    try {
+                        val qq = param.toLong()
+                        qqBot.getGroup(qq)?.let {
+                            GroupConfig.add(message.chatId, qq, message.chat.title)
+                            "绑定成功\n\n" +
+                                    "绑定QQ群id: `${it.id}`\n" +
+                                    "绑定QQ群名称: `${it.name.format2Markdown()}`\n" +
+                                    "绑定QQ群主: `${it.owner.nick.format2Markdown()}`\\(`${it.owner.id}`\\)\n"
+                        } ?: "没有找到qq群`$qq`"
+                    } catch (e: NumberFormatException) {
+                        "转换qq群组id错误"
+                    }
+                } else {
+                    "绑定群组操作需要超级管理员权限"
                 }
             }
         } else if (message.isUserMessage && UserConfig.superAdmins.contains(message.from.id)) {

@@ -47,8 +47,16 @@ class BotInitializer : InitializingBean {
                     }
                 }
                 doDeleteCacheFile(filesToDelete)
+
+                filesToDelete.clear()
+                val oldestAllowedFileDate = DateUtils.addMinutes(Date(), -10) //minus days from current date
+                cacheDir.listFiles()?.forEach { file ->
+                    if (file.isDirectory) {
+                        filesToDelete.addAll(FileUtils.listFiles(file, AgeFileFilter(oldestAllowedFileDate), null).filter { it.name.endsWith(".part") })
+                    }
+                }
             }
-        }, 1000L, 6 * 60 * 60 * 1000L)
+        }, 1000L, 1 * 60 * 60 * 1000L)
     }
 
     private fun doDeleteCacheFile(filesToDelete: ArrayList<File>) {

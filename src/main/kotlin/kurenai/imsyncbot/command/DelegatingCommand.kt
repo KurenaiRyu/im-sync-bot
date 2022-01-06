@@ -3,6 +3,7 @@ package kurenai.imsyncbot.command
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.exception.BotException
+import mu.KotlinLogging
 import net.mamoe.mirai.event.events.MessageEvent
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import org.telegram.telegrambots.meta.api.objects.EntityType
@@ -10,6 +11,8 @@ import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.Update
 
 object DelegatingCommand {
+
+    private val log = KotlinLogging.logger {}
 
     private val handlers = ArrayList<AbstractCommand>()
 
@@ -28,7 +31,8 @@ object DelegatingCommand {
         var msg: String? = null
         for (handler in handlers) {
             if (handler.command == command) {
-                msg = if (handler.onlyMaster && !ContextHolder.masterOfTg.contains(message.from.id)) {
+                log.debug { "Match ${handler.name}" }
+                msg = if (handler.onlyMaster && UserConfig.masterTg != message.from.id) {
                     "该命令只允许主人执行"
                 } else if (handler.onlySupperAdmin && !UserConfig.superAdmins.contains(message.from.id)) {
                     "该命令只允许超级管理员执行"

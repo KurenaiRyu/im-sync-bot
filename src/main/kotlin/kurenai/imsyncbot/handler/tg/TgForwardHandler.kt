@@ -1,6 +1,8 @@
 package kurenai.imsyncbot.handler.tg
 
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.config.GroupConfig
+import kurenai.imsyncbot.config.GroupConfig.bannedGroups
 import kurenai.imsyncbot.config.GroupConfig.tgQQ
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
@@ -51,9 +53,19 @@ class TgForwardHandler(
     @Throws(Exception::class)
     override suspend fun onMessage(message: Message): Int {
         if (message.isCommand) {
+            log.info { "ignore command" }
             return CONTINUE
         }
         if (!tgQQ.containsKey(message.chatId)) {
+            log.info { "ignore no config group" }
+            return CONTINUE
+        }
+        if (bannedGroups.contains(message.chatId)) {
+            log.info { "ignore banned group" }
+            return CONTINUE
+        }
+        if (UserConfig.bannedIds.contains(message.from.id)) {
+            log.info { "ignore banned id" }
             return CONTINUE
         }
 
@@ -63,7 +75,7 @@ class TgForwardHandler(
             message.replyToMessage?.let {
                 cacheService.getQQByTg(it)
             }
-        val groupId = quoteMsgSource?.targetId ?: tgQQ.getOrDefault(chatId, ContextHolder.defaultQQGroup)
+        val groupId = quoteMsgSource?.targetId ?: tgQQ.getOrDefault(chatId, GroupConfig.defaultQQGroup)
         if (groupId == 0L) return CONTINUE
         val group = bot.getGroup(groupId)
         if (null == group) {
@@ -71,7 +83,7 @@ class TgForwardHandler(
             return CONTINUE
         }
         val senderId = message.from.id
-        val isMaster = ContextHolder.masterOfTg.contains(senderId)
+        val isMaster = UserConfig.masterTg == senderId
         val senderName = getSenderName(message)
         val caption = message.caption ?: ""
 
@@ -98,6 +110,7 @@ class TgForwardHandler(
                 BotUtil.mp42gif(animation.fileId, tgFile)?.let { gifFile ->
                     gifFile.toExternalResource().use {
                         builder.add(group.uploadImage(it))
+                        formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, "", builder)
                         cacheService.cache(group.sendMessage(builder.build()).source, message)
                     }
                 }

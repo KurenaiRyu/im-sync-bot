@@ -10,31 +10,30 @@ import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.Update
 
 @Component
-class ForwardCommand(
-    val cacheService: CacheService
+class BanPicCommand(
+    val cacheService: CacheService,
 ) : AbstractCommand() {
 
-    override val command = "fwd"
-    override val help: String = "解除排除群或用户消息"
+    override val command = "banPic"
+    override val help: String = "排除群或用户图片消息"
     override val onlyGroupMessage = true
 
-    override fun execute(update: Update, message: Message): String {
+    override fun execute(update: Update, message: Message): String? {
         return if (message.isReply) {
             val user = message.replyToMessage.from
             if (user.isBot && user.userName == ContextHolder.telegramBotClient.botUsername) {
                 val qqMsg = cacheService.getQQByTg(message.replyToMessage)
                 if (qqMsg != null) {
-                    UserConfig.unban(qqMsg.fromId)
-                    "qq[${qqMsg.fromId}] 已正常转发"
+                    UserConfig.banPic(qqMsg.fromId)
+                    "qq[${qqMsg.fromId}] 已排除图片转发"
                 } else "找不到该qq信息"
             } else {
-                UserConfig.unban(user.id)
-                "${user.firstName} 已正常转发"
+                UserConfig.banPic(user.id)
+                "${user.firstName} 已排除图片转发"
             }
         } else {
-            GroupConfig.unban(message.chatId)
-            return "群消息已正常转发"
+            GroupConfig.banPic(message.chatId)
+            "排除群图片信息设置成功"
         }
     }
-
 }

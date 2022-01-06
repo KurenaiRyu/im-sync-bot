@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
 import kurenai.imsyncbot.command.AbstractCommand
+import kurenai.imsyncbot.config.GroupConfig
 import org.springframework.stereotype.Component
 import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.Update
@@ -13,6 +14,7 @@ class DefaultCommand : AbstractCommand() {
     override val onlyGroupMessage = true
 
     override fun execute(update: Update, message: Message): String {
+        GroupConfig.default(message)
         return "设置默认群成功"
     }
 

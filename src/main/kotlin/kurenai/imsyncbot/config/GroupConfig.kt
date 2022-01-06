@@ -3,9 +3,13 @@ package kurenai.imsyncbot.config
 import com.fasterxml.jackson.core.type.TypeReference
 import okhttp3.internal.toImmutableList
 import okhttp3.internal.toImmutableMap
+import org.telegram.telegrambots.meta.api.objects.Message
 import java.io.File
 
 object GroupConfig : AbstractConfig<Group>() {
+
+    var defaultQQGroup: Long = 0
+    var defaultTgGroup: Long = 0
 
     var qqTg = emptyMap<Long, Long>()
     var tgQQ = emptyMap<Long, Long>()
@@ -29,7 +33,6 @@ object GroupConfig : AbstractConfig<Group>() {
 
     fun unban(tg: Long) {
         removeStatus(tg, GroupStatus.BANNED)
-        afterUpdate()
     }
 
     fun banPic(tg: Long) {
@@ -38,7 +41,6 @@ object GroupConfig : AbstractConfig<Group>() {
 
     fun unbanPic(tg: Long) {
         removeStatus(tg, GroupStatus.PIC_BANNED)
-        afterUpdate()
     }
 
     private fun addStatus(tg: Long, status: GroupStatus) {
@@ -55,13 +57,22 @@ object GroupConfig : AbstractConfig<Group>() {
         afterUpdate()
     }
 
-    fun add(qq: Long, tg: Long, title: String) {
-        add(Group(qq, tg, title))
+    fun add(tg: Long, qq: Long, title: String) {
+        add(Group(tg, qq, title))
     }
 
     fun remove(tg: Long) {
         configs.removeIf { it.tg == tg }
         afterUpdate()
+    }
+
+    fun default(message: Message) {
+        val defaultGroup = configs.firstOrNull { it.status.contains(GroupStatus.DEFAULT) }
+        if (defaultGroup != null) {
+            add(Group(message.chatId, tgQQ[message.chatId] ?: defaultGroup.qq, message.chat.title, defaultGroup.status))
+        } else {
+            add(Group(message.chatId, tgQQ[message.chatId] ?: 0L, message.chat.title, hashSetOf(GroupStatus.DEFAULT)))
+        }
     }
 
     override fun refresh() {
@@ -79,10 +90,16 @@ object GroupConfig : AbstractConfig<Group>() {
                 when (status) {
                     GroupStatus.BANNED -> {
                         bannedGroups.add(config.qq)
+                        bannedGroups.add(config.tg)
                         banned = true
                     }
                     GroupStatus.PIC_BANNED -> {
                         picBannedGroups.add(config.qq)
+                        picBannedGroups.add(config.tg)
+                    }
+                    GroupStatus.DEFAULT -> {
+                        defaultQQGroup = config.qq
+                        defaultTgGroup = config.tg
                     }
                 }
             }
@@ -113,8 +130,8 @@ object GroupConfig : AbstractConfig<Group>() {
 }
 
 data class Group(
-    val qq: Long,
     val tg: Long,
+    val qq: Long,
     val title: String,
     val status: HashSet<GroupStatus> = HashSet(),
 )
@@ -122,4 +139,5 @@ data class Group(
 enum class GroupStatus {
     BANNED,
     PIC_BANNED,
+    DEFAULT,
 }

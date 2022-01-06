@@ -5,6 +5,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import kotlinx.coroutines.*
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.BotProperties
+import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.entity.FileCache
@@ -84,7 +85,7 @@ class QQForwardHandler(
         val messageChain = event.message
         val atAccount = AtomicLong(-100)
         val content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
-        val chatId = qqTg[group.id] ?: ContextHolder.defaultTgGroup
+        val chatId = qqTg[group.id] ?: GroupConfig.defaultTgGroup
 
         return if (content.startsWith("<?xml version='1.0'")) {
             handleRichMessage(event, chatId, senderName)
@@ -171,7 +172,7 @@ class QQForwardHandler(
         senderName: String,
     ): Int {
 //        log.info { "${group.name}(${group.id}) - $senderName($senderId): ${messageChain.contentToString()}" }
-        val rejectPic = botProperties.ban.picGroup.contains(group.id)
+        val rejectPic = GroupConfig.picBannedGroups.contains(group.id)
         if (rejectPic) log.debug { "Reject picture" }
 
         val client = ContextHolder.telegramBotClient
@@ -180,7 +181,7 @@ class QQForwardHandler(
         val atAccount = AtomicLong(-100)
         var content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it, replyId != null) }
 
-        val isMaster = group.bot.id == senderId || ContextHolder.masterOfQQ.contains(senderId)
+        val isMaster = group.bot.id == senderId || UserConfig.masterQQ == senderId
 
         if (isMaster && changeMsgFormatCmd(content)) {
             val demoContent = "demo msg."
@@ -419,14 +420,14 @@ class QQForwardHandler(
                 }
             }
             is MemberSpecialTitleChangeEvent -> {
-                "\\#头衔 \\#id${event.member.id}\n`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()})`获得头衔`${event.new.format2Markdown()}`"
+                "\\#头衔 \\#id${event.member.id}\n`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`获得头衔`${event.new.format2Markdown()}`"
             }
             else -> {
                 log.debug { "未支持群事件 ${event.javaClass} 的处理" }
                 return
             }
         }
-        val chatId = qqTg[event.group.id] ?: ContextHolder.defaultTgGroup
+        val chatId = qqTg[event.group.id] ?: GroupConfig.defaultTgGroup
         ContextHolder.telegramBotClient.send(SendMessage(chatId.toString(), msg).apply { parseMode = ParseMode.MARKDOWNV2 })
     }
 
@@ -437,9 +438,10 @@ class QQForwardHandler(
             if (hasReply && target == group.bot.id) return ""
             if (target == atAccount.get()) return "" else atAccount.set(target)
             val name = if (target == group.bot.id && !hasReply) {
-                ContextHolder.masterUsername
+                UserConfig.masterUsername.takeIf { it.isNotBlank() } ?: group.bot.nick
             } else {
-                UserConfig.idBindings[target]
+                UserConfig.qqUsernames[target]
+                    ?: UserConfig.idBindings[target]
                     ?: ContextHolder.qqBot.getFriend(target)?.remarkOrNick
                     ?: group.getMember(target)?.remarkOrNameCardOrNick?.let { BotUtil.formatUsername(it) }
                     ?: target.toString()
