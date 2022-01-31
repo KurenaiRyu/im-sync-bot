@@ -37,7 +37,7 @@ class BotInitializer(
     }
 
     private fun configProxy() {
-        HttpUtil.proxy = when (proxyProperties.type) {
+        HttpUtil.PROXY = when (proxyProperties.type) {
             DefaultBotOptions.ProxyType.HTTP -> {
                 Proxy(Proxy.Type.HTTP, InetSocketAddress(proxyProperties.host, proxyProperties.port))
             }

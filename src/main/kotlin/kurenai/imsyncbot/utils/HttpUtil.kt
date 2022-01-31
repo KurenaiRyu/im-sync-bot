@@ -15,6 +15,7 @@ import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.time.Duration
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -22,9 +23,10 @@ object HttpUtil {
 
     private val log = KotlinLogging.logger {}
 
-    var proxy: Proxy? = null
-    private const val filePartLength = 2 * 1024 * 1024L
-    private val pool = ThreadPoolExecutor(5, 10, 1L, TimeUnit.MINUTES,
+    var PROXY: Proxy? = null
+    private const val FILE_PART_LENGTH = 2 * 1024 * 1024L
+    private val DEFAULT_TIME_OUT = Duration.ofSeconds(5)
+    private val POOL = ThreadPoolExecutor(5, 10, 1L, TimeUnit.MINUTES,
         LinkedBlockingQueue(20),
         object : ThreadFactory {
             private val counter = AtomicInteger(0)
@@ -49,9 +51,18 @@ object HttpUtil {
             } else {
                 singleDownload(url, file, enableProxy)
             }
+        }.handle { _, case ->
+            case?.let {
+                file.delete()
+                throw case
+            }
         }.join()
 
-        if (file.length() <= 0) throw ImSyncBotRuntimeException("File is null: $url")
+        if (file.exists() && file.length() <= 0)
+            throw ImSyncBotRuntimeException("File is null: $url")
+        if (!file.exists()) {
+            throw ImSyncBotRuntimeException("Download file error: $url")
+        }
         val sizeOfMb = file.length() / 1024.0 / 1024
         val timeOfSeconds = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) / 1000.0
         val speed = sizeOfMb / timeOfSeconds
@@ -61,12 +72,12 @@ object HttpUtil {
 
     private fun multiPartDownload(url: String, file: File, size: Long, enableProxy: Boolean = false): CompletableFuture<Void> {
         createFile(file, size)
-        val partLength = if (size <= filePartLength) {
+        val partLength = if (size <= FILE_PART_LENGTH) {
             return singleDownload(url, file, enableProxy)
-        } else if (size > filePartLength * 20) {
-            filePartLength * 4
+        } else if (size > FILE_PART_LENGTH * 20) {
+            FILE_PART_LENGTH * 4
         } else {
-            filePartLength
+            FILE_PART_LENGTH
         }
 
         val moreOne = size % partLength != 0L
@@ -148,14 +159,15 @@ object HttpUtil {
     }
 
     private fun newHttpClient(enableProxy: Boolean = false): HttpClient {
-        return if (proxy != null && enableProxy) {
-            val address = proxy!!.address()
-            HttpClient
-                .newBuilder()
-                .executor(pool)
-                .proxy(ProxySelector.of(InetSocketAddress(address.hostname, address.port)))
-                .build()
-        } else HttpClient.newHttpClient()
+        val builder = HttpClient
+            .newBuilder()
+            .executor(POOL)
+            .connectTimeout(DEFAULT_TIME_OUT)
+        if (PROXY != null && enableProxy) {
+            val address = PROXY!!.address()
+            builder.proxy(ProxySelector.of(InetSocketAddress(address.hostname, address.port)))
+        }
+        return builder.build()
     }
 
     private fun createFile(file: File, size: Long? = null) {
