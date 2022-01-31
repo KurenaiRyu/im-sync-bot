@@ -16,4 +16,5 @@ class ProxyProperties {
     var host = "localhost"
     var port = 1080
     var type = DefaultBotOptions.ProxyType.NO_PROXY
+    var onlyDownloadTgFile = true
 }

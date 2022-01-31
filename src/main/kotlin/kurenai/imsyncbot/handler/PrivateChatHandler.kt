@@ -80,7 +80,7 @@ class PrivateChatHandler(
                         var sendByFile = aspectRatio > 10 || aspectRatio < 0.1 || msg.width > 1920 || msg.height > 1920
                         val inputFile = cacheService.getFile(msg.imageId).let {
                             if (it == null) {
-                                val file = BotUtil.downloadFile(msg.imageId, msg.queryUrl())
+                                val file = BotUtil.downloadImg(msg.imageId, msg.queryUrl())
                                 if (!sendByFile && file.length() > picToFileSize) {
                                     sendByFile = true
                                 }
@@ -125,7 +125,7 @@ class PrivateChatHandler(
                     })
                 }
                 is OnlineAudio -> {
-                    val file = BotUtil.downloadFile(msg.filename, msg.urlForDownload)
+                    val file = BotUtil.downloadDoc(msg.filename, msg.urlForDownload)
                     client.send(SendVoice(privateChat.toString(), InputFile(file)).apply {
                         replyToMessageId = replyMsgId
                         if (isSync) {

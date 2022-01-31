@@ -30,11 +30,12 @@ class BotAutoConfiguration {
     fun defaultBotOptions(proxyProperties: ProxyProperties, telegramBotProperties: TelegramBotProperties): DefaultBotOptions {
         val botOptions = DefaultBotOptions()
         telegramBotProperties.baseUrl.takeIf { it.isNotBlank() }?.let(botOptions::setBaseUrl)
-        if (proxyProperties.type == DefaultBotOptions.ProxyType.NO_PROXY) return botOptions
-        botOptions.proxyType = proxyProperties.type
-        botOptions.proxyHost = proxyProperties.host
-        botOptions.proxyPort = proxyProperties.port
-        botOptions.maxThreads = Runtime.getRuntime().availableProcessors() * 2
+        if (proxyProperties.type != DefaultBotOptions.ProxyType.NO_PROXY && !proxyProperties.onlyDownloadTgFile) {
+            botOptions.proxyType = proxyProperties.type
+            botOptions.proxyHost = proxyProperties.host
+            botOptions.proxyPort = proxyProperties.port
+            botOptions.maxThreads = Runtime.getRuntime().availableProcessors() * 2
+        }
         return botOptions
     }
 

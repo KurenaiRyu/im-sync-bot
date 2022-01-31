@@ -1,5 +1,6 @@
 package kurenai.imsyncbot.service
 
+import io.ktor.http.*
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.entity.FileCache
 import kurenai.imsyncbot.entity.MessageSourceCache
@@ -7,30 +8,42 @@ import mu.KotlinLogging
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceBuilder
 import net.mamoe.mirai.message.data.OnlineMessageSource
+import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Service
 import org.telegram.telegrambots.meta.api.methods.GetMessageInfo
 import org.telegram.telegrambots.meta.api.objects.Message
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 
 @Service
 class CacheService(
     private val cache: io.github.kurenairyu.cache.Cache,
-) {
+) : InitializingBean {
     companion object {
         const val TG_MSG_CACHE_KEY = "TG_MSG_CACHE"
         const val QQ_MSG_CACHE_KEY = "QQ_MSG_CACHE"
         const val TG_QQ_MSG_ID_CACHE_KEY = "TG_QQ_MSG_ID_CACHE"
         const val QQ_TG_MSG_ID_CACHE_KEY = "QQ_TG_MSG_ID_CACHE"
         const val TG_FILE_CACHE_KEY = "TG_FILE_CACHE"
+        const val TG_IMG_CACHE_KEY = "TG_IMG_CACHE"
         const val QQ_TG_PRIVATE_MSG_ID_CACHE_KEY = "QQ_TG_PRIVATE_MSG_ID_CACHE"
         const val TG_QQ_PRIVATE_MSG_ID_CACHE_KEY = "TG_QQ_PRIVATE_MSG_ID_CACHE"
-        val TTL = TimeUnit.DAYS.toMillis(7)
+        val TTL = TimeUnit.DAYS.toMillis(5)
+        val IMAGE_TTL = TimeUnit.DAYS.toMillis(1)
     }
 
     private val log = KotlinLogging.logger {}
 
+    override fun afterPropertiesSet() {
+        ContextHolder.cacheService = this
+    }
+
     fun cache(source: OnlineMessageSource, message: Message) {
+        if (source.ids.isEmpty()) {
+            log.warn { "source ids is empty: $source" }
+            return
+        }
         val qqMsgId: Int = source.ids[0]
         val tgMsgId: String = message.cacheId()
 
@@ -48,6 +61,15 @@ class CacheService(
 
     fun cacheFile(qqId: String, fileCache: FileCache) {
         cache.put(TG_FILE_CACHE_KEY, qqId, fileCache, TTL)
+    }
+
+    fun cacheImg(image: File) {
+        val count: Int = cache.get(TG_IMG_CACHE_KEY, image.name) ?: 0
+        cache.put(TG_IMG_CACHE_KEY, image.name.encodeURLPath(), count + 1, IMAGE_TTL)
+    }
+
+    fun imgExists(name: String): Boolean {
+        return cache.exists(TG_IMG_CACHE_KEY, name.encodeURLPath())
     }
 
     fun getFile(qqId: String): FileCache? {

@@ -3,6 +3,7 @@ package kurenai.imsyncbot.command
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.exception.BotException
+import kurenai.imsyncbot.telegram.send
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.MessageEvent
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage
@@ -58,10 +59,10 @@ object DelegatingCommand {
             }
         }
         msg?.let {
-            ContextHolder.telegramBotClient.send(SendMessage(message.chatId.toString(), msg).apply {
+            SendMessage(message.chatId.toString(), msg).apply {
                 parseMode?.let { this.parseMode = it }
                 if (reply) this.replyToMessageId = message.messageId
-            })
+            }.send()
         }
     }
 
@@ -81,9 +82,7 @@ object DelegatingCommand {
             sb.append("/${handler.command} ${handler.name}\n")
             sb.append(handler.help)
         }
-        ContextHolder.telegramBotClient.send(
-            SendMessage(message.chatId.toString(), sb.toString())
-        )
+        SendMessage(message.chatId.toString(), sb.toString()).send()
     }
 
 

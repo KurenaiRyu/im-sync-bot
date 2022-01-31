@@ -60,7 +60,7 @@ class InfoCommand(
                             if (config?.status?.isNotEmpty() == true)
                                 list.add("状态: ${config.status.toString().format2Markdown()}")
 
-                            val file = BotUtil.downloadFile("avatar-${member.id}.png", member.avatarUrl)
+                            val file = BotUtil.downloadImg("avatar-${member.id}.png", member.avatarUrl)
                             ContextHolder.telegramBotClient.send(SendPhoto(message.chatId.toString(), InputFile(file)).apply {
                                 caption = list.joinToString("\n")
                                 parseMode = ParseMode.MARKDOWNV2
@@ -93,7 +93,7 @@ class InfoCommand(
                 if (config?.status?.isNotEmpty() == true)
                     list.add("状态: ${config.status.toString().format2Markdown()}")
 
-                val file = BotUtil.downloadFile("group-avatar-${group.id}.png", group.avatarUrl)
+                val file = BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl)
                 ContextHolder.telegramBotClient.send(SendPhoto(message.chatId.toString(), InputFile(file)).apply {
                     caption = list.joinToString("\n")
                     parseMode = ParseMode.MARKDOWNV2

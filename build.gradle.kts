@@ -65,6 +65,7 @@ dependencies {
     implementation("com.esotericsoftware", "kryo", "5.1.1")
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
     implementation("io.github.kurenairyu", "simple-cache", "1.1.0")
+    implementation("net.bramp.ffmpeg", "ffmpeg", "0.6.2")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test:2.6.2")
 }

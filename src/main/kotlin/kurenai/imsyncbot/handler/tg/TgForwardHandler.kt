@@ -10,6 +10,7 @@ import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
+import kurenai.imsyncbot.utils.HttpUtil
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.message.data.Image
@@ -166,7 +167,7 @@ class TgForwardHandler(
         if (!cacheFile.exists() || !cacheFile.isFile) {
             cacheFile = File(BotUtil.getDocumentPath(fileName))
             if (!cacheFile.exists() || !cacheFile.isFile) {
-                ContextHolder.telegramBotClient.downloadFile(file, cacheFile)
+                HttpUtil.download(file, cacheFile)
             }
         }
 
@@ -209,13 +210,12 @@ class TgForwardHandler(
 
     @Throws(TelegramApiException::class, IOException::class)
     private suspend fun getImage(group: Group, fileId: String, fileUniqueId: String): Image? {
-        val client = ContextHolder.telegramBotClient
         val file = getTgFile(fileId, fileUniqueId)
         val suffix = BotUtil.getSuffix(file.filePath)
         val image = if (suffix.equals("webp", true)) {
             BotUtil.webp2png(file)
         } else {
-            File(file.filePath).takeIf { it.exists() } ?: client.downloadFile(file, File(BotUtil.getImagePath("$fileId.webp")))
+            File(file.filePath).takeIf { it.exists() } ?: HttpUtil.download(file, File(BotUtil.getImagePath("$fileId.webp")))
         }
 
         var ret: Image? = null
@@ -231,7 +231,7 @@ class TgForwardHandler(
 
     private suspend fun getTgFile(fileId: String, fileUniqueId: String): org.telegram.telegrambots.meta.api.objects.File {
         try {
-            return ContextHolder.telegramBotClient.send(GetFile.builder().fileId(fileId).build())
+            return ContextHolder.telegramBotClient.send(GetFile(fileId))
         } catch (e: TelegramApiException) {
             log.error(e) { e.message }
         }

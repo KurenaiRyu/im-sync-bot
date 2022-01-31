@@ -15,7 +15,6 @@ import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.service.TelegramId
 import kurenai.imsyncbot.utils.BotUtil
-import kurenai.imsyncbot.utils.HttpUtil
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.*
@@ -34,7 +33,6 @@ import org.telegram.telegrambots.meta.api.objects.InputFile
 import org.telegram.telegrambots.meta.api.objects.Message
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
-import java.io.File
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
@@ -244,13 +242,8 @@ class QQForwardHandler(
                 val inputFile = cacheService.getFile(image.imageId).let {
                     if (it == null) {
 
-                        val file = File(BotUtil.getImagePath(image.imageId))
-                        if (!rejectPic) {
-                            if (!file.exists() || !file.isFile) {
-                                val url: String = image.queryUrl()
-                                HttpUtil.download(url, file)
-                            }
-                        }
+                        val url: String = image.queryUrl()
+                        val file = BotUtil.downloadImg(image.imageId, url, rejectPic)
                         imageSize = file.length()
                         InputFile(file)
                     } else {
@@ -305,9 +298,8 @@ class QQForwardHandler(
                 val absoluteFile = messageChain[FileMessage.Key]!!.toAbsoluteFile(group) ?: return@launch
                 val url: String = absoluteFile.getUrl() ?: return@launch
                 try {
-                    val file = File(BotUtil.getDocumentPath(absoluteFile.name))
-                    if (!file.exists() || !file.isFile) withContext(Dispatchers.IO) {
-                        HttpUtil.download(url, file)
+                    val file = withContext(Dispatchers.IO) {
+                        BotUtil.downloadDoc(absoluteFile.name, url)
                     }
                     val inputFile = InputFile(file)
                     val extension: String = absoluteFile.extension.lowercase()
@@ -330,10 +322,7 @@ class QQForwardHandler(
         } else if (messageChain.contains(OnlineAudio.Key)) {
             val voice = messageChain[OnlineAudio.Key]
             voice?.urlForDownload?.let { url ->
-                val file = File(url)
-                if (!file.exists() || !file.isFile) {
-                    HttpUtil.download(url, file)
-                }
+                val file = BotUtil.downloadDoc(voice.filename, url)
                 try {
                     client.send(SendVoice.builder().chatId(chatId).voice(InputFile(file)).build())
                 } catch (e: Exception) {

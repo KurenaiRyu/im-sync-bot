@@ -5,6 +5,9 @@ import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.config.GroupConfig.tgQQ
 import mu.KotlinLogging
+import net.bramp.ffmpeg.FFmpeg
+import net.bramp.ffmpeg.FFprobe
+import net.bramp.ffmpeg.builder.FFmpegBuilder
 import net.mamoe.mirai.contact.Contact
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
@@ -13,7 +16,6 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.io.File
 import java.io.IOException
-import javax.imageio.ImageIO
 
 
 object BotUtil {
@@ -36,7 +38,7 @@ object BotUtil {
         val image = if (file.filePath.lowercase().endsWith(".webp")) {
             webp2png(file)
         } else {
-            File(file.filePath).takeIf { it.exists() } ?: client.downloadFile(file, File(getImagePath("$fileId.webp")))
+            File(file.filePath).takeIf { it.exists() } ?: HttpUtil.download(file, File(getImagePath("$fileId.webp")))
         }
 
         var ret: Image? = null
@@ -50,7 +52,7 @@ object BotUtil {
         return ret
     }
 
-    suspend fun getTgFile(fileId: String, fileUniqueId: String): org.telegram.telegrambots.meta.api.objects.File {
+    fun getTgFile(fileId: String, fileUniqueId: String): org.telegram.telegrambots.meta.api.objects.File {
         try {
             return ContextHolder.telegramBotClient.send(GetFile.builder().fileId(fileId).build())
         } catch (e: TelegramApiException) {
@@ -62,9 +64,19 @@ object BotUtil {
         }
     }
 
-    fun downloadFile(filename: String, url: String): File {
-        val file = File(getDocumentPath(filename))
-        if (!file.exists()) {
+    fun downloadDoc(filename: String, url: String, reject: Boolean = false): File {
+        return download(File(getDocumentPath(filename)), url, reject)
+    }
+
+    fun downloadImg(filename: String, url: String, reject: Boolean = false): File {
+        val image = File(getImagePath(filename))
+        return download(image, url, reject).also {
+            ContextHolder.cacheService.cacheImg(image)
+        }
+    }
+
+    private fun download(file: File, url: String, reject: Boolean): File {
+        if (!reject && !file.exists()) {
             HttpUtil.download(url, file)
         }
         return file
@@ -105,14 +117,14 @@ object BotUtil {
             pngFile.parentFile.mkdirs()
             webpFile = File(file.filePath).takeIf { it.exists() } ?: File(getImagePath("${file.fileId}.webp"))
             if (!webpFile.exists()) {
-                ContextHolder.telegramBotClient.downloadFile(file, webpFile)
+                HttpUtil.download(file, webpFile)
             }
         }
-//        val future =
-//            Runtime.getRuntime().exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
-//        future.get()
-        val webp = ImageIO.read(webpFile)
-        ImageIO.write(webp, "png", pngFile)
+        val future =
+            Runtime.getRuntime().exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
+        future.get()
+//        val webp = ImageIO.read(webpFile)
+//        ImageIO.write(webp, "png", pngFile)
         return pngFile
     }
 
@@ -120,9 +132,20 @@ object BotUtil {
         val gifFile = File(getImagePath("$id.gif"))
         if (gifFile.exists()) return gifFile
         val mp4File = File(tgFile.filePath)
-        if (!mp4File.exists()) ContextHolder.telegramBotClient.downloadFile(tgFile, mp4File)
+        if (!mp4File.exists()) HttpUtil.download(tgFile, mp4File)
         gifFile.parentFile.mkdirs()
         try {
+            val ffmpeg = FFmpeg("/path/to/ffmpeg")
+            val ffprobe = FFprobe("/path/to/ffprobe")
+            val builder = FFmpegBuilder()
+            builder.setInput(mp4File.name)
+                .overrideOutputFiles(true)
+                .addOutput(gifFile.name)
+                .setFormat("gif")
+                .disableSubtitle()
+                .done()
+
+
             val future =
                 Runtime.getRuntime().exec(String.format(MP4_TO_GIF_CMD_PATTERN, mp4File.path, gifFile.path).replace("\\", "\\\\")).onExit()
             if (future.get().exitValue() >= 0 || gifFile.exists()) return gifFile
