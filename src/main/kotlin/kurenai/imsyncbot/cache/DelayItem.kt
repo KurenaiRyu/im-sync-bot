@@ -5,7 +5,6 @@ import java.time.ZoneId
 import java.util.concurrent.Delayed
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
-import javax.validation.constraints.NotNull
 
 open class DelayItem<T> : Delayed {
     /**
@@ -36,7 +35,7 @@ open class DelayItem<T> : Delayed {
         return unit.convert(time - now(), TimeUnit.NANOSECONDS)
     }
 
-    override fun compareTo(other: @NotNull Delayed?): Int {
+    override fun compareTo(other: Delayed?): Int {
         if (other === this) { // compare zero ONLY if same object
             return 0
         }

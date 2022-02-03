@@ -2,7 +2,7 @@ package kurenai.imsyncbot.handler.tg
 
 import kurenai.imsyncbot.handler.Handler
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
-import org.telegram.telegrambots.meta.api.objects.Message
+import moe.kurenai.tdlight.model.message.Message
 
 interface TelegramHandler : Handler {
 

@@ -2,7 +2,7 @@ package kurenai.imsyncbot.telegram
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.ConstructorBinding
-import org.telegram.telegrambots.bots.DefaultBotOptions
+import java.net.Proxy
 
 /**
  * @author Kurenai
@@ -15,6 +15,6 @@ import org.telegram.telegrambots.bots.DefaultBotOptions
 class ProxyProperties {
     var host = "localhost"
     var port = 1080
-    var type = DefaultBotOptions.ProxyType.NO_PROXY
+    var type = Proxy.Type.DIRECT
     var onlyDownloadTgFile = true
 }

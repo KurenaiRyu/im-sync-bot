@@ -1,14 +1,14 @@
 package kurenai.imsyncbot.command.impl
 
-import kurenai.imsyncbot.command.AbstractCommand
+import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.UserConfig
+import moe.kurenai.tdlight.model.message.Message
+import moe.kurenai.tdlight.model.message.Update
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
-import org.telegram.telegrambots.meta.api.objects.Message
-import org.telegram.telegrambots.meta.api.objects.Update
 
 @Component
-class RemoveAdminCommand : AbstractCommand() {
+class RemoveAdminCommand : AbstractTelegramCommand() {
 
     override val command = "removeAdmin"
     override val help: String = "移除管理员"
@@ -18,7 +18,8 @@ class RemoveAdminCommand : AbstractCommand() {
     private val log = KotlinLogging.logger {}
 
     override fun execute(update: Update, message: Message): String {
-        val user = message.replyToMessage.from
+        val reply = message.replyToMessage!!
+        val user = reply.from!!
         UserConfig.removeAdmin(user.id)
         return "移除管理员成功"
     }

@@ -1,18 +1,18 @@
 package kurenai.imsyncbot.handler.qq
 
-import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
+import kurenai.imsyncbot.telegram.send
+import moe.kurenai.tdlight.exception.TelegramApiException
+import moe.kurenai.tdlight.request.message.SendMessage
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.stereotype.Component
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage
-import org.telegram.telegrambots.meta.exceptions.TelegramApiException
 import java.util.regex.Pattern
 
 @Component
@@ -26,7 +26,6 @@ class PixivHandler(private val forwardProperties: ForwardHandlerProperties) : QQ
 
     @Throws(Exception::class)
     override suspend fun onGroupMessage(event: GroupAwareMessageEvent): Int {
-        val telegramBotClient = ContextHolder.telegramBotClient
         val content = event.message.serializeToMiraiCode()
         val matcher = pattern.matcher(content)
         if (matcher.find()) {
@@ -37,8 +36,8 @@ class PixivHandler(private val forwardProperties: ForwardHandlerProperties) : QQ
             event.subject.sendMessage(artUrl)
             event.subject.sendMessage(userUrl)
             try {
-                telegramBotClient.send(SendMessage.builder().chatId(chartId).text(artUrl).build())
-                telegramBotClient.send(SendMessage.builder().chatId(chartId).text(userUrl).build())
+                SendMessage(chartId, artUrl).send()
+                SendMessage(chartId, userUrl).send()
             } catch (e: TelegramApiException) {
                 log.error(e.message, e)
             }

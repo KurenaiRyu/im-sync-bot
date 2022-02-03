@@ -1,9 +1,10 @@
 package kurenai.imsyncbot.command
 
-import org.telegram.telegrambots.meta.api.objects.Message
-import org.telegram.telegrambots.meta.api.objects.Update
+import moe.kurenai.tdlight.model.message.Message
+import moe.kurenai.tdlight.model.message.Update
 
-abstract class AbstractCommand {
+
+abstract class AbstractTelegramCommand {
 
     open val help: String = "No help information."
     open val name: String = this.javaClass.simpleName
@@ -18,7 +19,7 @@ abstract class AbstractCommand {
     open val reply: Boolean = false
 
     init {
-        DelegatingCommand.add(this)
+        DelegatingCommand.addTgHandle(this)
     }
 
     abstract fun execute(update: Update, message: Message): String?

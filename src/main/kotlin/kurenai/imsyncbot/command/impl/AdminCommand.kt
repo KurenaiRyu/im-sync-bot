@@ -1,14 +1,14 @@
 package kurenai.imsyncbot.command.impl
 
-import kurenai.imsyncbot.command.AbstractCommand
+import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.UserConfig
+import moe.kurenai.tdlight.model.message.Message
+import moe.kurenai.tdlight.model.message.Update
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
-import org.telegram.telegrambots.meta.api.objects.Message
-import org.telegram.telegrambots.meta.api.objects.Update
 
 @Component
-class AdminCommand : AbstractCommand() {
+class AdminCommand : AbstractTelegramCommand() {
 
     override val command = "admin"
     override val help: String = "设置管理员"
@@ -17,9 +17,9 @@ class AdminCommand : AbstractCommand() {
     private val log = KotlinLogging.logger {}
 
     override fun execute(update: Update, message: Message): String {
-        return if (message.isReply) {
-            val user = message.replyToMessage.from
-            UserConfig.admin(user.id, username = user.userName)
+        return if (message.isReply()) {
+            val user = message.replyToMessage!!.from!!
+            UserConfig.admin(user.id, username = user.username)
             "添加管理员成功"
         } else {
             "需要引用一条消息来找到该用户"

@@ -12,7 +12,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Lazy
-import org.telegram.telegrambots.bots.DefaultBotOptions
 
 /**
  * @author Kurenai
@@ -24,19 +23,6 @@ class BotAutoConfiguration {
     @Bean
     fun handlerHolder(@Lazy handlerList: List<Handler>): HandlerHolder {
         return HandlerHolder(handlerList)
-    }
-
-    @Bean
-    fun defaultBotOptions(proxyProperties: ProxyProperties, telegramBotProperties: TelegramBotProperties): DefaultBotOptions {
-        val botOptions = DefaultBotOptions()
-        telegramBotProperties.baseUrl.takeIf { it.isNotBlank() }?.let(botOptions::setBaseUrl)
-        if (proxyProperties.type != DefaultBotOptions.ProxyType.NO_PROXY && !proxyProperties.onlyDownloadTgFile) {
-            botOptions.proxyType = proxyProperties.type
-            botOptions.proxyHost = proxyProperties.host
-            botOptions.proxyPort = proxyProperties.port
-            botOptions.maxThreads = Runtime.getRuntime().availableProcessors() * 2
-        }
-        return botOptions
     }
 
     @Bean

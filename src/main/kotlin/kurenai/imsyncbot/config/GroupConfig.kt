@@ -1,9 +1,9 @@
 package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
+import moe.kurenai.tdlight.model.message.Message
 import okhttp3.internal.toImmutableList
 import okhttp3.internal.toImmutableMap
-import org.telegram.telegrambots.meta.api.objects.Message
 import java.io.File
 
 object GroupConfig : AbstractConfig<Group>() {
@@ -69,9 +69,9 @@ object GroupConfig : AbstractConfig<Group>() {
     fun default(message: Message) {
         val defaultGroup = configs.firstOrNull { it.status.contains(GroupStatus.DEFAULT) }
         if (defaultGroup != null) {
-            add(Group(message.chatId, tgQQ[message.chatId] ?: defaultGroup.qq, message.chat.title, defaultGroup.status))
+            add(Group(message.chat.id, tgQQ[message.chat.id] ?: defaultGroup.qq, message.chat.title!!, defaultGroup.status))
         } else {
-            add(Group(message.chatId, tgQQ[message.chatId] ?: 0L, message.chat.title, hashSetOf(GroupStatus.DEFAULT)))
+            add(Group(message.chat.id, tgQQ[message.chat.id] ?: 0L, message.chat.title!!, hashSetOf(GroupStatus.DEFAULT)))
         }
     }
 

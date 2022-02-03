@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.qq
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.config.GroupConfig
@@ -10,7 +11,9 @@ import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.handler.qq.QQForwardHandler
+import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
+import moe.kurenai.tdlight.request.message.SendMessage
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
 import net.mamoe.mirai.contact.nameCardOrNick
@@ -22,12 +25,8 @@ import net.mamoe.mirai.message.data.PlainText
 import org.springframework.beans.factory.DisposableBean
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage
 import java.io.File
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.ThreadFactory
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.system.measureTimeMillis
 
@@ -40,7 +39,7 @@ class QQBotClient(
 
     private val log = KotlinLogging.logger {}
     private val forwardHandler = handlerHolder.currentQQHandlerList.filterIsInstance<QQForwardHandler>()[0]
-    private val isRunning = true
+    val startCountDown = CountDownLatch(1)
 
     private val scope = CoroutineScope(Dispatchers.Default)
     private val handlerPool = ThreadPoolExecutor(
@@ -50,7 +49,7 @@ class QQBotClient(
             override fun newThread(r: Runnable): Thread {
                 val t = Thread(
                     Thread.currentThread().threadGroup, r,
-                    "handler-thread-" + threadNumber.getAndIncrement(),
+                    "qq-handler-" + threadNumber.getAndIncrement(),
                     0
                 )
                 if (t.isDaemon) t.isDaemon = false
@@ -151,6 +150,7 @@ class QQBotClient(
                     log.error(e) { "[message-$messageCount]${e.message}" }
                 }
             }
+            startCountDown.countDown()
         }
     }
 
@@ -189,25 +189,24 @@ class QQBotClient(
                 master.sendMessage(message).quote()
                     .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
             )
-            ContextHolder.telegramBotClient.sendAsync(
-                SendMessage.builder().chatId(BotUtil.getTgChatByQQ(event.group.id).toString()).text(event.message.contentToString())
-                    .build()
-            )
+            SendMessage(BotUtil.getTgChatByQQ(event.group.id).toString(), event.message.contentToString()).send().handle { _, case ->
+                case?.let {
+                    log.error(case) { "Report error fail." }
+                }
+            }
         }
     }
 
     private fun sendRemindMsg(event: GroupAwareMessageEvent) {
-        try {
-            if (UserConfig.masterUsername.isBlank()) return
-            val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
-            ContextHolder.telegramBotClient.sendAsync(
-                SendMessage(
-                    BotUtil.getTgChatByQQ(event.group.id).toString(),
-                    "#提醒 #id${event.sender.id} #group${event.group.id}\n @${UserConfig.masterUsername} $content"
-                )
-            )
-        } catch (e: Exception) {
-            log.error(e) { "Send remind message fail." }
+        if (UserConfig.masterUsername.isBlank()) return
+        val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
+        SendMessage(
+            BotUtil.getTgChatByQQ(event.group.id).toString(),
+            "#提醒 #id${event.sender.id} #group${event.group.id}\n @${UserConfig.masterUsername} $content"
+        ).send().handle { _, case ->
+            case?.let {
+                log.error(case) { "Send remind message fail." }
+            }
         }
     }
 

@@ -2,9 +2,9 @@ package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
+import moe.kurenai.tdlight.model.message.Message
 import okhttp3.internal.toImmutableList
 import okhttp3.internal.toImmutableMap
-import org.telegram.telegrambots.meta.api.objects.Message
 import java.io.File
 
 object UserConfig : AbstractConfig<User>() {
@@ -151,15 +151,15 @@ object UserConfig : AbstractConfig<User>() {
         afterUpdate()
     }
 
-    fun master(message: Message) {
-        master(User(message.from.id, masterQQ, message.from.userName, chatId = message.chatId))
+    fun setMaster(message: Message) {
+        setMaster(User(message.from?.id, masterQQ, message.from?.username, chatId = message.chat.id))
     }
 
-    fun master(properties: ForwardHandlerProperties) {
-        master(User(properties.masterOfTg[0], properties.masterOfQq[0]))
+    fun setMaster(properties: ForwardHandlerProperties) {
+        setMaster(User(properties.masterOfTg[0], properties.masterOfQq[0]))
     }
 
-    fun master(user: User) {
+    fun setMaster(user: User) {
         if (!user.status.contains(UserStatus.MASTER)) user.status.add(UserStatus.MASTER)
         val master = configs.firstOrNull { it.status.contains(UserStatus.MASTER) }
         if (master == null) {

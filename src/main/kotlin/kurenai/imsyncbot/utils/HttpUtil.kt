@@ -4,7 +4,8 @@ import io.ktor.util.network.*
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import mu.KotlinLogging
-import org.apache.http.HttpHeaders
+import org.apache.logging.log4j.LogManager
+import org.springframework.http.HttpHeaders
 import java.io.File
 import java.io.InputStream
 import java.io.RandomAccessFile
@@ -37,8 +38,8 @@ object HttpUtil {
             }
         })
 
-    fun download(tgFile: org.telegram.telegrambots.meta.api.objects.File, file: File): File {
-        return download(tgFile.getFileUrl(ContextHolder.telegramBotClient.botToken), file, true)
+    fun download(tgFile: moe.kurenai.tdlight.model.media.File, file: File): File {
+        return download(tgFile.getFileUrl(ContextHolder.telegramBot.token), file, true)
     }
 
     fun download(url: String, file: File, enableProxy: Boolean = false): File {
@@ -116,6 +117,7 @@ object HttpUtil {
                     .build(),
                 HttpResponse.BodyHandlers.ofInputStream())
             .thenAccept { response ->
+                val log = LogManager.getLogger()
                 response.body().write(file, offset)
                 response.headers().firstValue(HttpHeaders.CONTENT_RANGE).ifPresent { contentRange ->
                     val range = contentRange.substringBefore("/").replace("bytes ", "")
@@ -126,11 +128,11 @@ object HttpUtil {
                     val sizeOfMb = (right - left) / 1024.0 / 1024
                     val timeOfSeconds = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) / 1000.0
                     val speed = sizeOfMb / timeOfSeconds
-                    log.debug {
+                    log.debug(
                         "Downloaded ${file.name.substringBeforeLast(".")} part of $range ${String.format("%.3f", sizeOfMb)} MB in ${
                             String.format("%.2f", timeOfSeconds)
                         } s (${String.format("%.2f", speed)} MB/s)"
-                    }
+                    )
                 }
             }
     }

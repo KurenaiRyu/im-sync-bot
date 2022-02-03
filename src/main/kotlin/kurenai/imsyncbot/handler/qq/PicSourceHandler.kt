@@ -1,12 +1,15 @@
 package kurenai.imsyncbot.handler.qq
 
-import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.telegram.send
+import moe.kurenai.tdlight.model.media.InputFile
+import moe.kurenai.tdlight.model.message.ParseMode
+import moe.kurenai.tdlight.request.message.SendPhoto
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.message.data.Image
@@ -17,9 +20,6 @@ import net.mamoe.mirai.message.data.RichMessage
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.stereotype.Component
-import org.telegram.telegrambots.meta.api.methods.ParseMode
-import org.telegram.telegrambots.meta.api.methods.send.SendPhoto
-import org.telegram.telegrambots.meta.api.objects.InputFile
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -58,10 +58,10 @@ class PicSourceHandler(
         val chartId = qqTg[event.subject.id] ?: GroupConfig.defaultTgGroup
         val caption = "[SAUCE\\_NAO](${sauce_nao})\n[ASCII2D](${asscii2d})"
         try {
-            ContextHolder.telegramBotClient.send(
-                SendPhoto.builder().chatId(chartId.toString()).caption(caption).photo(InputFile(url)).parseMode(ParseMode.MARKDOWNV2)
-                    .build()
-            )
+            SendPhoto(chartId.toString(), InputFile(url)).apply {
+                this.caption = caption
+                this.parseMode = ParseMode.MARKDOWN_V2
+            }.send()
         } catch (e: Exception) {
             log.debug("caption: $caption")
             log.error(e.message, e)

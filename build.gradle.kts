@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.springframework.boot") version "2.6.2"
+    id("org.springframework.boot") version "3.0.0-M1"
     id("io.spring.dependency-management") version "1.0.11.RELEASE"
 //    id("org.springframework.experimental.aot") version "0.11.1"
     kotlin("jvm") version "1.6.10"
@@ -18,6 +18,7 @@ java.sourceCompatibility = JavaVersion.VERSION_17
 
 repositories {
     mavenLocal()
+    maven { url = uri("https://repo.spring.io/milestone") }
     maven { url = uri("https://maven.aliyun.com/repository/public/") }
     maven { url = uri("https://maven.aliyun.com/repository/spring/") }
     maven { url = uri("https://repo.spring.io/release") }
@@ -39,8 +40,8 @@ dependencies {
     }
     implementation("net.mamoe", "mirai-core-utils-jvm", miraiVersion)
 
-    //telegram
-    implementation("org.telegram", "telegrambots-spring-boot-starter", "5.6.0")
+    //td-light-sdk
+    implementation("moe.kurenai.tdlight", "td-light-sdk", "0.0.1")
 
     //spring
     implementation("org.springframework.boot", "spring-boot-starter")
@@ -48,8 +49,6 @@ dependencies {
 
     //logging
     implementation("org.apache.logging.log4j:log4j-to-slf4j:2.17.0")
-
-    implementation("io.netty", "netty-tcnative-boringssl-static", "2.0.0.Final")
 
     //kotlin
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
@@ -61,13 +60,12 @@ dependencies {
     implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")
     implementation("com.fasterxml.jackson.dataformat", "jackson-dataformat-xml")
     implementation("org.apache.commons", "commons-lang3")
-    implementation("com.google.guava:guava:31.0.1-jre")
+    implementation("org.apache.commons:commons-io:1.3.2")
     implementation("com.esotericsoftware", "kryo", "5.1.1")
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
     implementation("io.github.kurenairyu", "simple-cache", "1.1.0")
-    implementation("net.bramp.ffmpeg", "ffmpeg", "0.6.2")
 
-    testImplementation("org.springframework.boot:spring-boot-starter-test:2.6.2")
+    testImplementation("org.springframework.boot:spring-boot-starter-test:3.0.0-M1")
 }
 
 application {

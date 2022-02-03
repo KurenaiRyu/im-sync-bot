@@ -1,17 +1,17 @@
 package kurenai.imsyncbot.callback.impl
 
-import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.handler.tg.TgForwardHandler
 import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.telegram.send
+import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
+import moe.kurenai.tdlight.model.keyboard.InlineKeyboardMarkup
+import moe.kurenai.tdlight.model.message.Message
+import moe.kurenai.tdlight.model.message.Update
+import moe.kurenai.tdlight.request.message.DeleteMessage
+import moe.kurenai.tdlight.request.message.EditMessageText
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText
-import org.telegram.telegrambots.meta.api.objects.Message
-import org.telegram.telegrambots.meta.api.objects.Update
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton
 
 @Component
 class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwardHandler) : Callback() {
@@ -21,40 +21,37 @@ class RetryCallback(val cacheService: CacheService, val forwardHandler: TgForwar
     override val method: String = "retry"
 
     override fun handle0(update: Update, message: Message): Int {
-        val client = ContextHolder.telegramBotClient
 
-        val originMessage = cacheService.getTg(message.chatId, message.replyToMessage.messageId)
+        val originMessage = cacheService.getTg(message.chat.id, message.replyToMessage?.messageId!!)
         if (originMessage == null) {
-            client.send(EditMessageText("转发失败：缓存中无法找到该条消息，无法重试").apply {
-                this.chatId = chatId
-                this.messageId = messageId
-            })
+            EditMessageText("转发失败：缓存中无法找到该条消息，无法重试").apply {
+                this.chatId = message.chatId
+                this.messageId = message.messageId
+            }.send()
             return END
         }
 
-        val messageId = message.messageId
+        val messageId = message.messageId!!
         val chatId = message.chatId.toString()
         val retryMsg = "${message.text}\n\n正在重试..."
-        client.send(EditMessageText(retryMsg).apply {
+        EditMessageText(retryMsg).apply {
             this.chatId = chatId
             this.messageId = messageId
-        })
+        }.send()
 
         try {
             suspend {
                 forwardHandler.onMessage(originMessage)
             }
-            client.send(DeleteMessage(chatId, messageId))
+            DeleteMessage(chatId, messageId).send()
         } catch (e: Exception) {
             log.error(e) { e.message }
-            client.send(EditMessageText("#转发失败\n${e.message}").apply {
+            EditMessageText("#转发失败\n${e.message}").apply {
                 this.chatId = chatId
                 this.messageId = messageId
                 this.replyMarkup =
-                    InlineKeyboardMarkup().apply {
-                        this.keyboard = listOf(listOf(InlineKeyboardButton("重试").apply { this.callbackData = "retry" }))
-                    }
-            })
+                    InlineKeyboardMarkup(listOf(listOf(InlineKeyboardButton("重试").apply { this.callbackData = "retry" })))
+            }.send()
         }
 
         return END

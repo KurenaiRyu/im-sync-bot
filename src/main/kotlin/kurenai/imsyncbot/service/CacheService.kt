@@ -4,15 +4,17 @@ import io.ktor.http.*
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.entity.FileCache
 import kurenai.imsyncbot.entity.MessageSourceCache
+import kurenai.imsyncbot.telegram.send
+import moe.kurenai.tdlight.model.message.Message
+import moe.kurenai.tdlight.request.message.GetMessageInfo
 import mu.KotlinLogging
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceBuilder
 import net.mamoe.mirai.message.data.OnlineMessageSource
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Service
-import org.telegram.telegrambots.meta.api.methods.GetMessageInfo
-import org.telegram.telegrambots.meta.api.objects.Message
 import java.io.File
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 
@@ -81,7 +83,7 @@ class CacheService(
     }
 
     fun getQQIdByTg(message: Message): Int? {
-        return getQQIdByTg(message.chatId, message.messageId)
+        return getQQIdByTg(message.chat.id, message.messageId!!)
     }
 
     fun getQQIdByTg(chatId: Long, messageId: Int): Int? {
@@ -118,7 +120,7 @@ class CacheService(
     }
 
     fun getQQByTg(message: Message): MessageSource? {
-        val msgId = getQQIdByTg(message.chatId, message.messageId)
+        val msgId = getQQIdByTg(message.chat.id, message.messageId!!)
         return if (msgId == null) {
             log.debug { "QQ msg id not found by ${message.chatId}/${message.messageId}" }
             null
@@ -138,17 +140,18 @@ class CacheService(
     }
 
     fun getTg(message: Message): Message? {
-        return getTg(message.chatId, message.messageId)
+        return getTg(message.chat.id, message.messageId!!)
     }
 
     fun getTg(chatId: Long, messageId: Int): Message? {
-        return cache.get(TG_MSG_CACHE_KEY, getTgCacheId(chatId, messageId)) ?: getOnlineTg(chatId.toString(), messageId)
+        return cache.get(TG_MSG_CACHE_KEY, getTgCacheId(chatId, messageId)) ?: getOnlineTg(chatId.toString(), messageId)?.join()
     }
 
-    fun getOnlineTg(chatId: String?, messageId: Int): Message? {
+    fun getOnlineTg(chatId: String?, messageId: Int): CompletableFuture<Message>? {
         if (chatId == null) return null
-        return ContextHolder.telegramBotClient.send(GetMessageInfo(chatId, messageId))?.also {
+        return GetMessageInfo(chatId, messageId).send().thenApply {
             cache(it)
+            return@thenApply it
         }
     }
 

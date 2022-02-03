@@ -10,11 +10,11 @@ import org.apache.commons.io.filefilter.SizeFileFilter
 import org.apache.commons.lang3.time.DateUtils
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
-import org.telegram.telegrambots.bots.DefaultBotOptions
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.util.*
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.timerTask
 
 @Component
@@ -37,19 +37,8 @@ class BotInitializer(
     }
 
     private fun configProxy() {
-        HttpUtil.PROXY = when (proxyProperties.type) {
-            DefaultBotOptions.ProxyType.HTTP -> {
-                Proxy(Proxy.Type.HTTP, InetSocketAddress(proxyProperties.host, proxyProperties.port))
-            }
-            DefaultBotOptions.ProxyType.SOCKS4 -> {
-                Proxy(Proxy.Type.SOCKS, InetSocketAddress(proxyProperties.host, proxyProperties.port))
-            }
-            DefaultBotOptions.ProxyType.SOCKS5 -> {
-                Proxy(Proxy.Type.SOCKS, InetSocketAddress(proxyProperties.host, proxyProperties.port))
-            }
-            else -> {
-                null
-            }
+        if (proxyProperties.type != Proxy.Type.DIRECT) {
+            HttpUtil.PROXY = Proxy(proxyProperties.type, InetSocketAddress(proxyProperties.host, proxyProperties.port))
         }
     }
 
@@ -60,19 +49,20 @@ class BotInitializer(
             val filesToDelete = ArrayList<File>()
             cacheDir.listFiles()?.forEach { file ->
                 if (file.isDirectory) {
-                    filesToDelete.addAll(FileUtils.listFiles(file, AgeFileFilter(oldestAllowedFileDate), null))
+                    filesToDelete.addAll(FileUtils.listFiles(file, AgeFileFilter(oldestAllowedFileDate), null) as Collection<File>)
                 }
             }
             filesToDelete.removeIf { cacheService.imgExists(it.name) }
             doDeleteCacheFile(filesToDelete)
-        }, 5000L, 30 * 60 * 60 * 1000L)
+        }, 5000L, TimeUnit.MINUTES.toMillis(30))
 
         clearLargeCacheTimer.scheduleAtFixedRate(timerTask {
-            if (FileUtils.sizeOf(cacheDir) > largeDirSize) {
+            if (FileUtils.sizeOfDirectory(cacheDir) > largeDirSize) {
                 val filesToDelete = ArrayList<File>()
                 cacheDir.listFiles()?.forEach { file ->
                     if (file.isDirectory) {
-                        filesToDelete.addAll(FileUtils.listFiles(file, SizeFileFilter(largeFileSize), null).filter { !it.name.endsWith(".part") })
+                        val listFiles = FileUtils.listFiles(file, SizeFileFilter(largeFileSize), null) as Collection<File>
+                        filesToDelete.addAll(listFiles.filter { it.name.endsWith(".part") })
                     }
                 }
                 doDeleteCacheFile(filesToDelete)
@@ -83,10 +73,11 @@ class BotInitializer(
             val oldestAllowedFileDate = DateUtils.addMinutes(Date(), -10)
             cacheDir.listFiles()?.forEach { file ->
                 if (file.isDirectory) {
-                    filesToDelete.addAll(FileUtils.listFiles(file, AgeFileFilter(oldestAllowedFileDate), null).filter { it.name.endsWith(".part") })
+                    val listFiles = FileUtils.listFiles(file, AgeFileFilter(oldestAllowedFileDate), null) as Collection<File>
+                    filesToDelete.addAll(listFiles.filter { it.name.endsWith(".part") })
                 }
             }
-        }, 1000L, 20 * 60 * 1000L)
+        }, 1000L, TimeUnit.MINUTES.toMillis(30))
     }
 
     private fun doDeleteCacheFile(filesToDelete: ArrayList<File>) {
@@ -95,7 +86,7 @@ class BotInitializer(
             log.info { "Clearing cache files..." }
             filesToDelete.forEach {
                 log.debug { "${it.name} deleted." }
-                FileUtils.deleteQuietly(it)
+                it.delete()
             } //I don't want an exception if a file is not deleted. Otherwise use filesToDelete.next().delete() in a try/catch
             log.info { "Clear ${filesToDelete.size} cache files." }
         }

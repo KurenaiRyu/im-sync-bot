@@ -1,11 +1,11 @@
 package kurenai.imsyncbot.callback
 
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.telegram.send
+import moe.kurenai.tdlight.model.message.Message
+import moe.kurenai.tdlight.model.message.Update
+import moe.kurenai.tdlight.request.message.SendMessage
 import mu.KotlinLogging
-import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage
-import org.telegram.telegrambots.meta.api.objects.Message
-import org.telegram.telegrambots.meta.api.objects.Update
 import java.util.concurrent.TimeUnit
 
 abstract class Callback {
@@ -33,7 +33,7 @@ abstract class Callback {
         } finally {
             try {
                 if (result % 100 / 10 != WITHOUT_ANSWER) {
-                    ContextHolder.telegramBotClient.send(AnswerCallbackQuery(update.callbackQuery.id))
+//                    ContextHolder.telegramBotClient.send(AnswerCallbackQuery(update.callbackQuery.id))
                 }
             } catch (e: Exception) {
                 log.warn { e.message }
@@ -44,7 +44,7 @@ abstract class Callback {
     abstract fun handle0(update: Update, message: Message): Int
 
     open fun match(update: Update): Boolean {
-        return match(update.callbackQuery.data).also {
+        return match(update.callbackQuery?.data ?: "").also {
             if (it) {
                 log.debug { "Match ${this.name} callback" }
             }
@@ -56,21 +56,21 @@ abstract class Callback {
     }
 
     fun getBody(update: Update): String {
-        return update.callbackQuery.data.substringAfter(" ")
+        return update.callbackQuery?.data?.substringAfter(" ") ?: ""
     }
 
     fun waitForMsg(update: Update, message: Message): Update? {
-        val client = ContextHolder.telegramBotClient
-        var lock = client.nextMsgLock[message.chatId]
+        val client = ContextHolder.telegramBot
+        var lock = client.nextMsgLock[message.chat.id]
         if (lock == null) {
             lock = Object()
-            client.nextMsgLock.putIfAbsent(message.chatId, lock)?.let { lock = it }
+            client.nextMsgLock.putIfAbsent(message.chat.id, lock)?.let { lock = it }
         }
         synchronized(lock!!) {
             lock!!.wait(TimeUnit.SECONDS.toMillis(30))
         }
-        return client.nextMsgUpdate.remove(message.chatId) ?: run {
-            client.send(SendMessage(message.chatId.toString(), "等待消息超时"))
+        return client.nextMsgUpdate.remove(message.chat.id) ?: run {
+            SendMessage(message.chatId.toString(), "等待消息超时").send()
             null
         }
     }

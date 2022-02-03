@@ -11,6 +11,6 @@ class ForwardHandlerInitializer(
     override fun afterPropertiesSet() {
         GroupConfig.defaultQQGroup = properties.group.defaultQQ
         GroupConfig.defaultTgGroup = properties.group.defaultTelegram
-        UserConfig.master(properties)
+        UserConfig.setMaster(properties)
     }
 }
