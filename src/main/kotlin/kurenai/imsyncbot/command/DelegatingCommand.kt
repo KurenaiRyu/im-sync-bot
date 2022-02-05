@@ -67,8 +67,15 @@ object DelegatingCommand {
         }
     }
 
-    fun execute(event: MessageEvent) {
-
+    fun execute(event: MessageEvent): Int {
+        var matched = false
+        for (handler in qqHandlers) {
+            if (handler.execute(event) == 1) {
+                matched = true
+                break
+            }
+        }
+        return if (matched) 1 else 0
     }
 
     fun addTgHandle(handler: AbstractTelegramCommand) {

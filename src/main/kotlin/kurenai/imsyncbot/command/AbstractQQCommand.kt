@@ -9,6 +9,6 @@ abstract class AbstractQQCommand {
     }
 
 
-    abstract fun execute(event: MessageEvent)
+    abstract fun execute(event: MessageEvent): Int
 
 }

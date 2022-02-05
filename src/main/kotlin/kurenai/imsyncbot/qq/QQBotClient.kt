@@ -4,6 +4,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.CancellationException
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
+import kurenai.imsyncbot.command.DelegatingCommand
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
@@ -128,7 +129,7 @@ class QQBotClient(
                         is MessageEvent -> {
                             CoroutineScope(handlerScope).launch {
                                 measureTimeMillis {
-                                    handle(event)
+                                    if (DelegatingCommand.execute(event) == 0) handle(event)
                                 }.let {
                                     log.debug { "message-$c ${it}ms" }
                                 }

@@ -8,6 +8,7 @@ import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.config.UserStatus
 import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.ParseMode
 import moe.kurenai.tdlight.model.message.Update
@@ -60,7 +61,7 @@ class LinkCommand(
                     SendMessage(message.chatId, "请到qq群回复提示消息`accept`进行确认").apply {
                         replyToMessageId = message.messageId
                         parseMode = ParseMode.MARKDOWN_V2
-                    }
+                    }.send()
                     val msgId = receipt.source.ids[0]
                     holdLinks[msgId] = qqMsg.fromId to message
 
@@ -68,7 +69,7 @@ class LinkCommand(
                         holdLinks.remove(msgId)?.let {
                             SendMessage(message.chatId, "已超时").apply {
                                 replyToMessageId = message.messageId
-                            }
+                            }.send()
                             CoroutineScope(Dispatchers.Default).launch {
                                 qqGroup.sendMessage(receipt.quote().plus("已超时"))
                             }

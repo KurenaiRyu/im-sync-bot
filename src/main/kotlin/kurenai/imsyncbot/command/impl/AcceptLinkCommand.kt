@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.command.AbstractQQCommand
 import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.request.message.SendMessage
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.event.events.MessageEvent
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Component
 @Component
 class AcceptLinkCommand : AbstractQQCommand() {
 
-    override fun execute(event: MessageEvent) {
+    override fun execute(event: MessageEvent): Int {
         CoroutineScope(Dispatchers.Default).launch {
             val group = event.subject as Group
             event.message[QuoteReply.Key]?.let { LinkCommand.holdLinks[it.source.ids[0]] }?.takeIf { it.first == event.sender.id }?.let { p ->
@@ -25,10 +26,11 @@ class AcceptLinkCommand : AbstractQQCommand() {
                     group.sendMessage(event.message.quote().plus("绑定成功"))
                     SendMessage(p.second.chatId, "绑定成功").apply {
                         replyToMessageId = p.second.messageId
-                    }
+                    }.send()
                 }
             }
         }
+        return 1
     }
 
 
