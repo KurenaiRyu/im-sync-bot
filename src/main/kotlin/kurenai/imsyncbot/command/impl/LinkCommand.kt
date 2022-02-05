@@ -9,6 +9,7 @@ import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.config.UserStatus
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
+import kurenai.imsyncbot.telegram.sendSync
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.ParseMode
 import moe.kurenai.tdlight.model.message.Update
@@ -25,7 +26,7 @@ class LinkCommand(
 ) : AbstractTelegramCommand() {
 
     companion object {
-        val holdLinks = HashMap<Int, Pair<Long, Message>>()
+        val holdLinks = HashMap<Int, Pair<Long, List<Message>>>()
     }
 
     override val command = "link"
@@ -57,13 +58,13 @@ class LinkCommand(
         } else {
             val qqGroup = ContextHolder.qqBot.getGroup(qqMsg.targetId) ?: return "找不到QQ群信息"
             CoroutineScope(Dispatchers.Default).launch {
-                qqGroup.sendMessage(At(qqMsg.fromId).plus("【${message.from?.firstName ?: "First name not found"}】准备链接，回复此条消息 accept 完成绑定。不是请无视该信息。")).also { receipt ->
-                    SendMessage(message.chatId, "请到qq群回复提示消息`accept`进行确认").apply {
+                qqGroup.sendMessage(At(qqMsg.fromId).plus("【${message.from?.firstName ?: "First name not found"}】准备绑定，回复此条消息 accept 完成绑定。不是请无视该信息。")).also { receipt ->
+                    val tips = SendMessage(message.chatId, "请到qq群回复提示消息`accept`进行确认").apply {
                         replyToMessageId = message.messageId
                         parseMode = ParseMode.MARKDOWN_V2
-                    }.send()
+                    }.sendSync()
                     val msgId = receipt.source.ids[0]
-                    holdLinks[msgId] = qqMsg.fromId to message
+                    holdLinks[msgId] = qqMsg.fromId to listOf(message, tips)
 
                     timer.schedule(timerTask {
                         holdLinks.remove(msgId)?.let {

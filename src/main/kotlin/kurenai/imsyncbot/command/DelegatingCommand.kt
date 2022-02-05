@@ -67,7 +67,7 @@ object DelegatingCommand {
         }
     }
 
-    fun execute(event: MessageEvent): Int {
+    suspend fun execute(event: MessageEvent): Int {
         var matched = false
         for (handler in qqHandlers) {
             if (handler.execute(event) == 1) {

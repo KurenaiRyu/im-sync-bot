@@ -12,7 +12,6 @@ import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.service.TelegramId
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.telegram.sendSync
 import kurenai.imsyncbot.utils.BotUtil
@@ -40,7 +39,7 @@ import kotlin.math.min
 
 @Component
 class QQForwardHandler(
-    final val properties: ForwardHandlerProperties,
+    val properties: ForwardHandlerProperties,
     private val cacheService: CacheService,
 ) : QQHandler {
 
@@ -166,7 +165,7 @@ class QQForwardHandler(
 
         val client = ContextHolder.telegramBot
         val source = messageChain[OnlineMessageSource.Key]
-        val replyId = messageChain[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getTelegramIdByQQ(it) }
+        val replyId = messageChain[QuoteReply.Key]?.let { cacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }
         val atAccount = AtomicLong(-100)
         var content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it, replyId != null) }
 
@@ -249,20 +248,20 @@ class QQForwardHandler(
                         sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, source)
                     } else if (image.imageId.endsWith(".gif")) {
                         SendAnimation(chatId, inputFile).apply {
-                            replyToMessageId = replyId?.messageId
+                            replyToMessageId = replyId?.second
                             caption = msg
                             thumb = inputFile
                         }.sendSync()
                     } else {
                         if (sendByFile) {
                             SendDocument(chatId, inputFile).apply {
-                                replyToMessageId = replyId?.messageId
+                                replyToMessageId = replyId?.second
                                 caption = msg
                                 thumb = inputFile
                             }.sendSync()
                         } else {
                             SendPhoto(chatId, inputFile).apply {
-                                replyToMessageId = replyId?.messageId
+                                replyToMessageId = replyId?.second
                                 caption = msg
                             }.sendSync()
                         }
@@ -322,7 +321,7 @@ class QQForwardHandler(
             }
         } else {
             SendMessage(chatId, msg).apply {
-                replyToMessageId = replyId?.messageId
+                replyToMessageId = replyId?.second
             }.sendSync().also { m ->
                 source?.let { cacheService.cache(source, m) }
             }
@@ -435,7 +434,7 @@ class QQForwardHandler(
         }
     }
 
-    private suspend fun sendGroupMedias(chatId: String, replyId: TelegramId?, medias: List<InputMediaPhoto>, source: OnlineMessageSource?) {
+    private suspend fun sendGroupMedias(chatId: String, replyId: Pair<Long, Int>?, medias: List<InputMediaPhoto>, source: OnlineMessageSource?) {
         if (medias.isEmpty()) return
         val mediaGroups = ArrayList<List<InputMediaPhoto>>()
         var offset = 0
@@ -454,14 +453,14 @@ class QQForwardHandler(
             try {
                 if (list.size > 1) {
                     SendMediaGroup(chatId).apply {
-                        this.replyToMessageId = replyId?.messageId
+                        this.replyToMessageId = replyId?.second
                         this.media = list
                     }.sendSync().also { result ->
                         source?.let { source -> cacheService.cache(source, result[0]) }
                     }
                 } else if (list.size == 1) {
                     SendPhoto(chatId, list[0].media).apply {
-                        this.replyToMessageId = replyId?.messageId
+                        this.replyToMessageId = replyId?.second
                         this.caption = list[0].caption
                     }.sendSync().also { result ->
                         source?.let { source -> cacheService.cache(source, result) }
@@ -477,7 +476,7 @@ class QQForwardHandler(
 
     private suspend fun sendSimpleMedia(
         chatId: String,
-        replyId: TelegramId?,
+        replyId: Pair<Long, Int>?,
         urls: List<String>,
         msg: String?,
         source: OnlineMessageSource?,
@@ -488,7 +487,7 @@ class QQForwardHandler(
             urlStr += "[${mask.format2Markdown()}](${url.format2Markdown()})\n"
         }
         return SendMessage(chatId, "${msg?.format2Markdown()}$urlStr").apply {
-            this.replyToMessageId = replyId?.messageId
+            this.replyToMessageId = replyId?.second
             this.parseMode = ParseMode.MARKDOWN_V2
         }.sendSync().also { rec ->
             source?.let { source -> cacheService.cache(source, rec) }

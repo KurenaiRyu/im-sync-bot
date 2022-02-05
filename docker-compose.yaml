@@ -1,12 +1,12 @@
 version: '3.5'
 services:
   bot:
-#    build: .
-    image: kurenai9/im-sync-bot:nightly
+#    build: .  #自行打包镜像则去除该注释
+    image: kurenai9/im-sync-bot:1.0.0
     container_name: bot
     restart: always
     environment:
-      #      BASE_URL: "http://api:8081/bot"
+#      BASE_URL: "http://api:8081/bot" #本地api配置
       REDIS_HOST: "redis"
     # 调整时区
     # entrypoint: ["java", "-jar", "-Dspring.config.location=config.yaml", "-XX:+UseZGC", "-Duser.timezone=GMT+08", "./bot.jar"]
@@ -33,22 +33,23 @@ services:
     volumes:
       - ./redis-data:/usr/local/etc/redis
 
-  api:
-    image: aiogram/telegram-bot-api
-    container_name: tg-api
-    restart: always
-    environment:
-      TELEGRAM_API_ID: YOUR_API_ID
-      TELEGRAM_API_HASH: YOUR_API_HASH
-      TELEGRAM_STAT: 1
-      TELEGRAM_LOCAL: 1
-      TELEGRAM_VERBOSITY: 4
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "200m"
-        max-file: "3"
-    ports:
-      - 8081-8082:8081-8082
-    volumes:
-      - ./api-data:/var/lib/telegram-bot-api
+#  需要本地api则去除注释
+#  api:
+#    image: aiogram/telegram-bot-api
+#    container_name: tg-api
+#    restart: always
+#    environment:
+#      TELEGRAM_API_ID: YOUR_API_ID
+#      TELEGRAM_API_HASH: YOUR_API_HASH
+#      TELEGRAM_STAT: 1
+#      TELEGRAM_LOCAL: 1
+#      TELEGRAM_VERBOSITY: 4
+#    logging:
+#      driver: "json-file"
+#      options:
+#        max-size: "200m"
+#        max-file: "3"
+#    ports:
+#      - 8081-8082:8081-8082
+#    volumes:
+#      - ./api-data:/var/lib/telegram-bot-api

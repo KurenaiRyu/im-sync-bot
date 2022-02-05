@@ -67,7 +67,7 @@ class PrivateChatHandler(
     }
 
     suspend fun onFriendMessage(friend: Friend, chain: MessageChain, isSync: Boolean = false) {
-        var replyMsgId = chain[QuoteReply.Key]?.source?.ids?.get(0)?.let { cacheService.getTelegramIdByQQ(it) }?.messageId
+        var replyMsgId = chain[QuoteReply.Key]?.let { cacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }?.second
         if (replyMsgId == null) {
             replyMsgId = getStartMsg(friend) ?: return
         }
