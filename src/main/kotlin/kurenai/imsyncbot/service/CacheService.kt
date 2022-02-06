@@ -90,7 +90,7 @@ class CacheService(
     }
 
     fun getTgIdByQQ(group: Long, id: Int): Pair<Long, Int>? {
-        return cache.get<Int, String?>(QQ_TG_MSG_ID_CACHE_KEY, id)?.splitCacheId()
+        return cache.get<String, String?>(QQ_TG_MSG_ID_CACHE_KEY, getQQCacheId(group, id))?.splitCacheId()
     }
 
     fun getQQ(group: Long, id: Int): MessageSource? {

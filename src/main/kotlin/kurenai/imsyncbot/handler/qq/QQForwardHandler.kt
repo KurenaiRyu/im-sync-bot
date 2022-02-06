@@ -39,7 +39,7 @@ import kotlin.math.min
 
 @Component
 class QQForwardHandler(
-    val properties: ForwardHandlerProperties,
+    final val properties: ForwardHandlerProperties,
     private val cacheService: CacheService,
 ) : QQHandler {
 
@@ -163,9 +163,9 @@ class QQForwardHandler(
         val rejectPic = GroupConfig.picBannedGroups.contains(group.id)
         if (rejectPic) log.debug { "Reject picture" }
 
-        val client = ContextHolder.telegramBot
         val source = messageChain[OnlineMessageSource.Key]
         val replyId = messageChain[QuoteReply.Key]?.let { cacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }
+
         val atAccount = AtomicLong(-100)
         var content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it, replyId != null) }
 
