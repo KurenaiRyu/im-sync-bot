@@ -20,6 +20,7 @@ import moe.kurenai.tdlight.exception.TelegramApiException
 import moe.kurenai.tdlight.model.media.InputFile
 import moe.kurenai.tdlight.model.message.ParseMode
 import moe.kurenai.tdlight.request.message.*
+import moe.kurenai.tdlight.util.MarkdownUtil.fm2md
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.*
 import net.mamoe.mirai.contact.file.AbsoluteFileFolder.Companion.extension
@@ -194,6 +195,7 @@ class QQForwardHandler(
         if (chatId.isBlank() || chatId == "0") return CONTINUE
         val count = messageChain.filterIsInstance<Image>().count()
         if (count > 1) {
+            val mediaUrls = ArrayList<String>()
             val medias = messageChain.filterIsInstance<Image>()
                 .map { image ->
                     cacheService.getFile(image.imageId)?.let {
@@ -201,13 +203,16 @@ class QQForwardHandler(
                     }
 
                     val url = image.queryUrl()
+                    mediaUrls.add(url)
                     InputMediaPhoto(InputFile(BotUtil.downloadImg(image.imageId, url)))
-                }.let { ArrayList(it) }
+                }.let {
+                    ArrayList(it)
+                }
             if (medias.isNotEmpty()) {
                 medias[0].caption = msg
 
                 if (rejectPic) {
-                    sendSimpleMedia(chatId, replyId, medias.map { it.media.fileName!! }, msg, source)
+                    sendSimpleMedia(chatId, replyId, mediaUrls, msg, source)
                 } else {
                     val gifMedias = ArrayList<InputMediaPhoto>()
                     for (i in 0 until medias.size) {
@@ -219,8 +224,8 @@ class QQForwardHandler(
                         if (medias.isNotEmpty()) sendGroupMedias(chatId, replyId, medias, source)
                         if (gifMedias.isNotEmpty()) sendGroupMedias(chatId, replyId, gifMedias, source)
                     } catch (e: Exception) {
-                        log.error(e) { e.message }
-                        sendSimpleMedia(chatId, replyId, medias.map { it.media.fileName!! }, msg, source)
+                        log.error(e) { "Send image fall back to send simple media." }
+                        sendSimpleMedia(chatId, replyId, mediaUrls, msg, source)
                     }
                 }
             }
@@ -273,7 +278,7 @@ class QQForwardHandler(
                             caption = msg
                         }.sendSync()
                     } catch (e: Exception) {
-                        log.error(e) { "Send image fall back to send document fail." }
+                        log.error(e) { "Send image fall back to send simple media." }
                         sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, source)
                     }
                 }.also { m ->
@@ -314,7 +319,7 @@ class QQForwardHandler(
             voice?.urlForDownload?.let { url ->
                 val file = BotUtil.downloadDoc(voice.filename, url)
                 try {
-                    SendVoice(chatId, InputFile(file)).sendSync()
+                    SendDocument(chatId, InputFile(file)).sendSync()
                 } catch (e: Exception) {
                     sendSimpleMedia(chatId, replyId, listOf(url), msg, source, "语音")
                 }
@@ -486,7 +491,7 @@ class QQForwardHandler(
         for (url in urls) {
             urlStr += "[${mask.format2Markdown()}](${url.format2Markdown()})\n"
         }
-        return SendMessage(chatId, "${msg?.format2Markdown()}$urlStr").apply {
+        return SendMessage(chatId, "${msg?.fm2md()}$urlStr").apply {
             this.replyToMessageId = replyId?.second
             this.parseMode = ParseMode.MARKDOWN_V2
         }.sendSync().also { rec ->
