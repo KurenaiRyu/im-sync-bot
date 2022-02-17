@@ -499,7 +499,7 @@ class QQForwardHandler(
         }
     }
 
-    private fun cacheMsg(source: OnlineMessageSource?, recMsg: moe.kurenai.tdlight.model.message.Message, inputFile: InputFile? = null, qqFileId: String = "", imageSize: Long = 0L) {
+    private fun cacheMsg(source: OnlineMessageSource?, recMsg: moe.kurenai.tdlight.model.message.Message, inputFile: InputFile? = null, qqFileId: String, imageSize: Long = 0L) {
         if (inputFile != null && inputFile.isNew) {
             when {
                 recMsg.hasDocument() -> {

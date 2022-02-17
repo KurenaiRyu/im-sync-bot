@@ -113,7 +113,7 @@ class QQBotClient(
 
             filter.subscribeAlways<Event> { event ->
                 try {
-                    messageCount = messageCount % 1000 + 1
+                    messageCount = messageCount % 100000 + 1
                     val c = messageCount
                     log.debug { "message-$c $event" }
                     when (event) {

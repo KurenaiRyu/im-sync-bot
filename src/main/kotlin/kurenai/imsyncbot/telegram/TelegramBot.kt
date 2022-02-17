@@ -13,7 +13,6 @@ import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.qq.QQBotClient
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.utils.RateLimiter
 import moe.kurenai.tdlight.AbstractUpdateSubscriber
 import moe.kurenai.tdlight.LongPollingTelegramBot
 import moe.kurenai.tdlight.client.TDLightClient
@@ -32,9 +31,7 @@ import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
 import java.util.*
 import java.util.concurrent.*
-import java.util.concurrent.locks.Lock
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.timerTask
+import java.util.function.Function
 
 /**
  * 机器人实例
@@ -56,16 +53,9 @@ class TelegramBot(
     val nextMsgLock: ConcurrentHashMap<Long, Object> = ConcurrentHashMap()
     val username: String = telegramBotProperties.username
     val token: String = telegramBotProperties.token
-    val subTokens: List<String> = telegramBotProperties.subTokens
-    val subClients = ArrayList<Pair<Lock, TDLightClient>>()
 
     private val log = KotlinLogging.logger {}
-    private val rateLimiterLock = Object()
-    private val manyRequestsLock = Object()
-    private var time = TimeUnit.NANOSECONDS.toMillis(System.nanoTime())
     private lateinit var bot: LongPollingTelegramBot
-    val rateLimiter = RateLimiter(rateLimiterLock, time = time)
-//    val fileRateLimiter = RateLimiter(rateLimiterLock, "FileRateLimiter", 0.20, 1, time)
 
     private val pool = ThreadPoolExecutor(
         1, 1, 1L, TimeUnit.MILLISECONDS,
@@ -97,11 +87,7 @@ class TelegramBot(
         qqBotClient.startCountDown.await()
         bot = LongPollingTelegramBot(listOf(this), tdClient)
         telegramBot = this
-        subTokens.forEach { t ->
-            subClients.add(ReentrantLock() to TDLightClient(telegramBotProperties.baseUrl.substringBeforeLast("/"), t, isUserMode = false, isDebugEnabled = false))
-        }
         log.info { "Started telegram-bot $username" }
-
     }
 
     override fun onComplete0() {
@@ -212,14 +198,18 @@ class TelegramBot(
 
 val log: Logger = LogManager.getLogger()
 val mainClientLock = Object()
-val timer = Timer("telegram-lock-timer", true)
 
 fun <T> Request<ResponseWrapper<T>>.send(): CompletableFuture<out T> {
     return tdClient.send(this).handle { result, case ->
         return@handle case?.let {
-            this.sendSync()
-        } ?: result
-    }
+            try {
+                CompletableFuture.completedFuture(this.sendSync())
+            } catch (e: Exception) {
+                log.error(e.message, e)
+                CompletableFuture.failedFuture(e)
+            }
+        } ?: CompletableFuture.completedFuture(result)
+    }.thenCompose(Function.identity())
 }
 
 fun <T> Request<ResponseWrapper<T>>.sendSync(): T {
@@ -230,28 +220,8 @@ fun <T> Request<ResponseWrapper<T>>.sendSync(): T {
             } catch (e: TelegramApiRequestException) {
                 val retryAfter = e.response?.parameters?.retryAfter
                 if (retryAfter != null) {
-                    var success = false
-                    for (pair in telegramBot.subClients) {
-                        if (pair.first.tryLock()) {
-                            try {
-                                pair.second.sendSync(this)
-                                success = true
-                            } catch (ex: TelegramApiRequestException) {
-                                val awaitTime = e.response?.parameters?.retryAfter
-                                if (awaitTime != null) {
-                                    timer.schedule(timerTask {
-                                        pair.first.unlock()
-                                    }, TimeUnit.SECONDS.toMillis(awaitTime.toLong()))
-                                } else {
-                                    pair.first.unlock()
-                                    log.error("Sub client[${pair.second.token?.substringBefore(":") ?: "NaN"}] error.", e)
-                                    continue
-                                }
-                            }
-                        }
-                    }
                     log.info("Wait for ${retryAfter}s")
-                    if (!success) mainClientLock.wait(retryAfter.toLong())
+                    mainClientLock.wait(retryAfter.toLong() * 1000)
                 } else {
                     throw e
                 }

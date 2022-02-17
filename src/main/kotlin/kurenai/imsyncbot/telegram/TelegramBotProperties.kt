@@ -12,5 +12,4 @@ class TelegramBotProperties {
     var token = ""
     var username = ""
     var baseUrl = ""
-    var subTokens: List<String> = emptyList()
 }

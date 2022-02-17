@@ -98,11 +98,21 @@ class TgForwardHandler(
                 val voice = message.voice!!
                 val file = getTgFile(voice.fileId, voice.fileUniqueId)
                 uploadAndSend(message, group, file)
+                if (caption.isNotBlank()) {
+                    val builder = MessageChainBuilder()
+                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, message.caption!!, builder)
+                    cacheService.cache(group.sendMessage(builder.build()).source, message)
+                }
             }
             message.hasVideo() -> {
                 val video = message.video!!
                 val file = getTgFile(video.fileId, video.fileUniqueId)
-                uploadAndSend(message, group, file, video.fileName ?: video.fileId)
+                uploadAndSend(message, group, file, video.fileName ?: video.fileId.plus(".mp4"))
+                if (caption.isNotBlank()) {
+                    val builder = MessageChainBuilder()
+                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, message.caption!!, builder)
+                    cacheService.cache(group.sendMessage(builder.build()).source, message)
+                }
             }
             message.hasAnimation() -> {
                 val builder = MessageChainBuilder()
@@ -171,7 +181,9 @@ class TgForwardHandler(
             }
         }
 
-        return cacheFile.toExternalResource().use { group.files.uploadNewFile("/$fileName", it) }
+        return cacheFile.toExternalResource().use {
+            group.files.uploadNewFile("/$fileName", it)
+        }
     }
 
     private fun formatMsgAndQuote(
