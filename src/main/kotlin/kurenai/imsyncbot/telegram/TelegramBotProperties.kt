@@ -11,5 +11,5 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 class TelegramBotProperties {
     var token = ""
     var username = ""
-    var baseUrl = ""
+    var baseUrl = "https://api.telegram.org"
 }
