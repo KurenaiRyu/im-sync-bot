@@ -1,8 +1,8 @@
-FROM eclipse-temurin:17-jdk-focal as actual-image
+FROM eclipse-temurin:17-jdk-alpine as actual-image
 MAINTAINER kurenai233@yahoo.com
-RUN apt update -y && apt install ffmpeg -y
+RUN apk add ffmpeg libwebp libwebp-tools
 
-FROM gradle:7.1.1-jdk11-hotspot as builder
+FROM gradle:7.3.2-jdk17-alpine as builder
 WORKDIR /usr/src/java-code
 COPY build.gradle.kts settings.gradle.kts gradle.properties  ./
 RUN gradle clean build -i --stacktrace -x bootJar
