@@ -10,8 +10,8 @@ import kurenai.imsyncbot.config.UserStatus
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.telegram.sendSync
+import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.message.Message
-import moe.kurenai.tdlight.model.message.ParseMode
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.SendMessage
 import net.mamoe.mirai.message.data.At

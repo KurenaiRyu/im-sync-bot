@@ -8,9 +8,9 @@ import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
+import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.media.InputFile
 import moe.kurenai.tdlight.model.message.Message
-import moe.kurenai.tdlight.model.message.ParseMode
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.SendPhoto
 import moe.kurenai.tdlight.util.MarkdownUtil.fm2md

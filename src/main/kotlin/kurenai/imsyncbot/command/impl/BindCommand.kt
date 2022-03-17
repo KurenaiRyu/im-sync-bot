@@ -6,8 +6,8 @@ import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
+import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.message.Message
-import moe.kurenai.tdlight.model.message.ParseMode
 import moe.kurenai.tdlight.model.message.Update
 import org.springframework.stereotype.Component
 

@@ -8,10 +8,10 @@ import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.sendSync
 import kurenai.imsyncbot.utils.BotUtil
+import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.media.InputFile
 import moe.kurenai.tdlight.model.media.PhotoSize
 import moe.kurenai.tdlight.model.message.Message
-import moe.kurenai.tdlight.model.message.ParseMode
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.SendDocument
 import moe.kurenai.tdlight.request.message.SendMessage

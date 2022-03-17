@@ -17,8 +17,8 @@ import kurenai.imsyncbot.telegram.sendSync
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
 import moe.kurenai.tdlight.exception.TelegramApiException
+import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.media.InputFile
-import moe.kurenai.tdlight.model.message.ParseMode
 import moe.kurenai.tdlight.request.message.*
 import moe.kurenai.tdlight.util.MarkdownUtil.fm2md
 import mu.KotlinLogging

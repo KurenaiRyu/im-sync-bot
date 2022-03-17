@@ -7,8 +7,8 @@ import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
+import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.media.InputFile
-import moe.kurenai.tdlight.model.message.ParseMode
 import moe.kurenai.tdlight.request.message.SendPhoto
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent

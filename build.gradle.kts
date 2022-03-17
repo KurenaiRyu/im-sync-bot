@@ -22,13 +22,24 @@ repositories {
     maven { url = uri("https://maven.aliyun.com/repository/public/") }
     maven { url = uri("https://maven.aliyun.com/repository/spring/") }
     maven { url = uri("https://repo.spring.io/release") }
-    maven { url = uri("https://github.com/KurenaiRyu/maven-repo/raw/release/") }
+    maven(gpr("https://maven.pkg.github.com/KurenaiRyu/tdlight-sdk"))
+    maven(gpr("https://maven.pkg.github.com/KurenaiRyu/simple-cache"))
     mavenCentral()
+}
+
+fun gpr(url: String): (MavenArtifactRepository).() -> Unit {
+    return {
+        this.url = uri(url)
+        credentials {
+            username = project.findProperty("gpr.user") as String? ?: System.getenv("USERNAME")
+            password = project.findProperty("gpr.key") as String? ?: System.getenv("TOKEN")
+        }
+    }
 }
 
 dependencies {
 
-    val miraiVersion = "2.10.0"
+    val miraiVersion = "2.11.0-M1"
 
     //mirai
     implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {
@@ -41,7 +52,7 @@ dependencies {
     implementation("net.mamoe", "mirai-core-utils-jvm", miraiVersion)
 
     //td-light-sdk
-    implementation("moe.kurenai.tdlight", "td-light-sdk", "0.0.1")
+    implementation("moe.kurenai.tdlight", "td-light-sdk", "0.0.1-SNAPSHOT")
 
     //spring
     implementation("org.springframework.boot", "spring-boot-starter")
@@ -63,7 +74,7 @@ dependencies {
     implementation("org.apache.commons:commons-io:1.3.2")
     implementation("com.esotericsoftware", "kryo", "5.1.1")
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
-    implementation("io.github.kurenairyu", "simple-cache", "1.1.0")
+    implementation("io.github.kurenairyu", "simple-cache", "1.2.0-SNAPSHOT")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test:3.0.0-M1")
 }

@@ -1,7 +1,9 @@
 package kurenai.imsyncbot.config
 
+import io.github.kurenairyu.cache.Cache
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.ProxyProperties
+import kurenai.imsyncbot.telegram.TelegramBotProperties
 import kurenai.imsyncbot.utils.HttpUtil
 import mu.KotlinLogging
 import org.apache.commons.io.FileUtils
@@ -19,8 +21,10 @@ import kotlin.concurrent.timerTask
 
 @Component
 class BotInitializer(
-    val proxyProperties: ProxyProperties,
-    val cacheService: CacheService
+    private val tgProperties: TelegramBotProperties,
+    private val proxyProperties: ProxyProperties,
+    private val cacheService: CacheService,
+    private val cache: Cache,
 ) : InitializingBean {
 
     private val log = KotlinLogging.logger {}
@@ -32,6 +36,7 @@ class BotInitializer(
     private val clearLargeCacheTimer = Timer("ClearLargeCache", true)
 
     override fun afterPropertiesSet() {
+        checkRedisCodec()
         configProxy()
         setUpTimer()
     }
@@ -89,6 +94,14 @@ class BotInitializer(
                 it.delete()
             } //I don't want an exception if a file is not deleted. Otherwise use filesToDelete.next().delete() in a try/catch
             log.info { "Clear ${filesToDelete.size} cache files." }
+        }
+    }
+
+    private fun checkRedisCodec() {
+        val serializeType: String? = cache.get("SERIALIZE_TYPE", tgProperties.token.substringBefore(":"))
+        if ("json" != serializeType?.lowercase()) {
+            cache.clearAll()
+            cache.put("SERIALIZE_TYPE", tgProperties.token.substringBefore(":"), "json")
         }
     }
 }

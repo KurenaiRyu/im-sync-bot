@@ -4,8 +4,8 @@ import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.telegram.send
+import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.message.Message
-import moe.kurenai.tdlight.model.message.MessageEntityType
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.SendMessage
 import mu.KotlinLogging
