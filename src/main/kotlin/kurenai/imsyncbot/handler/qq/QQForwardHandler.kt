@@ -101,7 +101,7 @@ class QQForwardHandler(
     override suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {
         cacheService.getTgByQQ(event.group.id, event.messageIds[0])?.let { message ->
             if (enableRecall) {
-                DeleteMessage(message.chatId, message.messageId!!)
+                DeleteMessage(message.chatId, message.messageId!!).send()
             } else {
                 if (message.text.isNullOrBlank()) {
                     EditMessageCaption().apply {
@@ -109,13 +109,13 @@ class QQForwardHandler(
                         messageId = message.messageId
                         caption = "~${message.caption!!.format2Markdown()}~\n"
                         parseMode = ParseMode.MARKDOWN_V2
-                    }
+                    }.send()
                 } else {
                     EditMessageText("~${message.text!!.format2Markdown()}~\n").apply {
                         chatId = message.chatId
                         messageId = message.messageId
                         parseMode = ParseMode.MARKDOWN_V2
-                    }
+                    }.send()
                 }
             }
         }
