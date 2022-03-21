@@ -39,12 +39,20 @@ im同步机器人，现主要同步（转发）tg跟qq群。
    想要跳过则需要把 [Mirai](https://github.com/mamoe/mirai) 生成的device.json文件放入根目录下。
 3. 输入命令 `docker-compose up -d` 后台运行程序
 
+随后发送`/help`查看信息，例如在一个tg的群聊当中发送`/bind xxxx`进行绑定xxxxQ群，xxxx为Q群号。
+> tips  
+> /recall命令由于会删除用户信息，故需要管理员权限，但qq那边的撤回不受影响。
+
 其他会用到的命令
 
 - `docker-compose logs -f --tail 500 bot` 看机器人500行日志
 - `docker-compose stop` 停止
 - `docker-compose restart` 重启
 - `docker-compose up -d` 更新docker-compose配置后台运行
+
+## Backup
+
+只需要备份`config`目录下的文件即可，如果还需要缓存的信息，则还需要备份`redis-data`，但缓存文件有可能会有权限问题。
 
 ## Development
 
