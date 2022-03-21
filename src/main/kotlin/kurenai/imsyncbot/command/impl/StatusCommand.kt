@@ -10,7 +10,7 @@ class StatusCommand : AbstractTelegramCommand() {
 
     override val command = "status"
     override val help: String = "bot运行状态"
-    override val onlyGroupMessage = true
+    override val onlySupperAdmin = false
 
     override fun execute(update: Update, message: Message): String {
         val runtime = Runtime.getRuntime()
