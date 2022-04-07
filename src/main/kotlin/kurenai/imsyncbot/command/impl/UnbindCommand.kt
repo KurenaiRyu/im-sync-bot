@@ -16,8 +16,8 @@ class UnbindCommand(
 
     override val command = "unbind"
     override val help: String = "解绑群组或用户名"
-    override val onlyAdmin = true
-    override val onlySupperAdmin = false
+    override val onlyAdmin = false
+    override val onlySupperAdmin = true
     override val onlyGroupMessage = true
 
     override fun execute(update: Update, message: Message): String {
