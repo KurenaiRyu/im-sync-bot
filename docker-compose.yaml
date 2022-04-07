@@ -6,7 +6,7 @@ services:
     container_name: bot
     restart: always
     environment:
-#      BASE_URL: "http://api:8081/bot" #本地api配置
+#      BASE_URL: "http://api:8081" #本地api配置
       REDIS_HOST: "redis"
     # 调整时区
     # entrypoint: ["java", "-jar", "-Dspring.config.location=config.yaml", "-XX:+UseZGC", "-Duser.timezone=GMT+08", "./bot.jar"]

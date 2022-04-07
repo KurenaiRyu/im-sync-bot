@@ -9,7 +9,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties(prefix = "bot.telegram")
 //@PropertySource(factory = YamlPropertySourceFactory::class)
 class TelegramBotProperties {
+    companion object {
+        const val DEFAULT_BASE_URL = "https://api.telegram.org"
+    }
+
     var token = ""
     var username = ""
-    var baseUrl = "https://api.telegram.org"
+    var baseUrl = DEFAULT_BASE_URL
 }
