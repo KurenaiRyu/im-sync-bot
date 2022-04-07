@@ -20,6 +20,9 @@ services:
       - ./config/:/workspace/config/
       - ./cache:/workspace/cache
       - ./logs:/workspace/logs
+    depends_on:
+      - redis
+#      - api  #本地api则去掉注释
 
   redis:
     image: redis:alpine
