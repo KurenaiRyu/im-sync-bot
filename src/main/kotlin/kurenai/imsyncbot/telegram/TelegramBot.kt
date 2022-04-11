@@ -91,10 +91,11 @@ class TelegramBot(
         } else {
             val uri = URI(telegramBotProperties.baseUrl)
             if (uri.host == "api.telegram.org") DEFAULT_BASE_URL
-            else if (uri.path == "/bot") "${uri.scheme}://${uri.host}"
+            else if (uri.path == "/bot") telegramBotProperties.baseUrl.replace("/bot", "")
             else telegramBotProperties.baseUrl
         }
 
+        log.debug { "Telegram base url: $baseUrl" }
         tdClient = TDLightClient(baseUrl, telegramBotProperties.token, isUserMode = false, isDebugEnabled = false)
         qqBotClient.startCountDown.await()
         bot = LongPollingTelegramBot(listOf(this), tdClient)
