@@ -71,8 +71,8 @@ object BotUtil {
     }
 
     private fun download(file: File, url: String, reject: Boolean): File {
-        if (!reject && !file.exists()) {
-            HttpUtil.download(url, file)
+        if (!reject) {
+            HttpUtil.download(file, url)
         }
         return file
     }

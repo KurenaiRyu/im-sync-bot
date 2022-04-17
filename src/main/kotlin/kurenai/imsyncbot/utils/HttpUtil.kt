@@ -19,10 +19,13 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.ReentrantLock
 
 object HttpUtil {
 
     private val log = KotlinLogging.logger {}
+
+    private val fileLockMap = ConcurrentHashMap<String, ReentrantLock>()
 
     var PROXY: Proxy? = null
     private const val FILE_PART_LENGTH = 2 * 1024 * 1024L
@@ -39,10 +42,27 @@ object HttpUtil {
         })
 
     fun download(tgFile: moe.kurenai.tdlight.model.media.File, file: File): File {
-        return download(tgFile.getFileUrl(ContextHolder.telegramBot.token), file, true)
+        return download(file, tgFile.getFileUrl(ContextHolder.telegramBot.token), true)
     }
 
-    fun download(url: String, file: File, enableProxy: Boolean = false): File {
+    fun download(file: File, url: String, enableProxy: Boolean = false): File {
+        val lock = fileLockMap[file.name] ?: kotlin.run {
+            val l = ReentrantLock()
+            fileLockMap.putIfAbsent(file.name, l) ?: l
+        }
+        try {
+            if (lock.tryLock(10, TimeUnit.SECONDS)) {
+                if (file.exists()) return file
+
+                return doDownload(file, url, enableProxy)
+            }
+        } finally {
+            if (lock.isLocked) lock.unlock()
+        }
+        throw ImSyncBotRuntimeException("Download file error: $url")
+    }
+
+    private fun doDownload(file: File, url: String, enableProxy: Boolean = false): File {
         val start = System.nanoTime()
 
         getRemoteFileSize(url).thenCompose { size ->

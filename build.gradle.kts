@@ -76,6 +76,8 @@ dependencies {
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
     implementation("io.github.kurenairyu", "simple-cache", "1.2.0-SNAPSHOT")
 
+    implementation("org.redisson:redisson:3.17.0")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test:3.0.0-M1")
 }
 

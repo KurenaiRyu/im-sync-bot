@@ -66,6 +66,7 @@ class CacheService(
 
     fun cacheFile(qqId: String, fileCache: FileCache) {
         cache.put(TG_FILE_CACHE_KEY, qqId, fileCache, TTL)
+        cache.put(TG_FILE_CACHE_KEY, qqId, fileCache, TTL)
     }
 
     fun cacheImg(image: File) {
