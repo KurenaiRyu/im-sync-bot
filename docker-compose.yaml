@@ -16,7 +16,7 @@ services:
         max-size: "200m"
         max-file: "3"
     volumes:
-      - ./api-data/:/var/lib/telegram-bot-api/
+#      - ./api-data/:/var/lib/telegram-bot-api/ #本地api配置
       - ./config/:/workspace/config/
       - ./cache:/workspace/cache
       - ./logs:/workspace/logs
