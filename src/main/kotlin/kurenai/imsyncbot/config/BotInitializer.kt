@@ -28,16 +28,16 @@ class BotInitializer(
 ) : InitializingBean {
 
     private val log = KotlinLogging.logger {}
-    private val largeFileSize = 1 * 1024 * 1024L
-    private val largeDirSize = 500 * 1024 * 1024L
+    private val largeFileSize = 200 * 1024L
+    private val largeDirSize = 200 * 1024 * 1024L
 
     private val cacheDir = File("./cache")
     private val clearCacheTimer = Timer("ClearCache", true)
-    private val clearLargeCacheTimer = Timer("ClearLargeCache", true)
 
     override fun afterPropertiesSet() {
         checkRedisCodec()
         configProxy()
+        configImgBaseUrl()
         setUpTimer()
     }
 
@@ -47,45 +47,44 @@ class BotInitializer(
         }
     }
 
+    private fun configImgBaseUrl() {
+        tgProperties.imgBaseUrl?.isNotBlank()?.let {
+            HttpUtil.IMG_BASE_URL = tgProperties.imgBaseUrl
+        }
+
+    }
+
     private fun setUpTimer() {
         clearCacheTimer.scheduleAtFixedRate(timerTask {
-            val oldestAllowedFileDate = DateUtils.addDays(Date(), -1) //minus days from current date
-
+            log.info { "Cache folder size: ${FileUtils.sizeOfDirectory(cacheDir)}" }
             val filesToDelete = ArrayList<File>()
-            cacheDir.listFiles()?.forEach { file ->
-                if (file.isDirectory) {
-                    filesToDelete.addAll(FileUtils.listFiles(file, AgeFileFilter(oldestAllowedFileDate), null) as Collection<File>)
-                }
-            }
-            filesToDelete.removeIf { cacheService.imgExists(it.name) }
-            doDeleteCacheFile(filesToDelete)
-        }, 5000L, TimeUnit.MINUTES.toMillis(30))
+            val files = cacheService.getNotExistFiles()?.map { File(it.value) }
+            if (files?.isNotEmpty() == true) filesToDelete.addAll(filesToDelete)
 
-        clearLargeCacheTimer.scheduleAtFixedRate(timerTask {
             if (FileUtils.sizeOfDirectory(cacheDir) > largeDirSize) {
-                val filesToDelete = ArrayList<File>()
                 cacheDir.listFiles()?.forEach { file ->
                     if (file.isDirectory) {
-                        val listFiles = FileUtils.listFiles(file, SizeFileFilter(largeFileSize), null) as Collection<File>
+                        val listFiles =
+                            FileUtils.listFiles(file, SizeFileFilter(largeFileSize), null) as Collection<File>
                         filesToDelete.addAll(listFiles.filter { it.name.endsWith(".part") })
                     }
                 }
-                doDeleteCacheFile(filesToDelete)
             }
 
             // delete .part file
-            val filesToDelete = ArrayList<File>()
             val oldestAllowedFileDate = DateUtils.addMinutes(Date(), -10)
             cacheDir.listFiles()?.forEach { file ->
                 if (file.isDirectory) {
-                    val listFiles = FileUtils.listFiles(file, AgeFileFilter(oldestAllowedFileDate), null) as Collection<File>
+                    val listFiles =
+                        FileUtils.listFiles(file, AgeFileFilter(oldestAllowedFileDate), null) as Collection<File>
                     filesToDelete.addAll(listFiles.filter { it.name.endsWith(".part") })
                 }
             }
-        }, 1000L, TimeUnit.MINUTES.toMillis(30))
+            doDeleteCacheFile(filesToDelete)
+        }, 5000L, TimeUnit.MINUTES.toMillis(10))
     }
 
-    private fun doDeleteCacheFile(filesToDelete: ArrayList<File>) {
+    private fun doDeleteCacheFile(filesToDelete: List<File>) {
         if (filesToDelete.isNotEmpty()) {
             //if deleting subdirs, replace null above with TrueFileFilter.INSTANCE
             log.info { "Clearing cache files..." }

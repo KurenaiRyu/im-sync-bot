@@ -78,6 +78,8 @@ dependencies {
 
     implementation("org.redisson:redisson:3.17.0")
 
+    implementation("org.reflections", "reflections", "0.10.2")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test:3.0.0-M1")
 }
 

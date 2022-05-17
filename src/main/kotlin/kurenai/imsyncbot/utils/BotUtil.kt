@@ -1,5 +1,8 @@
 package kurenai.imsyncbot.utils
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.future.await
+import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
@@ -59,18 +62,18 @@ object BotUtil {
         return moe.kurenai.tdlight.model.media.File(fileId, fileUniqueId)
     }
 
-    fun downloadDoc(filename: String, url: String, reject: Boolean = false): File {
+    suspend fun downloadDoc(filename: String, url: String, reject: Boolean = false): File {
         return download(File(getDocumentPath(filename)), url, reject)
     }
 
-    fun downloadImg(filename: String, url: String, reject: Boolean = false): File {
+    suspend fun downloadImg(filename: String, url: String, reject: Boolean = false): File {
         val image = File(getImagePath(filename))
         return download(image, url, reject).also {
             ContextHolder.cacheService.cacheImg(image)
         }
     }
 
-    private fun download(file: File, url: String, reject: Boolean): File {
+    private suspend fun download(file: File, url: String, reject: Boolean): File {
         if (!reject) {
             HttpUtil.download(file, url)
         }
@@ -104,7 +107,7 @@ object BotUtil {
         }
     }
 
-    fun webp2png(file: moe.kurenai.tdlight.model.media.File): File {
+    suspend fun webp2png(file: moe.kurenai.tdlight.model.media.File): File {
         val pngFile = File(getImagePath("${file.fileId}.png"))
         val webpFile: File
         if (pngFile.exists()) return pngFile
@@ -115,24 +118,28 @@ object BotUtil {
                 HttpUtil.download(file, webpFile)
             }
         }
-        val future =
-            Runtime.getRuntime().exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.path, pngFile.path).replace("\\", "\\\\")).onExit()
-        future.get()
+        withContext(Dispatchers.IO) {
+            Runtime.getRuntime()
+                .exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.path, pngFile.path).replace("\\", "\\\\"))
+        }.onExit().await()
 //        val webp = ImageIO.read(webpFile)
 //        ImageIO.write(webp, "png", pngFile)
         return pngFile
     }
 
-    fun mp42gif(id: String, tgFile: moe.kurenai.tdlight.model.media.File): File? {
+    suspend fun mp42gif(id: String, tgFile: moe.kurenai.tdlight.model.media.File): File? {
         val gifFile = File(getImagePath("$id.gif"))
         if (gifFile.exists()) return gifFile
         val mp4File = File(tgFile.filePath!!)
         if (!mp4File.exists()) HttpUtil.download(tgFile, mp4File)
         gifFile.parentFile.mkdirs()
         try {
-            val future =
-                Runtime.getRuntime().exec(String.format(MP4_TO_GIF_CMD_PATTERN, mp4File.path, gifFile.path).replace("\\", "\\\\")).onExit()
-            if (future.get().exitValue() >= 0 || gifFile.exists()) return gifFile
+            val process =
+                withContext(Dispatchers.IO) {
+                    Runtime.getRuntime()
+                        .exec(String.format(MP4_TO_GIF_CMD_PATTERN, mp4File.path, gifFile.path).replace("\\", "\\\\"))
+                }.onExit().await()
+            if (process.exitValue() >= 0 || gifFile.exists()) return gifFile
             else gifFile.delete()
         } catch (e: Exception) {
             log.error(e) { e.message }

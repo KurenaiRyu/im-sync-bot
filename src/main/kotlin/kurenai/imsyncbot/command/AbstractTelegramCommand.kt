@@ -18,10 +18,6 @@ abstract class AbstractTelegramCommand {
     open val parseMode: String? = null
     open val reply: Boolean = false
 
-    init {
-        DelegatingCommand.addTgHandle(this)
-    }
-
     abstract fun execute(update: Update, message: Message): String?
 
     fun String.params(): String {

@@ -16,4 +16,6 @@ class TelegramBotProperties {
     var token = ""
     var username = ""
     var baseUrl = DEFAULT_BASE_URL
+    var imgBaseUrl: String? = null
+    var updateBaseUrl: String? = null
 }

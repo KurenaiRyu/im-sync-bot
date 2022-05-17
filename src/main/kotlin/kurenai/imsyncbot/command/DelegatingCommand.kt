@@ -5,6 +5,7 @@ import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.MessageEntityType
+import moe.kurenai.tdlight.model.inline.InlineQuery
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.SendMessage
@@ -17,6 +18,7 @@ object DelegatingCommand {
 
     private val tgHandlers = ArrayList<AbstractTelegramCommand>()
     private val qqHandlers = ArrayList<AbstractQQCommand>()
+    private val inlineCommands = HashMap<String, InlineCommandHandler>()
 
     fun execute(update: Update, message: Message) {
         val command = message.entities!!
@@ -64,6 +66,36 @@ object DelegatingCommand {
                 parseMode?.let { this.parseMode = it }
                 if (reply) this.replyToMessageId = message.messageId
             }.send()
+        }
+    }
+
+    fun handleInlineQuery(update: Update, inlineQuery: InlineQuery) {
+        if (inlineCommands.isEmpty()) return
+
+        if (inlineQuery.query.isBlank()) return
+        val query = inlineQuery.query.trim()
+        val offset = inlineQuery.offset.takeIf { it.isNotBlank() }?.toInt() ?: 0
+        if (offset < 0) return
+        try {
+            val args = query.split(" ", limit = 2)
+            when (args.size) {
+                0 -> return
+                1 -> {
+                    inlineCommands[query]?.run {
+                        log.info("Match command ${javaClass.name}")
+                        execute(update, inlineQuery, "")
+                    }
+                }
+                2 -> {
+                    val handler = inlineCommands[args[0]]?.run {
+                        log.info("Match command ${javaClass.name}")
+                        execute(update, inlineQuery, args[1])
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            log.error(e.message, e)
+//            BangumiBot.tdClient.sendSync(emptyAnswer(inlineQuery.id))
         }
     }
 

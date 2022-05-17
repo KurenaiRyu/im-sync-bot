@@ -16,6 +16,10 @@ import kurenai.imsyncbot.handler.Handler
 import kurenai.imsyncbot.qq.QQBotProperties
 import kurenai.imsyncbot.telegram.ProxyProperties
 import kurenai.imsyncbot.telegram.TelegramBotProperties
+import org.redisson.Redisson
+import org.redisson.api.RedissonClient
+import org.redisson.codec.JsonJacksonCodec
+import org.redisson.config.Config
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -35,7 +39,7 @@ class BotAutoConfiguration {
     }
 
     @Bean
-    fun cache(properties: RedisProperties): Cache {
+    fun cache(properties: RedisProperties, mapper: ObjectMapper): Cache {
         val redisURI = RedisURI.builder()
             .withHost(properties.host)
             .withPort(properties.port)
@@ -43,17 +47,34 @@ class BotAutoConfiguration {
             .also { b -> properties.password?.takeIf { it.isNotBlank() }?.let { b.withPassword(it) } }
             .build()
         return LettuceCache(
-            redisURI, JacksonCodec<Any>(
-                jacksonObjectMapper()
-                    .registerModules(Jdk8Module(), JavaTimeModule(), RecordNamingStrategyPatchModule())
-                    .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
-                    .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
-                    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-                    .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
-                    .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
-                    .activateDefaultTyping(BasicPolymorphicTypeValidator.builder().allowIfBaseType(Any::class.java).build(), ObjectMapper.DefaultTyping.EVERYTHING)
-            )
+            redisURI, JacksonCodec<Any>(mapper)
         )
+    }
+
+    @Bean
+    fun redisson(properties: RedisProperties, mapper: ObjectMapper): RedissonClient {
+        val config = Config()
+        config.codec = JsonJacksonCodec(mapper)
+        config.useSingleServer()
+            .setAddress("redis://${properties.host}:${properties.port}")
+            .setDatabase(properties.database)
+            .also { c -> properties.password?.takeIf { it.isNotBlank() }?.let { c.password = it } }
+        return Redisson.create(config)
+    }
+
+    @Bean
+    fun objectMapper(): ObjectMapper {
+        return jacksonObjectMapper()
+            .registerModules(Jdk8Module(), JavaTimeModule(), RecordNamingStrategyPatchModule())
+            .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+            .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
+            .activateDefaultTyping(
+                BasicPolymorphicTypeValidator.builder().allowIfBaseType(Any::class.java).build(),
+                ObjectMapper.DefaultTyping.EVERYTHING
+            )
     }
 
 }

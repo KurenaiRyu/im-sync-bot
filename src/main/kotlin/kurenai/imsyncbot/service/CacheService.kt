@@ -10,9 +10,14 @@ import mu.KotlinLogging
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceBuilder
 import net.mamoe.mirai.message.data.OnlineMessageSource
+import org.redisson.api.RedissonClient
+import org.redisson.client.protocol.ScoredEntry
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Service
 import java.io.File
+import java.text.NumberFormat
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
@@ -20,6 +25,7 @@ import java.util.concurrent.TimeUnit
 @Service
 class CacheService(
     private val cache: io.github.kurenairyu.cache.Cache,
+    private val redisson: RedissonClient
 ) : InitializingBean {
     companion object {
         const val TG_MSG_CACHE_KEY = "TG_MSG_CACHE"
@@ -27,12 +33,16 @@ class CacheService(
         const val TG_QQ_MSG_ID_CACHE_KEY = "TG_QQ_MSG_ID_CACHE"
         const val QQ_TG_MSG_ID_CACHE_KEY = "QQ_TG_MSG_ID_CACHE"
         const val TG_FILE_CACHE_KEY = "TG_FILE_CACHE"
+        const val TG_FILE_CACHE_TTL_KEY = "TG_FILE_CACHE_TTL"
         const val TG_IMG_CACHE_KEY = "TG_IMG_CACHE"
         const val QQ_TG_PRIVATE_MSG_ID_CACHE_KEY = "QQ_TG_PRIVATE_MSG_ID_CACHE"
         const val TG_QQ_PRIVATE_MSG_ID_CACHE_KEY = "TG_QQ_PRIVATE_MSG_ID_CACHE"
         val TTL = TimeUnit.DAYS.toMillis(5)
-        val IMAGE_TTL = TimeUnit.DAYS.toMillis(1)
+        val BEGIN = LocalDateTime.of(2022, 1, 1, 0, 0, 0).toEpochSecond(ZoneOffset.MIN)
     }
+
+    val hit = redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("HIT"))
+    val total = redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("TOTAL"))
 
     private val log = KotlinLogging.logger {}
 
@@ -64,22 +74,41 @@ class CacheService(
         cache.put(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId, messageId)
     }
 
-    fun cacheFile(qqId: String, fileCache: FileCache) {
-        cache.put(TG_FILE_CACHE_KEY, qqId, fileCache, TTL)
-        cache.put(TG_FILE_CACHE_KEY, qqId, fileCache, TTL)
+    fun cacheFile(qqFileId: String, fileCache: FileCache) {
+        cache.put(TG_FILE_CACHE_KEY, qqFileId, fileCache, TTL)
+    }
+
+    fun cacheFile(file: File) {
+        val ttlSet = redisson.getScoredSortedSet<String>(TG_FILE_CACHE_TTL_KEY)
+        ttlSet.addScore(file.path, LocalDateTime.now().plusHours(1).durationSeconds())
     }
 
     fun cacheImg(image: File) {
-        val count: Int = cache.get(TG_IMG_CACHE_KEY, image.name) ?: 0
-        cache.put(TG_IMG_CACHE_KEY, image.name, count + 1, IMAGE_TTL)
+        cacheFile(image)
     }
 
-    fun imgExists(name: String): Boolean {
-        return cache.exists(TG_IMG_CACHE_KEY, name)
+    fun getNotExistFiles(): MutableCollection<ScoredEntry<String>>? {
+        val ttlSet = redisson.getScoredSortedSet<String>(TG_FILE_CACHE_TTL_KEY)
+        val now = getNowSeconds().toDouble()
+        //TODO atomic by script
+        val entries = ttlSet.entryRange(0.0, true, now, false)
+        ttlSet.removeRangeByScore(0.0, true, now, false)
+        return entries
     }
 
-    fun getFile(qqId: String): FileCache? {
-        return cache.get(TG_FILE_CACHE_KEY, qqId)
+    fun getFile(qqFileId: String): FileCache? {
+        return cache.get<String?, FileCache?>(TG_FILE_CACHE_KEY, qqFileId).also {
+            val t = total.incrementAndGet()
+            if (it != null) {
+                val h = hit.incrementAndGet()
+                val formatter = NumberFormat.getPercentInstance()
+                formatter.maximumFractionDigits = 2
+
+                log.info { "Cache hit: $h / $t (${formatter.format(h / t.toFloat())})" }
+            } else {
+                hit.get()
+            }
+        }
     }
 
     fun getQQIdByTg(message: Message): Pair<Long, Int>? {
@@ -181,8 +210,24 @@ class CacheService(
         return getQQCacheId(targetId, ids[0])
     }
 
+    private fun Double.isExist(): Boolean {
+        return this - getNowSeconds() > 0
+    }
+
+    private fun getNowSeconds(): Long {
+        return LocalDateTime.now().toEpochSecond(ZoneOffset.MIN) - BEGIN
+    }
+
+    private fun LocalDateTime.durationSeconds(): Long {
+        return this.toEpochSecond(ZoneOffset.MIN) - BEGIN
+    }
+
     private fun String.splitCacheId(): Pair<Long, Int>? {
         return this.split(":").takeIf { it.size == 2 }?.let { it[0].toLong() to it[1].toInt() }
+    }
+
+    private fun String.appendKey(key: String): String {
+        return "$this:$key"
     }
 
 }

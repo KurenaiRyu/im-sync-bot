@@ -13,7 +13,6 @@ import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.qq.QQBotClient
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.TelegramBotProperties.Companion.DEFAULT_BASE_URL
 import moe.kurenai.tdlight.AbstractUpdateSubscriber
 import moe.kurenai.tdlight.LongPollingTelegramBot
 import moe.kurenai.tdlight.client.TDLightClient
@@ -30,7 +29,6 @@ import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
-import java.net.URI
 import java.util.*
 import java.util.concurrent.*
 import java.util.function.Function
@@ -86,17 +84,14 @@ class TelegramBot(
     override fun afterPropertiesSet() {
 //        GetChatMember(GroupConfig.tgQQ[0])
 
-        val baseUrl = if (telegramBotProperties.baseUrl == DEFAULT_BASE_URL) {
-            DEFAULT_BASE_URL
-        } else {
-            val uri = URI(telegramBotProperties.baseUrl)
-            if (uri.host == "api.telegram.org") DEFAULT_BASE_URL
-            else if (uri.path == "/bot") telegramBotProperties.baseUrl.replace("/bot", "")
-            else telegramBotProperties.baseUrl
-        }
-
-        log.debug { "Telegram base url: $baseUrl" }
-        tdClient = TDLightClient(baseUrl, telegramBotProperties.token, isUserMode = false, isDebugEnabled = false)
+        log.debug { "Telegram base url: ${telegramBotProperties.baseUrl}" }
+        tdClient = TDLightClient(
+            telegramBotProperties.baseUrl,
+            telegramBotProperties.token,
+            isUserMode = false,
+            isDebugEnabled = true,
+            updateBaseUrl = telegramBotProperties.baseUrl
+        )
         qqBotClient.startCountDown.await()
         bot = LongPollingTelegramBot(listOf(this), tdClient)
         telegramBot = this
@@ -164,6 +159,8 @@ class TelegramBot(
 
         if (message.isCommand()) {
             DelegatingCommand.execute(update, message)
+        } else if (update.hasInlineQuery()) {
+            DelegatingCommand.handleInlineQuery(update, update.inlineQuery!!)
         } else if (message.chat.id == privateChatHandler.privateChat) {
             privateChatHandler.onPrivateChat(update)
         } else if ((message.isGroupMessage() || message.isSuperGroupMessage())) {

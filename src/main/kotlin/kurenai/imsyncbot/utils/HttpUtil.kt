@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.utils
 
 import io.ktor.util.network.*
+import kotlinx.coroutines.future.await
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import mu.KotlinLogging
@@ -19,15 +20,13 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.locks.ReentrantLock
 
 object HttpUtil {
 
     private val log = KotlinLogging.logger {}
 
-    private val fileLockMap = ConcurrentHashMap<String, ReentrantLock>()
-
     var PROXY: Proxy? = null
+    var IMG_BASE_URL: String? = null
     private const val FILE_PART_LENGTH = 2 * 1024 * 1024L
     private val DEFAULT_TIME_OUT = Duration.ofSeconds(5)
     private val POOL = ThreadPoolExecutor(5, 10, 1L, TimeUnit.MINUTES,
@@ -41,28 +40,16 @@ object HttpUtil {
             }
         })
 
-    fun download(tgFile: moe.kurenai.tdlight.model.media.File, file: File): File {
+    suspend fun download(tgFile: moe.kurenai.tdlight.model.media.File, file: File): File {
         return download(file, tgFile.getFileUrl(ContextHolder.telegramBot.token), true)
     }
 
-    fun download(file: File, url: String, enableProxy: Boolean = false): File {
-        val lock = fileLockMap[file.name] ?: kotlin.run {
-            val l = ReentrantLock()
-            fileLockMap.putIfAbsent(file.name, l) ?: l
-        }
-        try {
-            if (lock.tryLock(10, TimeUnit.SECONDS)) {
-                if (file.exists()) return file
-
-                return doDownload(file, url, enableProxy)
-            }
-        } finally {
-            if (lock.isLocked) lock.unlock()
-        }
-        throw ImSyncBotRuntimeException("Download file error: $url")
+    suspend fun download(file: File, url: String, enableProxy: Boolean = false): File {
+        if (file.exists()) return file
+        return doDownload(file, url, enableProxy)
     }
 
-    private fun doDownload(file: File, url: String, enableProxy: Boolean = false): File {
+    private suspend fun doDownload(file: File, url: String, enableProxy: Boolean = false): File {
         val start = System.nanoTime()
 
         getRemoteFileSize(url).thenCompose { size ->
@@ -77,7 +64,7 @@ object HttpUtil {
                 file.delete()
                 throw case
             }
-        }.join()
+        }.await()
 
         if (file.exists() && file.length() <= 0)
             throw ImSyncBotRuntimeException("File is null: $url")

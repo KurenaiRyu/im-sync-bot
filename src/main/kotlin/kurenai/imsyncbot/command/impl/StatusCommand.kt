@@ -1,9 +1,11 @@
 package kurenai.imsyncbot.command.impl
 
+import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import org.springframework.stereotype.Component
+import java.text.NumberFormat
 
 @Component
 class StatusCommand : AbstractTelegramCommand() {
@@ -14,11 +16,23 @@ class StatusCommand : AbstractTelegramCommand() {
 
     override fun execute(update: Update, message: Message): String {
         val runtime = Runtime.getRuntime()
-        val arr = arrayOf(runtime.maxMemory() - runtime.totalMemory() + runtime.freeMemory(), runtime.maxMemory(), runtime.freeMemory(), runtime.totalMemory())
+        val arr = arrayOf(
+            runtime.maxMemory() - runtime.totalMemory() + runtime.freeMemory(),
+            runtime.maxMemory(),
+            runtime.freeMemory(),
+            runtime.totalMemory()
+        )
             .map { it / 1024 / 1024 }
             .map { "${it}m" }
-        return "总可用内存: ${arr[0]}/${arr[1]}\n" +
-                "剩余可用分配内存: ${arr[2]}/${arr[3]}\n"
+        val total = ContextHolder.cacheService.total.get()
+        val hit = ContextHolder.cacheService.hit.get()
+        val formatter = NumberFormat.getPercentInstance()
+        return """
+            总可用内存: ${arr[0]}/${arr[1]}
+            剩余可用分配内存: ${arr[2]}/${arr[3]}
+            
+            缓存命中率: $hit / $total (${formatter.format(hit / total.toFloat())})
+             """.trimIndent()
     }
 
 }

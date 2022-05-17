@@ -1,5 +1,8 @@
 package kurenai.imsyncbot.command.impl
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.GroupConfig
@@ -58,16 +61,28 @@ class InfoCommand(
                                 list.add("绑定名称: `${config.bindingName!!.fm2md()}`")
                             if (member.isMuted)
                                 list.add("被禁言${member.muteTimeRemaining}s")
-                            list.add("入群时间: `${Instant.ofEpochSecond(member.joinTimestamp.toLong()).atZone(ZoneId.systemDefault()).format(ContextHolder.dfs).fm2md()}`")
-                            list.add("最后发言: `${Instant.ofEpochSecond(member.lastSpeakTimestamp.toLong()).atZone(ZoneId.systemDefault()).format(ContextHolder.dfs).fm2md()}`")
+                            list.add(
+                                "入群时间: `${
+                                    Instant.ofEpochSecond(member.joinTimestamp.toLong()).atZone(ZoneId.systemDefault())
+                                        .format(ContextHolder.dfs).fm2md()
+                                }`"
+                            )
+                            list.add(
+                                "最后发言: `${
+                                    Instant.ofEpochSecond(member.lastSpeakTimestamp.toLong())
+                                        .atZone(ZoneId.systemDefault()).format(ContextHolder.dfs).fm2md()
+                                }`"
+                            )
                             if (config?.status?.isNotEmpty() == true)
                                 list.add("状态: ${config.status.toString().fm2md()}")
 
-                            val file = BotUtil.downloadImg("avatar-${member.id}.png", member.avatarUrl)
-                            SendPhoto(message.chatId.toString(), InputFile(file)).apply {
-                                caption = list.joinToString("\n")
-                                parseMode = ParseMode.MARKDOWN_V2
-                            }.send()
+                            CoroutineScope(Dispatchers.IO).launch {
+                                val file = BotUtil.downloadImg("avatar-${member.id}.png", member.avatarUrl)
+                                SendPhoto(message.chatId.toString(), InputFile(file)).apply {
+                                    caption = list.joinToString("\n")
+                                    parseMode = ParseMode.MARKDOWN_V2
+                                }.send()
+                            }
                             null
                         } else {
                             "找不到qq账户$userId"
@@ -96,11 +111,13 @@ class InfoCommand(
                 if (config?.status?.isNotEmpty() == true)
                     list.add("状态: ${config.status.toString().format2Markdown()}")
 
-                val file = BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl)
-                SendPhoto(message.chatId.toString(), InputFile(file)).apply {
-                    caption = list.joinToString("\n")
-                    parseMode = ParseMode.MARKDOWN_V2
-                }.send()
+                CoroutineScope(Dispatchers.IO).launch {
+                    val file = BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl)
+                    SendPhoto(message.chatId, InputFile(file)).apply {
+                        caption = list.joinToString("\n")
+                        parseMode = ParseMode.MARKDOWN_V2
+                    }.send()
+                }
                 null
             }
         }
