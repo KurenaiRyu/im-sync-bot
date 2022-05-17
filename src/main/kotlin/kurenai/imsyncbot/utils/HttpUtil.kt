@@ -4,6 +4,7 @@ import io.ktor.util.network.*
 import kotlinx.coroutines.future.await
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
+import kurenai.imsyncbot.humanReadableByteCountBin
 import mu.KotlinLogging
 import org.apache.logging.log4j.LogManager
 import org.springframework.http.HttpHeaders
@@ -71,10 +72,16 @@ object HttpUtil {
         if (!file.exists()) {
             throw ImSyncBotRuntimeException("Download file error: $url")
         }
-        val sizeOfMb = file.length() / 1024.0 / 1024
-        val timeOfSeconds = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) / 1000.0
-        val speed = sizeOfMb / timeOfSeconds
-        log.info { "Downloaded ${file.name} ${String.format("%.3f", sizeOfMb)} MB in ${String.format("%.2f", timeOfSeconds)} s (${String.format("%.2f", speed)} MB/s)" }
+        val timeOfMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
+        val speed = file.length() * 1000 / timeOfMillis
+        log.info {
+            "Downloaded ${file.name} ${file.length().humanReadableByteCountBin()} in ${
+                String.format(
+                    "%.2f",
+                    timeOfMillis / 1000.0
+                )
+            } s (${speed.humanReadableByteCountBin()}/s)"
+        }
         return file
     }
 

@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.config
 
 import io.github.kurenairyu.cache.Cache
+import kurenai.imsyncbot.humanReadableByteCountBin
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.ProxyProperties
 import kurenai.imsyncbot.telegram.TelegramBotProperties
@@ -29,9 +30,9 @@ class BotInitializer(
 
     private val log = KotlinLogging.logger {}
     private val largeFileSize = 200 * 1024L
-    private val largeDirSize = 200 * 1024 * 1024L
+    private val largeDirSize = 100 * 1024 * 1024L
 
-    private val cacheDir = File("./cache")
+    private val cacheDirs = listOf("./cache/img", "./cache/doc", "./cache/file")
     private val clearCacheTimer = Timer("ClearCache", true)
 
     override fun afterPropertiesSet() {
@@ -56,31 +57,37 @@ class BotInitializer(
 
     private fun setUpTimer() {
         clearCacheTimer.scheduleAtFixedRate(timerTask {
-            log.info { "Cache folder size: ${FileUtils.sizeOfDirectory(cacheDir)}" }
-            val filesToDelete = ArrayList<File>()
-            val files = cacheService.getNotExistFiles()?.map { File(it.value) }
-            if (files?.isNotEmpty() == true) filesToDelete.addAll(filesToDelete)
+            for (cacheDir in cacheDirs) {
+                try {
+                    val dir = File(cacheDir)
+                    val sizeOfDir = FileUtils.sizeOfDirectory(dir)
+                    log.info { "Cache folder [${dir.name}] size: ${sizeOfDir.humanReadableByteCountBin()}" }
+                    val filesToDelete = ArrayList<File>()
+                    val files = cacheService.getNotExistFiles()?.map { File(it.value) }
+                    if (files?.isNotEmpty() == true) filesToDelete.addAll(filesToDelete)
 
-            if (FileUtils.sizeOfDirectory(cacheDir) > largeDirSize) {
-                cacheDir.listFiles()?.forEach { file ->
-                    if (file.isDirectory) {
-                        val listFiles =
-                            FileUtils.listFiles(file, SizeFileFilter(largeFileSize), null) as Collection<File>
-                        filesToDelete.addAll(listFiles.filter { it.name.endsWith(".part") })
+                    val oldestAllowedFileDate = DateUtils.addMinutes(Date(), -10)
+                    if (sizeOfDir > largeDirSize) {
+                        filesToDelete.addAll(
+                            FileUtils.listFiles(
+                                dir,
+                                SizeFileFilter(largeFileSize),
+                                null
+                            ) as Collection<File>
+                        )
+                        filesToDelete.addAll(
+                            FileUtils.listFiles(
+                                dir,
+                                AgeFileFilter(oldestAllowedFileDate),
+                                null
+                            ) as Collection<File>
+                        )
                     }
+                    doDeleteCacheFile(filesToDelete)
+                } catch (e: Exception) {
+                    log.error(e.message, e)
                 }
             }
-
-            // delete .part file
-            val oldestAllowedFileDate = DateUtils.addMinutes(Date(), -10)
-            cacheDir.listFiles()?.forEach { file ->
-                if (file.isDirectory) {
-                    val listFiles =
-                        FileUtils.listFiles(file, AgeFileFilter(oldestAllowedFileDate), null) as Collection<File>
-                    filesToDelete.addAll(listFiles.filter { it.name.endsWith(".part") })
-                }
-            }
-            doDeleteCacheFile(filesToDelete)
         }, 5000L, TimeUnit.MINUTES.toMillis(10))
     }
 

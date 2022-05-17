@@ -23,6 +23,8 @@ import net.mamoe.mirai.event.GlobalEventChannel
 import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.PlainText
+import org.redisson.api.RBlockingQueue
+import org.redisson.api.RedissonClient
 import org.springframework.beans.factory.DisposableBean
 import org.springframework.beans.factory.InitializingBean
 import org.springframework.stereotype.Component
@@ -34,6 +36,7 @@ import kotlin.system.measureTimeMillis
 @Component
 class QQBotClient(
     properties: QQBotProperties,
+    private val redisson: RedissonClient,
     private val handlerHolder: HandlerHolder,
     private val privateChatHandler: PrivateChatHandler,
 ) : InitializingBean, DisposableBean {
@@ -42,6 +45,7 @@ class QQBotClient(
     private val forwardHandler = handlerHolder.currentQQHandlerList.filterIsInstance<QQForwardHandler>()[0]
     val startCountDown = CountDownLatch(1)
 
+    private val bucketMap = HashMap<String, RBlockingQueue<String>>()
     private val scope = CoroutineScope(Dispatchers.Default)
     private val handlerPool = ThreadPoolExecutor(
         System.getProperty("QQ_THREAD", "10").toInt(), System.getProperty("QQ_THREAD", "10").toInt() + 10, 60L, TimeUnit.SECONDS,
@@ -118,6 +122,11 @@ class QQBotClient(
                     log.debug { "message-$c $event" }
                     when (event) {
                         is FriendEvent -> {
+//                            val bucketName = "QUEUE:FRIEND:${event.friend.id}"
+//                            redisson.getBucket<>()
+//                            val bucket = bucketMap[bucketName] ?: redisson.getQueue<String>()
+
+
                             CoroutineScope(handlerScope).launch {
                                 measureTimeMillis {
                                     privateChatHandler.onFriendEvent(event)

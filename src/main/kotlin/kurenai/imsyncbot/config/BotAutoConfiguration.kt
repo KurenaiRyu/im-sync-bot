@@ -18,6 +18,7 @@ import kurenai.imsyncbot.telegram.ProxyProperties
 import kurenai.imsyncbot.telegram.TelegramBotProperties
 import org.redisson.Redisson
 import org.redisson.api.RedissonClient
+import org.redisson.api.RedissonReactiveClient
 import org.redisson.codec.JsonJacksonCodec
 import org.redisson.config.Config
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties
@@ -52,7 +53,7 @@ class BotAutoConfiguration {
     }
 
     @Bean
-    fun redisson(properties: RedisProperties, mapper: ObjectMapper): RedissonClient {
+    fun redissonClient(properties: RedisProperties, mapper: ObjectMapper): RedissonClient {
         val config = Config()
         config.codec = JsonJacksonCodec(mapper)
         config.useSingleServer()
@@ -60,6 +61,11 @@ class BotAutoConfiguration {
             .setDatabase(properties.database)
             .also { c -> properties.password?.takeIf { it.isNotBlank() }?.let { c.password = it } }
         return Redisson.create(config)
+    }
+
+    @Bean
+    fun redissonReactiveClient(redissonClient: RedissonClient): RedissonReactiveClient {
+        return redissonClient.reactive()
     }
 
     @Bean

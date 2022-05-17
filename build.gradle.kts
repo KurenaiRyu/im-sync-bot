@@ -4,11 +4,11 @@ plugins {
     id("org.springframework.boot") version "3.0.0-M1"
     id("io.spring.dependency-management") version "1.0.11.RELEASE"
 //    id("org.springframework.experimental.aot") version "0.11.1"
-    kotlin("jvm") version "1.6.10"
-    kotlin("plugin.spring") version "1.6.10"
-    kotlin("plugin.allopen") version "1.6.10"
-    kotlin("plugin.noarg") version "1.6.10"
-    kotlin("kapt") version "1.6.10"
+    kotlin("jvm") version "1.6.21"
+    kotlin("plugin.spring") version "1.6.21"
+    kotlin("plugin.allopen") version "1.6.21"
+    kotlin("plugin.noarg") version "1.6.21"
+    kotlin("kapt") version "1.6.21"
     application
 }
 
