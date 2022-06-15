@@ -6,6 +6,7 @@ import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ContextHolder.cacheService
 import kurenai.imsyncbot.ContextHolder.qqBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
+import kurenai.imsyncbot.command.Bannable
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.telegram.send
@@ -23,7 +24,7 @@ import org.apache.logging.log4j.LogManager
 import org.springframework.stereotype.Component
 
 @Component
-class TitleCommand : AbstractTelegramCommand() {
+class TitleCommand : AbstractTelegramCommand(), Bannable {
 
     private val log = LogManager.getLogger()
 
@@ -32,13 +33,13 @@ class TitleCommand : AbstractTelegramCommand() {
     override val onlySupperAdmin = false
 
     override fun execute(update: Update, message: Message): String? {
-        val params = message.text!!.params().trim()
+        val param = message.text!!.param()
         if (message.isReply()) {
             val replyMsg = message.replyToMessage!!
             try {
                 val from = replyMsg.from!!
                 UserConfig.superAdmins.firstOrNull { message.from?.id == it }?.also {
-                    if (!handleLinkCase(from, message, params)) {
+                    if (!handleLinkCase(from, message, param)) {
                         CoroutineScope(Dispatchers.Default).launch {
                             val qqMsg = cacheService.getQQByTg(replyMsg)
                             if (qqMsg == null) {
@@ -47,7 +48,7 @@ class TitleCommand : AbstractTelegramCommand() {
                                 }.send()
                             } else {
                                 qqBot.getGroup(qqMsg.targetId)?.getMember(qqMsg.fromId)?.also {
-                                    modifyTitle(it, message, params)
+                                    modifyTitle(it, message, param)
                                 } ?: kotlin.run {
                                     SendMessage(message.chatId, "未能找到对应的qq用户或群组").apply {
                                         replyToMessageId = message.messageId
@@ -67,7 +68,7 @@ class TitleCommand : AbstractTelegramCommand() {
             }
         } else {
             val from = message.from!!
-            if (!handleLinkCase(from, message, params)) {
+            if (!handleLinkCase(from, message, param)) {
                 SendMessage(message.chatId, "未能找到对应的qq用户").apply {
                     this.replyToMessageId = message.messageId
                 }.send()

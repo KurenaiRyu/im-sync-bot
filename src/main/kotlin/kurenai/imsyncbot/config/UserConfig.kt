@@ -303,5 +303,5 @@ enum class UserStatus {
     SUPER_ADMIN,
     MASTER,
     BANNED,
-    PIC_BANNED,
+    PIC_BANNED
 }

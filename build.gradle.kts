@@ -66,6 +66,7 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
     //tool kit
+    implementation("com.google.guava:guava:31.1-jre")
     implementation("org.sejda.imageio:webp-imageio:0.1.6")
     implementation("com.squareup.okhttp3:okhttp:4.9.3")
     implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")

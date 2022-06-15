@@ -107,7 +107,7 @@ class InfoCommand(
                 val config = GroupConfig.configs.firstOrNull { it.tg == message.chat.id }
                 list.add("绑定群id: `${group.id}`")
                 list.add("绑定群名称: `${group.name.format2Markdown()}`")
-                list.add("绑定群群主: `${group.owner.nick.format2Markdown()}`\\(`${group.id}`\\)")
+                list.add("绑定群群主: `${group.owner.nick.format2Markdown()}`\\(`${group.owner.id}`\\)")
                 if (config?.status?.isNotEmpty() == true)
                     list.add("状态: ${config.status.toString().format2Markdown()}")
 

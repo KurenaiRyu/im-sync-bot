@@ -1,6 +1,8 @@
 package kurenai.imsyncbot.command
 
+import com.google.common.base.CaseFormat
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.telegram.send
@@ -36,26 +38,39 @@ object DelegatingCommand {
         for (handler in tgHandlers) {
             if (handler.command == command) {
                 log.debug { "Match ${handler.name}" }
-                msg = if (handler.onlyMaster && UserConfig.masterTg != message.from?.id) {
-                    "该命令只允许主人执行"
-                } else if (handler.onlySupperAdmin && !UserConfig.superAdmins.contains(message.from?.id)) {
-                    "该命令只允许超级管理员执行"
-                } else if (handler.onlyAdmin && !UserConfig.admins.contains(message.from?.id)) {
-                    "该命令只允许管理员执行"
-                } else if (handler.onlyUserMessage && !message.isUserMessage()) {
-                    "该命令只允许私聊执行"
-                } else if (handler.onlyGroupMessage && !(message.isSuperGroupMessage() || message.isGroupMessage())) {
-                    "该命令只允许群组执行"
-                } else if (handler.onlyReply && !(message.isReply())) {
-                    "需要引用一条消息"
+                val isSupperAdmin = UserConfig.superAdmins.contains(message.from?.id)
+                val param = message.text?.replace("/${handler.command}", "")?.trim()
+                msg = if (isSupperAdmin && param == "ban") {
+                    handleBan(message.chat.id, handler)
+                    "Banned command: ${handler.command}"
+                } else if (isSupperAdmin && param == "unban") {
+                    handleUnban(message.chat.id, handler)
+                    "Unbanned command: ${handler.command}"
+                } else if (GroupConfig.statusContain(message.chat.id, handler.getCommandBannedStatus())) {
+                    log.debug("Command was banned for group[${message.chat.title}(${message.chat.id})].")
+                    return
                 } else {
-                    try {
-                        handler.execute(update, message)?.also {
-                            reply = handler.reply
-                            parseMode = handler.parseMode
+                    if (handler.onlyMaster && UserConfig.masterTg != message.from?.id) {
+                        "该命令只允许主人执行"
+                    } else if (handler.onlySupperAdmin && !isSupperAdmin) {
+                        "该命令只允许超级管理员执行"
+                    } else if (handler.onlyAdmin && !UserConfig.admins.contains(message.from?.id)) {
+                        "该命令只允许管理员执行"
+                    } else if (handler.onlyUserMessage && !message.isUserMessage()) {
+                        "该命令只允许私聊执行"
+                    } else if (handler.onlyGroupMessage && !(message.isSuperGroupMessage() || message.isGroupMessage())) {
+                        "该命令只允许群组执行"
+                    } else if (handler.onlyReply && !(message.isReply())) {
+                        "需要引用一条消息"
+                    } else {
+                        try {
+                            handler.execute(update, message)?.also {
+                                reply = handler.reply
+                                parseMode = handler.parseMode
+                            }
+                        } catch (e: BotException) {
+                            e.message
                         }
-                    } catch (e: BotException) {
-                        e.message
                     }
                 }
                 break
@@ -67,6 +82,29 @@ object DelegatingCommand {
                 if (reply) this.replyToMessageId = message.messageId
             }.send()
         }
+    }
+
+    private fun handleUnban(groupId: Long, handler: AbstractTelegramCommand) {
+        GroupConfig.removeStatus(groupId, handler.getCommandBannedStatus())
+        log.info("Unbanned command: ${handler.command}")
+    }
+
+    private fun handleBan(groupId: Long, handler: AbstractTelegramCommand) {
+        GroupConfig.addStatus(groupId, handler.getCommandBannedStatus())
+        log.info("Banned command: ${handler.command}")
+    }
+
+    private fun AbstractTelegramCommand.getCommandBannedStatus(): String {
+        return "${CaseFormat.UPPER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, this::class.simpleName!!)}_BANNED"
+    }
+
+    private fun AbstractQQCommand.getCommandBannedStatus(): String {
+        return "${
+            CaseFormat.UPPER_CAMEL.to(
+                CaseFormat.UPPER_UNDERSCORE,
+                this::class.simpleName!!.replace("QQ", "")
+            )
+        }_BANNED"
     }
 
     fun handleInlineQuery(update: Update, inlineQuery: InlineQuery) {
@@ -102,10 +140,11 @@ object DelegatingCommand {
     suspend fun execute(event: MessageEvent): Int {
         var matched = false
         for (handler in qqHandlers) {
-            if (handler.execute(event) == 1) {
-                matched = true
-                break
-            }
+            if (GroupConfig.configs.any { it.qq == event.subject.id && it.status.contains(handler.getCommandBannedStatus()) })
+                if (handler.execute(event) == 1) {
+                    matched = true
+                    break
+                }
         }
         return if (matched) 1 else 0
     }
@@ -126,7 +165,7 @@ object DelegatingCommand {
             sb.append("/${handler.command} ${handler.name}\n")
             sb.append(handler.help)
         }
-        SendMessage(message.chatId.toString(), sb.toString()).send()
+        SendMessage(message.chatId, sb.toString()).send()
     }
 
 

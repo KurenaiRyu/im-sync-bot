@@ -25,7 +25,7 @@ class BindCommand(
     override fun execute(update: Update, message: Message): String? {
         val client = ContextHolder.telegramBot
         val qqBot = ContextHolder.qqBot
-        val param = message.text?.params()?.trim() ?: "参数错误"
+        val param = message.text?.param() ?: "参数错误"
         return if (message.isGroupMessage() || message.isSuperGroupMessage()) {
             if (message.isReply()) {
                 val replyMessage = message.replyToMessage!!

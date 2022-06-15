@@ -56,8 +56,8 @@ abstract class AbstractConfig<T> {
         refresh()
     }
 
-    abstract fun add0(config: T)
-    abstract fun addAll0(configs: Collection<T>)
+    protected abstract fun add0(config: T)
+    protected abstract fun addAll0(configs: Collection<T>)
     abstract fun getConfigName(): String
     protected abstract fun refresh()
 

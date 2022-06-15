@@ -20,8 +20,8 @@ abstract class AbstractTelegramCommand {
 
     abstract fun execute(update: Update, message: Message): String?
 
-    fun String.params(): String {
-        return this.replace("/$command", "")
+    fun String.param(): String {
+        return this.replace("/$command", "").trim()
     }
 
 

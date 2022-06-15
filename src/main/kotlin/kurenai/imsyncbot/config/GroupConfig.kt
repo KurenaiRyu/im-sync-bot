@@ -28,32 +28,32 @@ object GroupConfig : AbstractConfig<Group>() {
     }
 
     fun ban(tg: Long) {
-        addStatus(tg, GroupStatus.BANNED)
+        addStatus(tg, GroupStatus.BANNED.name)
     }
 
     fun unban(tg: Long) {
-        removeStatus(tg, GroupStatus.BANNED)
+        removeStatus(tg, GroupStatus.BANNED.name)
     }
 
     fun banPic(tg: Long) {
-        addStatus(tg, GroupStatus.PIC_BANNED)
+        addStatus(tg, GroupStatus.PIC_BANNED.name)
     }
 
     fun unbanPic(tg: Long) {
-        removeStatus(tg, GroupStatus.PIC_BANNED)
+        removeStatus(tg, GroupStatus.PIC_BANNED.name)
     }
 
-    private fun addStatus(tg: Long, status: GroupStatus) {
-        configs.filter { it.tg == tg && !it.status.contains(status) }.forEach {
-            it.status.add(status)
-        }
+    fun statusContain(tg: Long, status: String): Boolean {
+        return configs.any { it.tg == tg && it.status.contains(status) }
+    }
+
+    fun addStatus(tg: Long, status: String) {
+        configs.firstOrNull { it.tg == tg && !it.status.contains(status) }?.status?.add(status)
         afterUpdate()
     }
 
-    private fun removeStatus(tg: Long, status: GroupStatus) {
-        configs.filter { it.tg == tg && it.status.contains(status) }.forEach {
-            it.status.remove(status)
-        }
+    fun removeStatus(tg: Long, status: String) {
+        configs.removeIf { it.tg == tg && it.status.contains(status) }
         afterUpdate()
     }
 
@@ -67,11 +67,18 @@ object GroupConfig : AbstractConfig<Group>() {
     }
 
     fun default(message: Message) {
-        val defaultGroup = configs.firstOrNull { it.status.contains(GroupStatus.DEFAULT) }
+        val defaultGroup = configs.firstOrNull { it.status.contains(GroupStatus.DEFAULT.name) }
         if (defaultGroup != null) {
             add(Group(message.chat.id, tgQQ[message.chat.id] ?: defaultGroup.qq, message.chat.title!!, defaultGroup.status))
         } else {
-            add(Group(message.chat.id, tgQQ[message.chat.id] ?: 0L, message.chat.title!!, hashSetOf(GroupStatus.DEFAULT)))
+            add(
+                Group(
+                    message.chat.id,
+                    tgQQ[message.chat.id] ?: 0L,
+                    message.chat.title!!,
+                    hashSetOf(GroupStatus.DEFAULT.name)
+                )
+            )
         }
     }
 
@@ -88,16 +95,16 @@ object GroupConfig : AbstractConfig<Group>() {
             var banned = false
             for (status in config.status) {
                 when (status) {
-                    GroupStatus.BANNED -> {
+                    GroupStatus.BANNED.name -> {
                         bannedGroups.add(config.qq)
                         bannedGroups.add(config.tg)
                         banned = true
                     }
-                    GroupStatus.PIC_BANNED -> {
+                    GroupStatus.PIC_BANNED.name -> {
                         picBannedGroups.add(config.qq)
                         picBannedGroups.add(config.tg)
                     }
-                    GroupStatus.DEFAULT -> {
+                    GroupStatus.DEFAULT.name -> {
                         defaultQQGroup = config.qq
                         defaultTgGroup = config.tg
                     }
@@ -133,7 +140,7 @@ data class Group(
     val tg: Long,
     val qq: Long,
     val title: String,
-    val status: HashSet<GroupStatus> = HashSet(),
+    val status: HashSet<String> = HashSet(),
 )
 
 enum class GroupStatus {
