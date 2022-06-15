@@ -1,9 +1,7 @@
 package kurenai.imsyncbot.handler.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.boot.context.properties.ConstructorBinding
 
-@ConstructorBinding
 @ConfigurationProperties(prefix = "bot.handler.forward")
 //@PropertySource(factory = YamlPropertySourceFactory::class)
 class ForwardHandlerProperties {

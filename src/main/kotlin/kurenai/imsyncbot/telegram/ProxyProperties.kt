@@ -1,7 +1,6 @@
 package kurenai.imsyncbot.telegram
 
 import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.boot.context.properties.ConstructorBinding
 import java.net.Proxy
 
 /**
@@ -9,7 +8,6 @@ import java.net.Proxy
  * @since 2021-06-30 14:13
  */
 
-@ConstructorBinding
 @ConfigurationProperties(prefix = "bot.telegram.proxy")
 //@PropertySource(factory = YamlPropertySourceFactory::class)
 class ProxyProperties {

@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.springframework.boot") version "3.0.0-M1"
+    id("org.springframework.boot") version "3.0.0-M3"
     id("io.spring.dependency-management") version "1.0.11.RELEASE"
 //    id("org.springframework.experimental.aot") version "0.11.1"
     kotlin("jvm") version "1.6.21"
@@ -39,7 +39,7 @@ fun gpr(url: String): (MavenArtifactRepository).() -> Unit {
 
 dependencies {
 
-    val miraiVersion = "2.11.0-M1"
+    val miraiVersion = "2.11.1"
 
     //mirai
     implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {
@@ -101,29 +101,3 @@ tasks.withType<JavaCompile> {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
-
-//tasks.getByName<BootBuildImage>("bootBuildImage") {
-//    imageName = "kurenai9/im-sync-bot:test"
-//    builder = "paketobuildpacks/builder:base"
-//    isVerboseLogging = true
-//    environment = mapOf(
-//        "BP_NATIVE_IMAGE_BUILD_ARGUMENTS" to "  --initialize-at-run-time=io.netty.channel.epoll.Epoll\n" +
-//                " --initialize-at-run-time=io.netty.channel.kqueue.KQueue\n" +
-//                "  --initialize-at-run-time=io.netty.channel.epoll.Native\n" +
-//                "  --initialize-at-run-time=io.netty.channel.epoll.EpollEventLoop\n" +
-//                "  --initialize-at-run-time=io.netty.channel.epoll.EpollEventArray\n" +
-//                "  --initialize-at-run-time=io.netty.channel.DefaultFileRegion\n" +
-//                "  --initialize-at-run-time=io.netty.channel.kqueue.KQueueEventArray\n" +
-//                "  --initialize-at-run-time=io.netty.channel.kqueue.KQueueEventLoop\n" +
-//                "  --initialize-at-run-time=io.netty.channel.kqueue.Native\n" +
-//                "  --initialize-at-run-time=io.netty.channel.unix.Errors\n" +
-//                "  --initialize-at-run-time=io.netty.channel.unix.IovArray\n" +
-//                "  --initialize-at-run-time=io.netty.channel.unix.Limits\n" +
-//                "  --initialize-at-run-time=io.netty.util.internal.logging.Log4JLogger\n" +
-//                "  --initialize-at-run-time=io.netty.handler.ssl.JdkNpnApplicationProtocolNegotiator\n" +
-//                "  --initialize-at-run-time=io.netty.handler.ssl.JettyNpnSslEngine",
-//        "BP_NATIVE_IMAGE" to "true",
-//        "HTTP_PROXY" to "http://10.0.0.9:7890",
-//        "HTTPS_PROXY" to "http://10.0.0.9:7890"
-//    )
-//}
