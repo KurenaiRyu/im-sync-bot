@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
 
 @Component
-class QQForwardHandler(
+class QQMessageHandler(
     final val properties: ForwardHandlerProperties,
     private val cacheService: CacheService,
 ) : QQHandler {
@@ -69,22 +69,22 @@ class QQForwardHandler(
     }
 
     @Throws(Exception::class)
-    override suspend fun onGroupMessage(event: GroupAwareMessageEvent): Int {
-        val group = event.group
-        val sender = event.sender
+    override suspend fun onGroupMessage(group: Group, messageChain: MessageChain): Int {
+        val messageSource = messageChain.source
+        val sender = group.getOrFail(messageSource.fromId)
         val senderName = BotUtil.formatUsername(
             UserConfig.idBindings[sender.id] ?: ContextHolder.qqBot.getFriend(sender.id)?.remarkOrNick
             ?: (sender as Member).remarkOrNameCardOrNick
         )
-        val messageChain = event.message
         val atAccount = AtomicLong(-100)
-        val content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
+        val content =
+            messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
         val chatId = qqTg[group.id] ?: GroupConfig.defaultTgGroup
 
         return if (content.startsWith("<?xml version='1.0'")) {
-            handleRichMessage(event, chatId, senderName)
+            handleRichMessage(messageChain, group, sender, chatId, senderName)
         } else if (content.contains("\"app\":")) {
-            handleAppMessage(event, chatId, senderName)
+            handleAppMessage(messageChain, group, sender, chatId, senderName)
         } else if (messageChain.contains(ForwardMessage.Key)) {
             onGroupForwardMessage(
                 messageChain[ForwardMessage.Key]!!,
@@ -93,7 +93,7 @@ class QQForwardHandler(
                 senderName
             )
         } else {
-            handleGroupMessage(messageChain, event.group, chatId.toString(), sender.id, senderName)
+            handleGroupMessage(messageChain, group, chatId.toString(), sender.id, senderName)
         }
     }
 
@@ -122,8 +122,14 @@ class QQForwardHandler(
         return CONTINUE
     }
 
-    private suspend fun handleAppMessage(event: GroupAwareMessageEvent, chatId: Long, senderName: String): Int {
-        val jsonNode = jsonMapper.readTree(event.message.contentToString())
+    private suspend fun handleAppMessage(
+        messageSource: MessageChain,
+        group: Group,
+        sender: User,
+        chatId: Long,
+        senderName: String
+    ): Int {
+        val jsonNode = jsonMapper.readTree(messageSource.contentToString())
         val url = if (jsonNode["view"].asText("") == "news") {
             val news = jsonNode["meta"]?.get("news")
             news?.get("jumpUrl")?.asText() ?: ""
@@ -131,17 +137,29 @@ class QQForwardHandler(
             val item = jsonNode["meta"]?.get("detail_1")
             item?.get("qqdocurl")?.asText() ?: ""
         }
-        if (url.isNotBlank()) return handleGroupMessage(buildMessageChain { add(handleUrl(url)) }, event.group, chatId.toString(), event.sender.id, senderName)
+        if (url.isNotBlank()) return handleGroupMessage(
+            buildMessageChain { add(handleUrl(url)) },
+            group,
+            chatId.toString(),
+            sender.id,
+            senderName
+        )
         return CONTINUE
     }
 
-    private suspend fun handleRichMessage(event: GroupAwareMessageEvent, chatId: Long, senderName: String): Int {
-        val jsonNode = xmlMapper.readTree(event.message.contentToString())
+    private suspend fun handleRichMessage(
+        messageChain: MessageChain,
+        group: Group,
+        sender: User,
+        chatId: Long,
+        senderName: String
+    ): Int {
+        val jsonNode = xmlMapper.readTree(messageChain.contentToString())
         val action = jsonNode["action"].asText("")
         val url: String
         if (action == "web") {
             url = handleUrl(jsonNode["url"]?.asText() ?: "")
-            return handleGroupMessage(buildMessageChain { add(url) }, event.group, chatId.toString(), event.sender.id, senderName)
+            return handleGroupMessage(buildMessageChain { add(url) }, group, chatId.toString(), sender.id, senderName)
         }
         return CONTINUE
     }

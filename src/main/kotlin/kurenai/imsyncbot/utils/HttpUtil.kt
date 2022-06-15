@@ -53,7 +53,7 @@ object HttpUtil {
     private suspend fun doDownload(file: File, url: String, enableProxy: Boolean = false): File {
         val start = System.nanoTime()
 
-        getRemoteFileSize(url).thenCompose { size ->
+        getRemoteFileSize(url, enableProxy).thenCompose { size ->
             if (size != null) {
                 if (size < 1024 * 1024 * 100) multiPartDownload(url, file, size, enableProxy)
                 else throw ImSyncBotRuntimeException("The file is too large: $size")

@@ -2,12 +2,13 @@ package kurenai.imsyncbot.handler.qq
 
 import kurenai.imsyncbot.handler.Handler
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
-import net.mamoe.mirai.event.events.GroupAwareMessageEvent
+import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.event.events.MessageRecallEvent
+import net.mamoe.mirai.message.data.MessageChain
 
 interface QQHandler : Handler {
 
-    suspend fun onGroupMessage(event: GroupAwareMessageEvent): Int {
+    suspend fun onGroupMessage(group: Group, messageChain: MessageChain): Int {
         return CONTINUE
     }
 

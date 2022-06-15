@@ -29,7 +29,7 @@ import java.io.File
 import java.io.IOException
 
 @Component
-class TgForwardHandler(
+class TgMessageHandler(
     properties: ForwardHandlerProperties,
     private val cacheService: CacheService,
 ) : TelegramHandler {
@@ -129,6 +129,16 @@ class TgForwardHandler(
             message.hasSticker() -> {
                 val sticker = message.sticker!!
                 val builder = MessageChainBuilder()
+                if (sticker.isVideo) {
+                    BotUtil.mp42gif(sticker.fileId, getTgFile(sticker.fileId, sticker.fileUniqueId))?.let { gifFile ->
+                        gifFile.toExternalResource().use {
+                            builder.add(group.uploadImage(it))
+                            formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, "", builder)
+                            cacheService.cache(group.sendMessage(builder.build()).source, message)
+                        }
+                    }
+                    return CONTINUE
+                }
                 if (sticker.isAnimated) {
                     formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, sticker.emoji ?: "NaN", builder)
                 } else {

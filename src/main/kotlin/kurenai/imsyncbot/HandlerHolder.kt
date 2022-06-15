@@ -2,7 +2,7 @@ package kurenai.imsyncbot
 
 import kurenai.imsyncbot.handler.Handler
 import kurenai.imsyncbot.handler.qq.QQHandler
-import kurenai.imsyncbot.handler.tg.TgForwardHandler
+import kurenai.imsyncbot.handler.tg.TgMessageHandler
 import mu.KotlinLogging
 
 class HandlerHolder(
@@ -12,13 +12,13 @@ class HandlerHolder(
     private val log = KotlinLogging.logger {}
 
     val currentQQHandlerList = ArrayList<QQHandler>()
-    val currentTgHandlerList = ArrayList<TgForwardHandler>()
+    val currentTgHandlerList = ArrayList<TgMessageHandler>()
 
     init {
         handlerList.sorted().takeIf { it.isNotEmpty() }?.forEach {
             when (it) {
                 is QQHandler -> currentQQHandlerList.add(it)
-                is TgForwardHandler -> currentTgHandlerList.add(it)
+                is TgMessageHandler -> currentTgHandlerList.add(it)
             }
         }
 
