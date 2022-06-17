@@ -24,6 +24,7 @@ import net.mamoe.mirai.event.events.FriendMessageEvent
 import net.mamoe.mirai.event.events.FriendMessageSyncEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
+import net.mamoe.mirai.message.sourceMessage
 import okhttp3.internal.notifyAll
 import org.apache.logging.log4j.LogManager
 import org.springframework.stereotype.Component
@@ -141,9 +142,7 @@ class PrivateChatHandler(
                     }
                 }
             }?.also { rec ->
-                chain[OnlineMessageSource.Key]?.let { source ->
-                    cacheService.cache(source, rec)
-                }
+                cacheService.cache(chain, rec)
             }
         }
     }
@@ -212,7 +211,7 @@ class PrivateChatHandler(
                     builder.add(message.text!!)
                 }
             }
-            cacheService.cache(friend.sendMessage(builder.build()).source, message)
+            cacheService.cache(friend.sendMessage(builder.build()).sourceMessage, message)
         }
     }
 

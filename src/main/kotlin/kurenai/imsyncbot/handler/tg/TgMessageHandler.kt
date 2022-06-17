@@ -19,10 +19,11 @@ import moe.kurenai.tdlight.request.GetFile
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.message.data.Image
+import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageChainBuilder
-import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
+import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import org.springframework.stereotype.Component
 import java.io.File
@@ -72,11 +73,11 @@ class TgMessageHandler(
         }
 
         val bot = ContextHolder.qqBot
-        val quoteMsgSource =
+        val quoteMsgChain =
             message.replyToMessage?.let {
                 cacheService.getQQByTg(it)
             }
-        val groupId = quoteMsgSource?.targetId ?: tgQQ.getOrDefault(message.chat.id, GroupConfig.defaultQQGroup)
+        val groupId = quoteMsgChain?.source?.targetId ?: tgQQ.getOrDefault(message.chat.id, GroupConfig.defaultQQGroup)
         if (groupId == 0L) return CONTINUE
         val group = bot.getGroup(groupId)
         if (null == group) {
@@ -97,21 +98,21 @@ class TgMessageHandler(
             message.hasVoice() -> {
                 val voice = message.voice!!
                 val file = getTgFile(voice.fileId, voice.fileUniqueId)
-                uploadAndSend(message, group, file)
+                uploadAndSend(group, file)
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
-                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, message.caption!!, builder)
-                    cacheService.cache(group.sendMessage(builder.build()).source, message)
+                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.caption!!, builder)
+                    cacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
             message.hasVideo() -> {
                 val video = message.video!!
                 val file = getTgFile(video.fileId, video.fileUniqueId)
-                uploadAndSend(message, group, file, video.fileName ?: video.fileId.plus(".mp4"))
+                uploadAndSend(group, file, video.fileName ?: video.fileId.plus(".mp4"))
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
-                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, message.caption!!, builder)
-                    cacheService.cache(group.sendMessage(builder.build()).source, message)
+                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.caption!!, builder)
+                    cacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
             message.hasAnimation() -> {
@@ -121,8 +122,8 @@ class TgMessageHandler(
                 BotUtil.mp42gif(animation.fileId, tgFile)?.let { gifFile ->
                     gifFile.toExternalResource().use {
                         builder.add(group.uploadImage(it))
-                        formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, "", builder)
-                        cacheService.cache(group.sendMessage(builder.build()).source, message)
+                        formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, "", builder)
+                        cacheService.cache(group.sendMessage(builder.build()), message)
                     }
                 }
             }
@@ -133,52 +134,55 @@ class TgMessageHandler(
                     BotUtil.mp42gif(sticker.fileId, getTgFile(sticker.fileId, sticker.fileUniqueId))?.let { gifFile ->
                         gifFile.toExternalResource().use {
                             builder.add(group.uploadImage(it))
-                            formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, "", builder)
-                            cacheService.cache(group.sendMessage(builder.build()).source, message)
+                            formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, "", builder)
+                            cacheService.cache(group.sendMessage(builder.build()), message)
                         }
                     }
                     return CONTINUE
                 }
                 if (sticker.isAnimated) {
-                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, sticker.emoji ?: "NaN", builder)
+                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, sticker.emoji ?: "NaN", builder)
                 } else {
                     getImage(group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
-                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, "", builder)
+                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, "", builder)
                 }
                 group.sendMessage(builder.build()).let {
-                    cacheService.cache(it.source, message)
+                    cacheService.cache(it, message)
                 }
             }
             message.hasDocument() -> {
                 val document = message.document!!
                 val file = getTgFile(document.fileId, document.fileUniqueId)
-                uploadAndSend(message, group, file, document.fileName ?: document.fileId)
+                uploadAndSend(group, file, document.fileName ?: document.fileId)
                 if (!isMaster) group.sendMessage("Upload by $senderName.")
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
-                    formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
-                    cacheService.cache(group.sendMessage(builder.build()).source, message)
+                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, caption, builder)
+                    cacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
             message.hasPhoto() -> {
                 val builder = MessageChainBuilder()
                 message.photo!!.groupBy { it.fileId.substring(0, 40) }
-                    .mapNotNull { (_: String, photoSizes: List<PhotoSize>) -> photoSizes.maxByOrNull { it.fileSize ?: 0 } }
+                    .mapNotNull { (_: String, photoSizes: List<PhotoSize>) ->
+                        photoSizes.maxByOrNull {
+                            it.fileSize ?: 0
+                        }
+                    }
                     .mapNotNull { getImage(group, it.fileId, it.fileUniqueId) }.forEach(builder::add)
-                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, caption, builder)
-                cacheService.cache(group.sendMessage(builder.build()).source, message)
+                formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, caption, builder)
+                cacheService.cache(group.sendMessage(builder.build()), message)
             }
             message.hasText() -> {
                 val builder = MessageChainBuilder()
-                formatMsgAndQuote(quoteMsgSource, isMaster, senderId, senderName, message.text!!, builder)
-                cacheService.cache(group.sendMessage(builder.build()).source, message)
+                formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.text!!, builder)
+                cacheService.cache(group.sendMessage(builder.build()), message)
             }
         }
         return CONTINUE
     }
 
     private suspend fun uploadAndSend(
-        message: Message,
         group: Group,
         file: moe.kurenai.tdlight.model.media.File,
         fileName: String = "${file.fileId.substring(0, 40)}.${BotUtil.getSuffix(file.filePath)}",
@@ -197,15 +201,15 @@ class TgMessageHandler(
     }
 
     private fun formatMsgAndQuote(
-        quoteMsgSource: MessageSource?,
+        quoteMsgChain: MessageChain?,
         isMaster: Boolean,
         id: Long,
         username: String,
         content: String,
         builder: MessageChainBuilder,
     ) {
-        val msg = if (quoteMsgSource != null) {
-            builder.add(quoteMsgSource.quote())
+        val msg = if (quoteMsgChain != null) {
+            builder.add(quoteMsgChain.quote())
             content.takeIf { it.isNotEmpty() } ?: " "
         } else {
             content

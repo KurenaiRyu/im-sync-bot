@@ -152,7 +152,7 @@ object UserConfig : AbstractConfig<User>() {
     }
 
     fun setMaster(message: Message) {
-        setMaster(User(message.from?.id, masterQQ, message.from?.username, chatId = message.chat.id))
+        setMaster(User(message.from?.id, masterQQ, message.from?.firstName, chatId = message.chat.id))
     }
 
     fun setMaster(properties: ForwardHandlerProperties) {

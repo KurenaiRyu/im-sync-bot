@@ -2,14 +2,17 @@ package kurenai.imsyncbot.service
 
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.entity.FileCache
-import kurenai.imsyncbot.entity.MessageSourceCache
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.request.message.GetMessageInfo
 import mu.KotlinLogging
+import net.mamoe.mirai.message.MessageReceipt
+import net.mamoe.mirai.message.data.MessageChain
+import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
 import net.mamoe.mirai.message.data.MessageSource
-import net.mamoe.mirai.message.data.MessageSourceBuilder
-import net.mamoe.mirai.message.data.OnlineMessageSource
+import net.mamoe.mirai.message.data.ids
+import net.mamoe.mirai.message.data.source
+import net.mamoe.mirai.message.sourceMessage
 import org.redisson.api.RedissonClient
 import org.redisson.client.protocol.ScoredEntry
 import org.springframework.beans.factory.InitializingBean
@@ -50,19 +53,18 @@ class CacheService(
         ContextHolder.cacheService = this
     }
 
-    fun cache(source: OnlineMessageSource, message: Message) {
-        if (source.ids.isEmpty()) {
-            log.warn { "source ids is empty: $source" }
-            return
-        }
-        val qqMsgId: String = source.cacheId()
+    fun cache(messageChain: MessageChain, message: Message) {
+        val qqMsgId: String = messageChain.cacheId()
         val tgMsgId: String = message.cacheId()
 
         cache.put(QQ_TG_MSG_ID_CACHE_KEY, qqMsgId, tgMsgId, TTL)
         cache.put(TG_QQ_MSG_ID_CACHE_KEY, tgMsgId, qqMsgId, TTL)
-        cache.put(QQ_MSG_CACHE_KEY, qqMsgId, MessageSourceCache(source), TTL)
-
+        cache.put(QQ_MSG_CACHE_KEY, qqMsgId, messageChain.serializeToJsonString(), TTL)
         cache(message)
+    }
+
+    fun cache(receipt: MessageReceipt<*>, message: Message) {
+        cache(receipt.sourceMessage.plus(receipt.source), message)
     }
 
     fun cache(message: Message) {
@@ -123,28 +125,26 @@ class CacheService(
         return cache.get<String, String?>(QQ_TG_MSG_ID_CACHE_KEY, getQQCacheId(group, id))?.splitCacheId()
     }
 
-    fun getQQ(group: Long, id: Int): MessageSource? {
+    fun getQQ(group: Long, id: Int): MessageChain? {
         return getOfflineQQ(group, id)
     }
 
-    fun getOfflineQQ(group: Long, id: Int): MessageSource? {
-        val source: MessageSourceCache? = cache.get(QQ_MSG_CACHE_KEY, getQQCacheId(group, id))
-        return if (source == null) {
+    fun getOfflineQQ(group: Long, id: Int): MessageChain? {
+        val json: String? = cache.get(QQ_MSG_CACHE_KEY, getQQCacheId(group, id))
+        return if (json == null) {
             log.debug { "QQ source not found by $group:$id" }
             null
         } else {
-            MessageSourceBuilder().apply {
-                this.ids = source.ids
-                this.time = source.time
-                this.fromId = source.fromId
-                this.targetId = source.targetId
-                this.internalIds = source.internalIds
-                this.messages { this.add(source.content) }
-            }.build(source.botId, source.kind)
+            try {
+                MessageChain.deserializeFromJsonString(json)
+            } catch (e: Exception) {
+                log.error("Deserialize error: $json")
+                null
+            }
         }
     }
 
-    fun getQQByTg(message: Message): MessageSource? {
+    fun getQQByTg(message: Message): MessageChain? {
         val msgId = getQQIdByTg(message.chat.id, message.messageId!!)
         return if (msgId == null) {
             log.debug { "QQ msg id not found by ${message.cacheId()}" }
@@ -154,7 +154,7 @@ class CacheService(
         }
     }
 
-    fun getQQByTg(chatId: Long, messageId: Int): MessageSource? {
+    fun getQQByTg(chatId: Long, messageId: Int): MessageChain? {
         val msgId = getQQIdByTg(chatId, messageId)
         return if (msgId == null) {
             log.debug { "QQ msg id not found by $msgId" }
@@ -206,7 +206,11 @@ class CacheService(
         return getTgCacheId(chat.id, messageId!!)
     }
 
-    private fun OnlineMessageSource.cacheId(): String {
+    private fun MessageChain.cacheId(): String {
+        return getQQCacheId(source.targetId, ids[0])
+    }
+
+    private fun MessageSource.cacheId(): String {
         return getQQCacheId(targetId, ids[0])
     }
 

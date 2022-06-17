@@ -93,10 +93,10 @@ object BotUtil {
     }
 
     fun formatUsername(username: String): String {
-        return username.replace("https://", "", true)
+        return username.replace("https://", "_", true)
             .replace("http://", "", true)
-            .replace(".", " .")
-            .replace("/", "-")
+            .replace(".", "_")
+            .replace("/", "_")
     }
 
     fun buildInlineMarkup(dataList: List<Map<String, String>>): List<List<InlineKeyboardButton>> {

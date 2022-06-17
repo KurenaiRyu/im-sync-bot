@@ -9,6 +9,7 @@ import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
 import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
+import net.mamoe.mirai.message.data.source
 import org.springframework.stereotype.Component
 
 @Component
@@ -33,8 +34,8 @@ class BindCommand(
                     val user = replyMessage.from!!
                     if (user.username == client.username) {
                         val qqMsg = cacheService.getQQByTg(replyMessage) ?: return "找不到该qq信息"
-                        UserConfig.bindName(qq = qqMsg.fromId, bindingName = param)
-                        "qq`${qqMsg.fromId}` 绑定名称为 `${param.format2Markdown()}`"
+                        UserConfig.bindName(qq = qqMsg.source.fromId, bindingName = param)
+                        "qq`${qqMsg.source.fromId}` 绑定名称为 `${param.format2Markdown()}`"
                     } else {
                         UserConfig.bindName(user.id, null, param, user.username)
                         "`${user.firstName.format2Markdown()}` 绑定名称为 `${param.format2Markdown()}`"

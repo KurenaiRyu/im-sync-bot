@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.entity
 
+import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceKind
-import net.mamoe.mirai.message.data.OnlineMessageSource
 import net.mamoe.mirai.message.data.kind
 
 class MessageSourceCache {
@@ -17,7 +17,7 @@ class MessageSourceCache {
 
     constructor()
 
-    constructor(messageSource: OnlineMessageSource) {
+    constructor(messageSource: MessageSource) {
         ids = messageSource.ids
         internalIds = messageSource.internalIds
         time = messageSource.time

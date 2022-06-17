@@ -7,6 +7,7 @@ import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.service.CacheService
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
+import net.mamoe.mirai.message.data.source
 import org.springframework.stereotype.Component
 
 @Component
@@ -25,8 +26,8 @@ class UnForwardCommand(
             if (user.isBot && user.username == ContextHolder.telegramBot.username) {
                 val qqMsg = cacheService.getQQByTg(reply)
                 if (qqMsg != null) {
-                    UserConfig.ban(qq = qqMsg.fromId)
-                    "qq[${qqMsg.fromId}] 已排除转发"
+                    UserConfig.ban(qq = qqMsg.source.fromId)
+                    "qq[${qqMsg.source.fromId}] 已排除转发"
                 } else "找不到该qq信息"
             } else {
                 UserConfig.ban(user.id)

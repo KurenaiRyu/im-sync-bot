@@ -20,6 +20,7 @@ import net.mamoe.mirai.contact.NormalMember
 import net.mamoe.mirai.contact.PermissionDeniedException
 import net.mamoe.mirai.contact.getMember
 import net.mamoe.mirai.contact.remarkOrNameCardOrNick
+import net.mamoe.mirai.message.data.source
 import org.apache.logging.log4j.LogManager
 import org.springframework.stereotype.Component
 
@@ -47,7 +48,7 @@ class TitleCommand : AbstractTelegramCommand(), Bannable {
                                     replyToMessageId = message.messageId
                                 }.send()
                             } else {
-                                qqBot.getGroup(qqMsg.targetId)?.getMember(qqMsg.fromId)?.also {
+                                qqBot.getGroup(qqMsg.source.targetId)?.getMember(qqMsg.source.fromId)?.also {
                                     modifyTitle(it, message, param)
                                 } ?: kotlin.run {
                                     SendMessage(message.chatId, "未能找到对应的qq用户或群组").apply {

@@ -7,6 +7,7 @@ import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.service.CacheService
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
+import net.mamoe.mirai.message.data.source
 import org.springframework.stereotype.Component
 
 @Component
@@ -25,8 +26,8 @@ class BanPicCommand(
             if (user.isBot && user.username == ContextHolder.telegramBot.username) {
                 val qqMsg = cacheService.getQQByTg(replyMessage)
                 if (qqMsg != null) {
-                    UserConfig.banPic(qqMsg.fromId)
-                    "qq[${qqMsg.fromId}] 已排除图片转发"
+                    UserConfig.banPic(qqMsg.source.fromId)
+                    "qq[${qqMsg.source.fromId}] 已排除图片转发"
                 } else "找不到该qq信息"
             } else {
                 UserConfig.banPic(user.id)

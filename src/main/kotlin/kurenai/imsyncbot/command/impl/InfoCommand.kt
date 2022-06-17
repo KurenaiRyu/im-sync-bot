@@ -17,6 +17,7 @@ import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.SendPhoto
 import moe.kurenai.tdlight.util.MarkdownUtil.fm2md
+import net.mamoe.mirai.message.data.source
 import org.springframework.stereotype.Component
 import java.time.Instant
 import java.time.ZoneId
@@ -38,7 +39,7 @@ class InfoCommand(
             if (user.isBot && user.username == ContextHolder.telegramBot.username) {
                 val qqMsg = cacheService.getQQByTg(replyMessage)
                 if (qqMsg != null) {
-                    val userId = qqMsg.fromId
+                    val userId = qqMsg.source.fromId
                     val qqGroup = GroupConfig.tgQQ[message.chat.id]?.let { ContextHolder.qqBot.getGroup(it) }
                     if (qqGroup == null) {
                         return "找不到绑定的qq群"

@@ -65,6 +65,11 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
+
+    implementation("io.ktor:ktor-client-core:1.6.7")
+    implementation("io.ktor:ktor-client-encoding:1.6.7")
+    implementation("io.ktor:ktor-client-okhttp:1.6.7")
+
     //tool kit
     implementation("com.google.guava:guava:31.1-jre")
     implementation("org.sejda.imageio:webp-imageio:0.1.6")

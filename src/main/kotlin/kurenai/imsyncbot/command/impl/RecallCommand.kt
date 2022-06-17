@@ -13,6 +13,7 @@ import moe.kurenai.tdlight.request.message.DeleteMessage
 import moe.kurenai.tdlight.request.message.SendMessage
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.recallMessage
+import net.mamoe.mirai.message.data.source
 import org.springframework.stereotype.Component
 
 @Component
@@ -35,7 +36,7 @@ class RecallCommand(
                 if (qqMsg == null)
                     SendMessage(message.chatId, "未能找到对应的qq消息").send()
                 else {
-                    ContextHolder.qqBot.getGroup(qqMsg.targetId)?.recallMessage(qqMsg)
+                    ContextHolder.qqBot.getGroup(qqMsg.source.targetId)?.recallMessage(qqMsg)
                     DeleteMessage(message.chatId, replyMsg.messageId!!).send()
                     DeleteMessage(message.chatId, message.messageId!!).send()
                 }

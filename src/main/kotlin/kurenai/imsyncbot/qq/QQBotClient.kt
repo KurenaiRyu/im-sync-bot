@@ -2,6 +2,8 @@ package kurenai.imsyncbot.qq
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.config.GroupConfig
@@ -11,6 +13,9 @@ import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.handler.qq.QQMessageHandler
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
+import moe.kurenai.tdlight.model.MessageEntityType
+import moe.kurenai.tdlight.model.message.MessageEntity
+import moe.kurenai.tdlight.model.message.User
 import moe.kurenai.tdlight.request.message.SendMessage
 import mu.KotlinLogging
 import net.mamoe.mirai.BotFactory
@@ -45,9 +50,8 @@ class QQBotClient(
     private val messageHandle = handlerHolder.currentQQHandlerList.filterIsInstance<QQMessageHandler>()[0]
     val startCountDown = CountDownLatch(1)
 
-    private val bucketMap = ConcurrentHashMap<String, RBlockingQueue<String?>>()
-    private val groupDispatcher = ConcurrentHashMap<Long, ExecutorCoroutineDispatcher>()
-    private val friendDispatcher = ConcurrentHashMap<Long, ExecutorCoroutineDispatcher>()
+    private val queueMap = HashMap<String, RBlockingQueue<String?>>()
+    private val dispatcherMap = HashMap<String, ExecutorCoroutineDispatcher>()
     private val defaultScope = CoroutineScope(Dispatchers.Default)
     private val handlerPool = ThreadPoolExecutor(
         System.getProperty("QQ_THREAD", "10").toInt(),
@@ -87,7 +91,9 @@ class QQBotClient(
     }
 
     var messageCount = 0
+    val mapLock: Mutex = Mutex()
 
+    @OptIn(DelicateCoroutinesApi::class)
     override fun afterPropertiesSet() {
         defaultScope.launch {
             log.info { "Login qq bot..." }
@@ -124,7 +130,7 @@ class QQBotClient(
 
             filter.subscribeAlways<Event> { event ->
                 try {
-                    messageCount = (messageCount + 1) xor Int.MAX_VALUE
+                    messageCount = (messageCount + 1) and Int.MAX_VALUE
                     val c = messageCount
                     log.debug { "message-$c $event" }
 
@@ -133,65 +139,81 @@ class QQBotClient(
                             val json = event.message.serializeToJsonString()
                             when (event) {
                                 is FriendMessageEvent -> {
-                                    val bucketName = "QUEUE:FRIEND:${event.friend.id}"
-                                    val queue = bucketMap[bucketName] ?: let {
-                                        redisson.getBlockingQueue<String?>(bucketName).also {
-                                            val dispatcher = friendDispatcher[event.friend.id]
-                                                ?: newSingleThreadContext("friend#${event.friend.id}")
-                                            CoroutineScope(dispatcher).launch {
-                                                val friend = event.friend
-                                                while (defaultScope.isActive) {
-                                                    try {
-                                                        val message =
-                                                            withContext(Dispatchers.IO) {
-                                                                it.poll(30, TimeUnit.SECONDS)
-                                                            } ?: continue
-                                                        privateChatHandler.onFriendMessage(
-                                                            friend,
-                                                            message.deserializeJsonToMessageChain()
-                                                        )
-                                                    } catch (e: Exception) {
-                                                        log.warn { e.message }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    queue.add(json)
-                                }
-                                is GroupAwareMessageEvent -> {
-                                    val bucketName = "QUEUE:GROUP:${event.group.id}"
-                                    val queue = bucketMap[bucketName] ?: let {
-                                        redisson.getBlockingQueue<String?>(bucketName).also {
-                                            val dispatcher = groupDispatcher[event.group.id]
-                                                ?: newSingleThreadContext("group#${event.group.id}")
-                                            CoroutineScope(dispatcher).launch {
-                                                val group = event.group
-                                                while (defaultScope.isActive) {
-                                                    try {
-                                                        val message =
-                                                            withContext(Dispatchers.IO) {
-                                                                it.poll(30, TimeUnit.SECONDS)
-                                                            } ?: continue
-                                                        messageHandle.onGroupMessage(
-                                                            group,
-                                                            message.deserializeJsonToMessageChain()
-                                                        )
-                                                    } catch (e: ImSyncBotRuntimeException) {
-                                                        log.warn { e.message }
-                                                    } catch (e: Exception) {
-                                                        log.error(e) { "处理信息失败，发送失败报告。" }
-                                                        try {
-                                                            reportError(event, e)
-                                                        } catch (e: Exception) {
-                                                            log.error(e) { "发送报告失败。" }
+                                    val queueName = "QUEUE:FRIEND:${event.friend.id}"
+                                    var queue = queueMap[queueName]
+                                    if (queue == null) {
+                                        mapLock.withLock {
+                                            queue = queueMap[queueName] ?: let {
+                                                redisson.getBlockingQueue<String?>(queueName).also { q ->
+                                                    queueMap[queueName] = q
+                                                    val dispatcher = dispatcherMap[queueName]
+                                                        ?: newSingleThreadContext("friend#${event.friend.id}").also {
+                                                            dispatcherMap[queueName] = it
+                                                        }
+                                                    CoroutineScope(dispatcher).launch {
+                                                        val friend = event.friend
+                                                        while (defaultScope.isActive) {
+                                                            try {
+                                                                val message =
+                                                                    withContext(Dispatchers.IO) {
+                                                                        q.poll(30, TimeUnit.SECONDS)
+                                                                    } ?: continue
+                                                                privateChatHandler.onFriendMessage(
+                                                                    friend,
+                                                                    message.deserializeJsonToMessageChain()
+                                                                )
+                                                            } catch (e: Exception) {
+                                                                log.warn { e.message }
+                                                            }
                                                         }
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    queue.add(json)
+                                    queue!!.add(json)
+                                }
+                                is GroupAwareMessageEvent -> {
+                                    val queueName = "QUEUE:GROUP:${event.group.id}"
+                                    var queue = queueMap[queueName]
+                                    if (queue == null) {
+                                        mapLock.withLock {
+                                            queue = queueMap[queueName] ?: let {
+                                                redisson.getBlockingQueue<String?>(queueName).also { q ->
+                                                    queueMap[queueName] = q
+                                                    val dispatcher = dispatcherMap[queueName]
+                                                        ?: newSingleThreadContext("friend#${event.group.id}").also {
+                                                            dispatcherMap[queueName] = it
+                                                        }
+                                                    CoroutineScope(dispatcher).launch {
+                                                        val group = event.group
+                                                        while (defaultScope.isActive) {
+                                                            try {
+                                                                val message =
+                                                                    withContext(Dispatchers.IO) {
+                                                                        q.poll(30, TimeUnit.SECONDS)
+                                                                    } ?: continue
+                                                                messageHandle.onGroupMessage(
+                                                                    group,
+                                                                    message.deserializeJsonToMessageChain()
+                                                                )
+                                                            } catch (e: ImSyncBotRuntimeException) {
+                                                                log.warn { e.message }
+                                                            } catch (e: Exception) {
+                                                                log.error(e) { "处理信息失败，发送失败报告。" }
+                                                                try {
+                                                                    reportError(event, e)
+                                                                } catch (e: Exception) {
+                                                                    log.error(e) { "发送报告失败。" }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    queue!!.add(json)
                                 }
                                 else -> {
                                     log.trace { "未支持事件 ${event.javaClass} 的处理" }
@@ -285,7 +307,7 @@ class QQBotClient(
             val master = ContextHolder.qqBot.getFriend(UserConfig.masterQQ)
             master?.takeIf { it.id != 0L }?.sendMessage(
                 master.sendMessage(message).quote()
-                    .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: ${e.message}")
+                    .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: (${e::class.simpleName}) ${e.message}")
             )
             SendMessage(BotUtil.getTgChatByQQ(event.group.id).toString(), event.message.contentToString()).send()
                 .handle { _, case ->
@@ -301,8 +323,11 @@ class QQBotClient(
         val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
         SendMessage(
             BotUtil.getTgChatByQQ(event.group.id).toString(),
-            "#提醒 #id${event.sender.id} #group${event.group.id}\n @${UserConfig.masterUsername} $content"
-        ).send().handle { _, case ->
+            "#提醒 #id${event.sender.id} #group${event.group.id}\n $content"
+        ).apply {
+            entities =
+                listOf(MessageEntity(MessageEntityType.TEXT_MENTION, 1, 3).apply { user = User(UserConfig.masterTg) })
+        }.send().handle { _, case ->
             case?.let {
                 log.error(case) { "Send remind message fail." }
             }

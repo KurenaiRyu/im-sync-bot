@@ -2,7 +2,10 @@ package kurenai.imsyncbot.handler.qq
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Runnable
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
@@ -17,8 +20,10 @@ import kurenai.imsyncbot.telegram.sendSync
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
 import moe.kurenai.tdlight.exception.TelegramApiException
+import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.media.InputFile
+import moe.kurenai.tdlight.model.message.MessageEntity
 import moe.kurenai.tdlight.request.message.*
 import moe.kurenai.tdlight.util.MarkdownUtil.fm2md
 import mu.KotlinLogging
@@ -35,7 +40,6 @@ import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
 
 @Component
@@ -76,9 +80,7 @@ class QQMessageHandler(
             UserConfig.idBindings[sender.id] ?: ContextHolder.qqBot.getFriend(sender.id)?.remarkOrNick
             ?: (sender as Member).remarkOrNameCardOrNick
         )
-        val atAccount = AtomicLong(-100)
-        val content =
-            messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it) }
+        val content = messageChain.contentToString()
         val chatId = qqTg[group.id] ?: GroupConfig.defaultTgGroup
 
         return if (content.startsWith("<?xml version='1.0'")) {
@@ -182,33 +184,33 @@ class QQMessageHandler(
         val rejectPic = GroupConfig.picBannedGroups.contains(group.id)
         if (rejectPic) log.debug { "Reject picture" }
 
-        val source = messageChain[OnlineMessageSource.Key]
-        val replyId = messageChain[QuoteReply.Key]?.let { cacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }
+        val replyId =
+            messageChain[QuoteReply.Key]?.let { cacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }
 
-        val atAccount = AtomicLong(-100)
-        var content = messageChain.filter { it !is Image }.joinToString(separator = "") { getSingleContent(group, atAccount, it, replyId != null) }
+        val (content, atEntities) = messageChain.getContentAndAtEntities(group, replyId != null)
 
-        val isMaster = group.bot.id == senderId || UserConfig.masterQQ == senderId
+//        val isMaster = group.bot.id == senderId || UserConfig.masterQQ == senderId
 
-        if (isMaster && changeMsgFormatCmd(content)) {
-            val demoContent = "demo msg."
-            val demoMsg = qqMsgFormat
-                .replace(BotUtil.NEWLINE_PATTERN, "\n")
-                .replace(BotUtil.NAME_PATTERN, "demo username")
-                .replace(BotUtil.ID_PATTERN, "123456789")
-                .replace(BotUtil.MSG_PATTERN, demoContent)
-            group.sendMessage("changed msg format\ne.g.\n$demoMsg")
-            return END
-        }
+//        if (isMaster && changeMsgFormatCmd(text)) {
+//            val demoContent = "demo msg."
+//            val demoMsg = qqMsgFormat
+//                .replace(BotUtil.NEWLINE_PATTERN, "\n")
+//                .replace(BotUtil.NAME_PATTERN, "demo_username")
+//                .replace(BotUtil.ID_PATTERN, "123456789")
+//                .replace(BotUtil.MSG_PATTERN, demoContent)
+//            group.sendMessage("changed msg format\ne.g.\n$demoMsg")
+//            return END
+//        }
 
-        if (content.startsWith("\n")) {
-            content = content.substring(1)
-        }
-
-        val msg = tgMsgFormat.replace(BotUtil.NEWLINE_PATTERN, "\n", true)
+        var msg = tgMsgFormat.replace(BotUtil.NEWLINE_PATTERN, "\n", true)
             .replace(BotUtil.ID_PATTERN, senderId.toString(), true)
             .replace(BotUtil.NAME_PATTERN, senderName.replace(" @", " "), true)
-            .replace(BotUtil.MSG_PATTERN, content, true)
+
+        val plusOffset = msg.length - BotUtil.MSG_PATTERN.length
+        atEntities.forEach { it.offset += plusOffset }
+
+        msg = msg.replace(BotUtil.MSG_PATTERN, content, true)
+
 
         if (chatId.isBlank() || chatId == "0") return CONTINUE
         val count = messageChain.filterIsInstance<Image>().count()
@@ -230,7 +232,7 @@ class QQMessageHandler(
                 medias[0].caption = msg
 
                 if (rejectPic) {
-                    sendSimpleMedia(chatId, replyId, mediaUrls, msg, source)
+                    sendSimpleMedia(chatId, replyId, mediaUrls, msg, messageChain, atEntities)
                 } else {
                     val gifMedias = ArrayList<InputMediaPhoto>()
                     for (i in 0 until medias.size) {
@@ -239,11 +241,17 @@ class QQMessageHandler(
                         }
                     }
                     try {
-                        if (medias.isNotEmpty()) sendGroupMedias(chatId, replyId, medias, source)
-                        if (gifMedias.isNotEmpty()) sendGroupMedias(chatId, replyId, gifMedias, source)
+                        if (medias.isNotEmpty()) sendGroupMedias(chatId, replyId, medias, messageChain, atEntities)
+                        if (gifMedias.isNotEmpty()) sendGroupMedias(
+                            chatId,
+                            replyId,
+                            gifMedias,
+                            messageChain,
+                            atEntities
+                        )
                     } catch (e: Exception) {
                         log.error(e) { "Send image fall back to send simple media." }
-                        sendSimpleMedia(chatId, replyId, mediaUrls, msg, source)
+                        sendSimpleMedia(chatId, replyId, mediaUrls, msg, messageChain, atEntities)
                     }
                 }
             }
@@ -251,7 +259,8 @@ class QQMessageHandler(
             messageChain.filterIsInstance<Image>().forEach { image ->
                 val imageSize: Long
                 val aspectRatio = image.width.toFloat() / image.height.toFloat()
-                var sendByFile = aspectRatio > 10 || aspectRatio < 0.1 || image.width > 1920 || image.height > 1920 || image.size > picToFileSize
+                var sendByFile =
+                    aspectRatio > 10 || aspectRatio < 0.1 || image.width > 1920 || image.height > 1920 || image.size > picToFileSize
                 val inputFile = cacheService.getFile(image.imageId).let {
                     if (it == null) {
 
@@ -268,7 +277,7 @@ class QQMessageHandler(
 
                 try {
                     if (rejectPic) {
-                        sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, source)
+                        sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, messageChain, atEntities)
                     } else if (image.imageId.endsWith(".gif")) {
                         SendAnimation(chatId, inputFile).apply {
                             replyToMessageId = replyId?.second
@@ -281,11 +290,13 @@ class QQMessageHandler(
                                 replyToMessageId = replyId?.second
                                 caption = msg
                                 thumb = inputFile
+                                if (atEntities.isNotEmpty()) captionEntities = atEntities
                             }.sendSync()
                         } else {
                             SendPhoto(chatId, inputFile).apply {
                                 replyToMessageId = replyId?.second
                                 caption = msg
+                                if (atEntities.isNotEmpty()) captionEntities = atEntities
                             }.sendSync()
                         }
                     }
@@ -294,19 +305,20 @@ class QQMessageHandler(
                     try {
                         SendDocument(chatId, inputFile).apply {
                             caption = msg
+                            if (atEntities.isNotEmpty()) captionEntities = atEntities
                         }.sendSync()
                     } catch (e: Exception) {
                         log.error(e) { "Send image fall back to send simple media." }
-                        sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, source)
+                        sendSimpleMedia(chatId, replyId, listOf(image.queryUrl()), msg, messageChain, atEntities)
                     }
                 }.also { m ->
-                    cacheMsg(source, m, inputFile, image.imageId, imageSize)
+                    cacheMsg(messageChain, m, inputFile, image.imageId, imageSize)
                 }
             }
         } else if (messageChain.contains(FileMessage.Key)) {
-            CoroutineScope(Dispatchers.IO).launch {
-                val absoluteFile = messageChain[FileMessage.Key]!!.toAbsoluteFile(group) ?: return@launch
-                val url: String = absoluteFile.getUrl() ?: return@launch
+            withContext(Dispatchers.IO) {
+                val absoluteFile = messageChain[FileMessage.Key]!!.toAbsoluteFile(group) ?: return@withContext
+                val url: String = absoluteFile.getUrl() ?: return@withContext
                 try {
                     val file = withContext(Dispatchers.IO) {
                         BotUtil.downloadDoc(absoluteFile.name, url)
@@ -314,22 +326,30 @@ class QQMessageHandler(
                     val inputFile = InputFile(file)
                     val extension: String = absoluteFile.extension.lowercase()
                     if (listOf("mp4", "mkv").contains(extension)) {
-                        SendVideo(chatId, inputFile).apply { caption = msg }.sendSync()
+                        SendVideo(chatId, inputFile).apply {
+                            caption = msg
+                            if (atEntities.isNotEmpty()) captionEntities = atEntities
+                        }.sendSync()
                     } else if (extension == "gif") {
-                        SendAnimation(chatId, inputFile).apply { caption = msg }.sendSync()
+                        SendAnimation(chatId, inputFile).apply {
+                            caption = msg
+                            if (atEntities.isNotEmpty()) captionEntities = atEntities
+                        }.sendSync()
                     } else if (listOf("bmp", "jpeg", "jpg", "png").contains(extension)) {
                         SendDocument(chatId, inputFile).apply {
                             thumb = InputFile(url)
                             caption = msg
+                            if (atEntities.isNotEmpty()) captionEntities = atEntities
                         }.sendSync()
                     } else {
                         SendDocument(chatId, inputFile).apply {
                             this.caption = msg
+                            if (atEntities.isNotEmpty()) captionEntities = atEntities
                         }
                     }
                 } catch (e: Exception) {
                     log.error(e) { e.message }
-                    sendSimpleMedia(chatId, replyId, listOf(url), msg, source, absoluteFile.name)
+                    sendSimpleMedia(chatId, replyId, listOf(url), msg, messageChain, atEntities, absoluteFile.name)
                 }
             }
         } else if (messageChain.contains(OnlineAudio.Key)) {
@@ -339,14 +359,15 @@ class QQMessageHandler(
                 try {
                     SendDocument(chatId, InputFile(file)).sendSync()
                 } catch (e: Exception) {
-                    sendSimpleMedia(chatId, replyId, listOf(url), msg, source, "语音")
+                    sendSimpleMedia(chatId, replyId, listOf(url), msg, messageChain, atEntities, "语音")
                 }
             }
         } else {
             SendMessage(chatId, msg).apply {
                 replyToMessageId = replyId?.second
+                if (atEntities.isNotEmpty()) entities = atEntities
             }.sendSync().also { m ->
-                source?.let { cacheService.cache(source, m) }
+                cacheService.cache(messageChain, m)
             }
         }
         return CONTINUE
@@ -432,32 +453,54 @@ class QQMessageHandler(
         SendMessage(chatId.toString(), msg).apply { parseMode = ParseMode.MARKDOWN_V2 }.send()
     }
 
-    //TODO: 优化
-    private fun getSingleContent(group: Group, atAccount: AtomicLong, msg: SingleMessage, hasReply: Boolean = true): String {
-        return if (msg is At) {
-            val target = msg.target
-            if (hasReply && target == group.bot.id) return ""
-            if (target == atAccount.get()) return "" else atAccount.set(target)
-            val name = if (target == group.bot.id && !hasReply) {
-                UserConfig.masterUsername.takeIf { it.isNotBlank() } ?: group.bot.nick
-            } else {
-                UserConfig.qqUsernames[target]
-                    ?: UserConfig.idBindings[target]
-                    ?: ContextHolder.qqBot.getFriend(target)?.remarkOrNick
-                    ?: group.getMember(target)?.remarkOrNameCardOrNick?.let { BotUtil.formatUsername(it) }
-                    ?: target.toString()
+    private fun MessageChain.getContentAndAtEntities(
+        group: Group,
+        hasReply: Boolean = true
+    ): Pair<String, List<MessageEntity>> {
+        var atAccount = -100L
+        var text = ""
+        val entities = ArrayList<MessageEntity>()
+        for (msg in this) {
+            if (msg is At) {
+                val target = msg.target
+                if (hasReply && target == group.bot.id) continue
+                if (target == atAccount) continue
+                else atAccount = target
+                val id: Long?
+                val name = if (target == group.bot.id && !hasReply) {
+                    id = UserConfig.masterTg
+                    UserConfig.masterUsername.takeIf { it.isNotBlank() } ?: "ご主人様"
+                } else {
+                    id = UserConfig.links.find { it.qq == target }?.tg
+                    UserConfig.qqUsernames[target]
+                        ?: UserConfig.idBindings[target]
+                        ?: ContextHolder.qqBot.getFriend(target)?.remarkOrNick
+                        ?: group.getMember(target)?.remarkOrNameCardOrNick
+                        ?: target.toString()
+                }.let(BotUtil::formatUsername)
+                if (id != null) {
+                    entities.add(MessageEntity(
+                        MessageEntityType.TEXT_MENTION,
+                        text.length,
+                        name.length
+                    ).apply { user = moe.kurenai.tdlight.model.message.User(id) })
+                    text += name
+                }
+            } else if (msg !is Image) {
+                text += msg.contentToString()
             }
-            if (!name.startsWith("@")) {
-                " @$name "
-            } else {
-                " $name "
-            }
-        } else {
-            msg.contentToString()
         }
+        if (text.startsWith("\n")) text = text.substring(1)
+        return text to entities
     }
 
-    private suspend fun sendGroupMedias(chatId: String, replyId: Pair<Long, Int>?, medias: List<InputMediaPhoto>, source: OnlineMessageSource?) {
+    private suspend fun sendGroupMedias(
+        chatId: String,
+        replyId: Pair<Long, Int>?,
+        medias: List<InputMediaPhoto>,
+        chain: MessageChain,
+        atEntities: List<MessageEntity>
+    ) {
         if (medias.isEmpty()) return
         val mediaGroups = ArrayList<List<InputMediaPhoto>>()
         var offset = 0
@@ -479,19 +522,26 @@ class QQMessageHandler(
                         this.replyToMessageId = replyId?.second
                         this.media = list
                     }.sendSync().also { result ->
-                        source?.let { source -> cacheService.cache(source, result[0]) }
+                        cacheService.cache(chain, result[0])
                     }
                 } else if (list.size == 1) {
                     SendPhoto(chatId, list[0].media).apply {
                         this.replyToMessageId = replyId?.second
                         this.caption = list[0].caption
                     }.sendSync().also { result ->
-                        source?.let { source -> cacheService.cache(source, result) }
+                        cacheService.cache(chain, result)
                     }
                 }
             } catch (e: Exception) {
                 log.error(e) { "Send group medias[$count] fail." }
-                sendSimpleMedia(chatId, replyId, medias.map { it.media.attachName }, medias[0].caption, source)
+                sendSimpleMedia(
+                    chatId,
+                    replyId,
+                    medias.map { it.media.attachName },
+                    medias[0].caption,
+                    chain,
+                    atEntities
+                )
             }
             count++
         }
@@ -502,7 +552,8 @@ class QQMessageHandler(
         replyId: Pair<Long, Int>?,
         urls: List<String>,
         msg: String?,
-        source: OnlineMessageSource?,
+        chain: MessageChain,
+        atEntities: List<MessageEntity>,
         mask: String = "图片"
     ): moe.kurenai.tdlight.model.message.Message {
         var urlStr = ""
@@ -512,12 +563,19 @@ class QQMessageHandler(
         return SendMessage(chatId, "${msg?.fm2md()}$urlStr").apply {
             this.replyToMessageId = replyId?.second
             this.parseMode = ParseMode.MARKDOWN_V2
+            if (atEntities.isNotEmpty()) entities = atEntities
         }.sendSync().also { rec ->
-            source?.let { source -> cacheService.cache(source, rec) }
+            cacheService.cache(chain, rec)
         }
     }
 
-    private fun cacheMsg(source: OnlineMessageSource?, recMsg: moe.kurenai.tdlight.model.message.Message, inputFile: InputFile? = null, qqFileId: String, imageSize: Long = 0L) {
+    private fun cacheMsg(
+        chain: MessageChain,
+        recMsg: moe.kurenai.tdlight.model.message.Message,
+        inputFile: InputFile? = null,
+        qqFileId: String,
+        imageSize: Long = 0L
+    ) {
         if (inputFile != null && inputFile.isNew) {
             when {
                 recMsg.hasDocument() -> {
@@ -534,9 +592,7 @@ class QQMessageHandler(
                 cacheService.cacheFile(qqFileId, FileCache(fileId, imageSize))
             }
         }
-        source?.let {
-            cacheService.cache(source, recMsg)
-        }
+        cacheService.cache(chain, recMsg)
     }
 
     private fun changeMsgFormatCmd(text: String): Boolean {

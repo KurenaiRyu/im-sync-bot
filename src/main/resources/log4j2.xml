@@ -7,7 +7,7 @@
         <Console name="Console" target="SYSTEM_OUT">
             <ThresholdFilter level="trace" onMatch="ACCEPT" onMisMatch="DENY"/>
             <PatternLayout
-                    pattern="%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}} %highlight{${LOG_LEVEL_PATTERN:-%5p}}{FATAL=red blink, ERROR=red, WARN=yellow bold, INFO=green, DEBUG=green bold, TRACE=blue} %style{%processId}{magenta} --- [%t] %style{%-36.36c{4}}{cyan} : %m%n%ex"/>
+                    pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}} %highlight{${LOG_LEVEL_PATTERN:-5%p}}{FATAL=red blink, ERROR=red, WARN=yellow bold, INFO=green, DEBUG=green bold, TRACE=blue} %style{%processId}{magenta} --- [%t] %style{%c}{cyan} : %m%n%ex"/>
         </Console>
         <RandomAccessFile name="RandomAccessFile" filename="${path}/async.log" immediateFlush="false" append="true">
             <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
