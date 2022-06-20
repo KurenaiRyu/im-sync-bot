@@ -472,11 +472,17 @@ class QQMessageHandler(
                     UserConfig.masterUsername.takeIf { it.isNotBlank() } ?: "ご主人様"
                 } else {
                     id = UserConfig.links.find { it.qq == target }?.tg
-                    UserConfig.qqUsernames[target]
-                        ?: UserConfig.idBindings[target]
-                        ?: ContextHolder.qqBot.getFriend(target)?.remarkOrNick
-                        ?: group.getMember(target)?.remarkOrNameCardOrNick
-                        ?: target.toString()
+                    val name: String
+                    val tgBindName = UserConfig.qqUsernames[target] ?: UserConfig.idBindings[target]
+                    name = if (tgBindName == null || tgBindName.isBlank()) {
+                        val qqBindName = ContextHolder.qqBot.getFriend(target)?.remarkOrNick?.takeIf { it.isNotBlank() }
+                            ?: group.getMember(target)?.remarkOrNameCardOrNick?.takeIf { it.isNotBlank() }
+                            ?: target.toString()
+                        " @$qqBindName "
+                    } else {
+                        tgBindName
+                    }
+                    name
                 }.let(BotUtil::formatUsername)
                 if (id != null) {
                     entities.add(MessageEntity(
