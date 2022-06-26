@@ -9,9 +9,7 @@ import net.mamoe.mirai.event.events.MessageEvent
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.message.data.QuoteReply
-import org.springframework.stereotype.Component
 
-@Component
 class AcceptLinkCommand : AbstractQQCommand() {
 
     override suspend fun execute(event: MessageEvent): Int {

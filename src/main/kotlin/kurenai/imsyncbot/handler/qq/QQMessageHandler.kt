@@ -7,14 +7,14 @@ import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.ContextHolder.cacheService
+import kurenai.imsyncbot.ContextHolder.config
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.entity.FileCache
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
-import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
-import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.telegram.sendSync
 import kurenai.imsyncbot.utils.BotUtil
@@ -34,28 +34,25 @@ import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.ForwardMessage
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import org.apache.commons.lang3.StringUtils
-import org.springframework.stereotype.Component
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import javax.enterprise.context.ApplicationScoped
 import kotlin.math.min
 
-@Component
-class QQMessageHandler(
-    final val properties: ForwardHandlerProperties,
-    private val cacheService: CacheService,
-) : QQHandler {
+@ApplicationScoped
+class QQMessageHandler : QQHandler {
 
     private val log = KotlinLogging.logger {}
 
     private val xmlMapper = XmlMapper()
     private val jsonMapper = ObjectMapper()
-    private val picToFileSize = properties.picToFileSize * 1024 * 1024
+    private val picToFileSize = config.handler.picToFileSize * 1024 * 1024
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
-    private var enableRecall = properties.enableRecall
+    private var enableRecall = config.handler.enableRecall
     private var groupForwardContext = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
         LinkedBlockingQueue(20),
         object : ThreadFactory {
@@ -68,8 +65,8 @@ class QQMessageHandler(
         }).asCoroutineDispatcher()
 
     init {
-        if (properties.tgMsgFormat.contains("\$msg")) tgMsgFormat = properties.tgMsgFormat
-        if (properties.qqMsgFormat.contains("\$msg")) qqMsgFormat = properties.qqMsgFormat
+        if (config.handler.tgMsgFormat.contains("\$msg")) tgMsgFormat = config.handler.tgMsgFormat
+        if (config.handler.qqMsgFormat.contains("\$msg")) qqMsgFormat = config.handler.qqMsgFormat
     }
 
     @Throws(Exception::class)

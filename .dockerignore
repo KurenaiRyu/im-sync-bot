@@ -1,10 +1,5 @@
-data
-bin
-cache
-logs
-build
-*.log
-*.gz
-*.iml
-api-data
-redis-data
+*
+!build/*-runner
+!build/*-runner.jar
+!build/lib/*
+!build/quarkus-app/*

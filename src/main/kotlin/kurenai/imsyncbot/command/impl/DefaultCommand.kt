@@ -4,9 +4,7 @@ import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.GroupConfig
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
-import org.springframework.stereotype.Component
 
-@Component
 class DefaultCommand : AbstractTelegramCommand() {
 
     override val command = "default"

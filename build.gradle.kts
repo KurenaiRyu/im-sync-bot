@@ -1,9 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.springframework.boot") version "3.0.0-M3"
-    id("io.spring.dependency-management") version "1.0.11.RELEASE"
-//    id("org.springframework.experimental.aot") version "0.11.1"
+    id("io.quarkus")
     kotlin("jvm") version "1.6.21"
     kotlin("plugin.spring") version "1.6.21"
     kotlin("plugin.allopen") version "1.6.21"
@@ -14,7 +12,10 @@ plugins {
 
 group = "moe.kurenai.bot"
 version = "0.0.1-SNAPSHOT"
-java.sourceCompatibility = JavaVersion.VERSION_17
+
+val quarkusPlatformGroupId: String by project
+val quarkusPlatformArtifactId: String by project
+val quarkusPlatformVersion: String by project
 
 repositories {
     mavenLocal()
@@ -54,56 +55,81 @@ dependencies {
     //td-light-sdk
     implementation("moe.kurenai.tdlight", "td-light-sdk", "0.0.1-SNAPSHOT")
 
-    //spring
-    implementation("org.springframework.boot", "spring-boot-starter")
-    implementation("org.springframework.boot", "spring-boot-starter-json")
+    //quarkus
+    implementation(enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}"))
+    implementation("io.quarkus:quarkus-kotlin")
+    implementation("io.quarkus:quarkus-arc")
+    implementation("io.quarkus:quarkus-config-yaml")
+    implementation("org.jboss.logmanager:log4j2-jboss-logmanager")
+    testImplementation("io.quarkus:quarkus-junit5")
 
     //logging
-    implementation("org.apache.logging.log4j:log4j-to-slf4j:2.17.0")
+    implementation("org.apache.logging.log4j:log4j-core")
+    implementation("org.apache.logging.log4j:log4j-api")
+    implementation("com.lmax:disruptor")
 
     //kotlin
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
-
-    implementation("io.ktor:ktor-client-core:1.6.7")
-    implementation("io.ktor:ktor-client-encoding:1.6.7")
-    implementation("io.ktor:ktor-client-okhttp:1.6.7")
-
     //tool kit
     implementation("com.google.guava:guava:31.1-jre")
     implementation("org.sejda.imageio:webp-imageio:0.1.6")
-    implementation("com.squareup.okhttp3:okhttp:4.9.3")
+    implementation("com.squareup.okhttp3:okhttp:4.10.0")
     implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")
     implementation("com.fasterxml.jackson.dataformat", "jackson-dataformat-xml")
+    implementation("com.fasterxml.jackson.dataformat", "jackson-dataformat-yaml")
     implementation("org.apache.commons", "commons-lang3")
     implementation("org.apache.commons:commons-io:1.3.2")
     implementation("com.esotericsoftware", "kryo", "5.1.1")
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
     implementation("io.github.kurenairyu", "simple-cache", "1.2.0-SNAPSHOT")
 
-    implementation("org.redisson:redisson:3.17.0")
+    implementation("org.redisson:redisson:3.17.3")
 
     implementation("org.reflections", "reflections", "0.10.2")
-
-    testImplementation("org.springframework.boot:spring-boot-starter-test:3.0.0-M1")
 }
 
 application {
     applicationDefaultJvmArgs = listOf("-Dspring.config.location=./config/config.yaml", "-Duser.timezone=GMT+08")
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+allOpen {
+    annotation("javax.ws.rs.Path")
+    annotation("javax.enterprise.context.ApplicationScoped")
+    annotation("io.quarkus.test.junit.QuarkusTest")
+}
+
 tasks.withType<KotlinCompile> {
     kotlinOptions {
         freeCompilerArgs = listOf("-Xjsr305=strict")
-        jvmTarget = "17"
+        jvmTarget = JavaVersion.VERSION_17.toString()
+        javaParameters = true
     }
 }
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
+    options.compilerArgs.add("-parameters")
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+tasks.quarkusDev {
+    compilerOptions {
+        compiler("kotlin").args(listOf("-Werror"))
+    }
+}
+tasks.quarkusBuild {
+    nativeArgs {
+        "container-build" to true
+        "builder-image" to "quay.io/quarkus/ubi-quarkus-native-image:22.0-java17"
+    }
 }

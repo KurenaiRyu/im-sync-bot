@@ -4,10 +4,8 @@ import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
-import org.springframework.stereotype.Component
 import java.text.NumberFormat
 
-@Component
 class StatusCommand : AbstractTelegramCommand() {
 
     override val command = "status"

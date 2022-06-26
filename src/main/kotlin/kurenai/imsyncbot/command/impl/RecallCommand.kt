@@ -4,8 +4,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.ContextHolder.cacheService
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
@@ -14,12 +14,8 @@ import moe.kurenai.tdlight.request.message.SendMessage
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.recallMessage
 import net.mamoe.mirai.message.data.source
-import org.springframework.stereotype.Component
 
-@Component
-class RecallCommand(
-    val cacheService: CacheService
-) : AbstractTelegramCommand() {
+class RecallCommand : AbstractTelegramCommand() {
 
     private val log = KotlinLogging.logger {}
     override val help: String = "撤回消息"

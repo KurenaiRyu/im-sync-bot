@@ -22,9 +22,7 @@ import net.mamoe.mirai.contact.getMember
 import net.mamoe.mirai.contact.remarkOrNameCardOrNick
 import net.mamoe.mirai.message.data.source
 import org.apache.logging.log4j.LogManager
-import org.springframework.stereotype.Component
 
-@Component
 class TitleCommand : AbstractTelegramCommand(), Bannable {
 
     private val log = LogManager.getLogger()

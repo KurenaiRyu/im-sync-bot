@@ -1,11 +1,11 @@
 package kurenai.imsyncbot.handler
 
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
-import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.ContextHolder.cacheService
+import kurenai.imsyncbot.ContextHolder.config
+import kurenai.imsyncbot.ContextHolder.qqBot
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.handler.Handler.Companion.END
-import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
-import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.sendSync
 import kurenai.imsyncbot.utils.BotUtil
 import moe.kurenai.tdlight.model.ParseMode
@@ -25,26 +25,22 @@ import net.mamoe.mirai.event.events.FriendMessageSyncEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.message.sourceMessage
-import okhttp3.internal.notifyAll
 import org.apache.logging.log4j.LogManager
-import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap
+import javax.enterprise.context.ApplicationScoped
 
-@Component
-class PrivateChatHandler(
-    val cacheService: CacheService,
-    forwardHandlerProperties: ForwardHandlerProperties,
-) {
+@ApplicationScoped
+class PrivateChatHandler {
 
     //TODO: 其他qq事件
     private val log = LogManager.getLogger()
 
-    val privateChat = forwardHandlerProperties.privateChat
-    val privateChatChannel = forwardHandlerProperties.privateChatChannel
-    val locks = ConcurrentHashMap<Int, Any>()
+    val privateChat = config.handler.privateChat
+    val privateChatChannel = config.handler.privateChatChannel
+    val locks = ConcurrentHashMap<Int, Object>()
     val newChannelLock = Object()
     val msgIds = HashMap<Int, Int>()
-    private val picToFileSize = forwardHandlerProperties.picToFileSize * 1024 * 1024
+    private val picToFileSize = config.handler.picToFileSize * 1024 * 1024
     private val contextMap = HashMap<Long, ExecutorCoroutineDispatcher>()
 
     suspend fun onFriendEvent(event: FriendEvent): Int {
@@ -152,7 +148,7 @@ class PrivateChatHandler(
         if (message.from?.id == 777000L && message.forwardFromChat?.id == privateChatChannel) {
             onChannelForward(update)
         } else if (message.isReply()) {
-            val bot = ContextHolder.qqBot
+            val bot = qqBot
             val rootReplyMessageId = message.getRootReplyMessageId()
             val quoteMsgSource = message.replyToMessage?.let(cacheService::getQQByTg)
             val friendId = cacheService.getFriendId(rootReplyMessageId) ?: run {
@@ -200,9 +196,13 @@ class PrivateChatHandler(
                     return
                 }
                 message.hasPhoto() -> {
-                    message.photo!!.groupBy { it.fileId!!.substring(0, 40) }
-                        .mapNotNull { (_: String, photoSizes: List<PhotoSize>) -> photoSizes.maxByOrNull { it.fileSize ?: 0 } }
-                        .mapNotNull { BotUtil.getImage(friend, it.fileId!!, it.fileUniqueId!!) }.forEach(builder::add)
+                    message.photo!!.groupBy { it.fileId.substring(0, 40) }
+                        .mapNotNull { (_: String, photoSizes: List<PhotoSize>) ->
+                            photoSizes.maxByOrNull {
+                                it.fileSize ?: 0
+                            }
+                        }
+                        .mapNotNull { BotUtil.getImage(friend, it.fileId, it.fileUniqueId) }.forEach(builder::add)
                     message.caption?.let {
                         builder.add(it)
                     }
@@ -216,7 +216,7 @@ class PrivateChatHandler(
     }
 
     fun getStartMsg(friend: Friend): Int? {
-        val bot = ContextHolder.qqBot
+        val bot = qqBot
         var messageId = cacheService.getPrivateChannelMessageId(friend.id)
         synchronized(newChannelLock) {
             log.debug("Locked by ${friend.id}")

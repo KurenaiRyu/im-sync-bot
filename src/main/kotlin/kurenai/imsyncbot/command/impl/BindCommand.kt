@@ -4,24 +4,21 @@ import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
-import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
 import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import net.mamoe.mirai.message.data.source
-import org.springframework.stereotype.Component
 
-@Component
-class BindCommand(
-    val cacheService: CacheService,
-) : AbstractTelegramCommand() {
+class BindCommand : AbstractTelegramCommand() {
 
     override val command = "bind"
     override val help: String = "绑定群组或用户名"
     override val onlyAdmin = true
     override val onlySupperAdmin = false
     override val parseMode = ParseMode.MARKDOWN_V2
+
+    private val cacheService = ContextHolder.cacheService
 
     override fun execute(update: Update, message: Message): String? {
         val client = ContextHolder.telegramBot

@@ -9,9 +9,7 @@ import net.mamoe.mirai.contact.PermissionDeniedException
 import net.mamoe.mirai.contact.getMember
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.events.MessageEvent
-import org.springframework.stereotype.Component
 
-@Component
 class TitleQQCommand : AbstractQQCommand() {
 
     override suspend fun execute(event: MessageEvent): Int {

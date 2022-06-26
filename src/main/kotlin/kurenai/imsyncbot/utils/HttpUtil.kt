@@ -1,5 +1,6 @@
 package kurenai.imsyncbot.utils
 
+import io.ktor.http.*
 import io.ktor.util.network.*
 import kotlinx.coroutines.future.await
 import kurenai.imsyncbot.ContextHolder
@@ -7,7 +8,6 @@ import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import kurenai.imsyncbot.humanReadableByteCountBin
 import mu.KotlinLogging
 import org.apache.logging.log4j.LogManager
-import org.springframework.http.HttpHeaders
 import java.io.File
 import java.io.InputStream
 import java.io.RandomAccessFile
@@ -126,14 +126,14 @@ object HttpUtil {
             .sendAsync(
                 HttpRequest
                     .newBuilder(URI.create(url))
-                    .header(HttpHeaders.RANGE, "bytes=$offset-${length?.let { offset + length - 1 } ?: ""}")
+                    .header(HttpHeaders.Range, "bytes=$offset-${length?.let { offset + length - 1 } ?: ""}")
                     .GET()
                     .build(),
                 HttpResponse.BodyHandlers.ofInputStream())
             .thenAccept { response ->
                 val log = LogManager.getLogger()
                 response.body().write(file, offset)
-                response.headers().firstValue(HttpHeaders.CONTENT_RANGE).ifPresent { contentRange ->
+                response.headers().firstValue(HttpHeaders.ContentRange).ifPresent { contentRange ->
                     val range = contentRange.substringBefore("/").replace("bytes ", "")
                     val ranges = range.split("-")
                     val left = ranges[0].toLong()
@@ -143,7 +143,12 @@ object HttpUtil {
                     val timeOfSeconds = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) / 1000.0
                     val speed = sizeOfMb / timeOfSeconds
                     log.debug(
-                        "Downloaded ${file.name.substringBeforeLast(".")} part of $range ${String.format("%.3f", sizeOfMb)} MB in ${
+                        "Downloaded ${file.name.substringBeforeLast(".")} part of $range ${
+                            String.format(
+                                "%.3f",
+                                sizeOfMb
+                            )
+                        } MB in ${
                             String.format("%.2f", timeOfSeconds)
                         } s (${String.format("%.2f", speed)} MB/s)"
                     )
@@ -155,7 +160,7 @@ object HttpUtil {
         return newHttpClient(enableProxy).sendAsync(
             HttpRequest
                 .newBuilder(URI.create(url))
-                .header(HttpHeaders.RANGE, "bytes=0-1")
+                .header(HttpHeaders.Range, "bytes=0-1")
                 .GET()
                 .build(),
             HttpResponse.BodyHandlers.ofInputStream()
@@ -169,7 +174,8 @@ object HttpUtil {
             } else if (res.statusCode() == 404) {
                 throw ImSyncBotRuntimeException("File not found: ${res.infoString()}")
             } else {
-                res.headers().firstValue(HttpHeaders.CONTENT_RANGE).map { it.substringAfterLast('/').toLong() }.orElse(null)
+                res.headers().firstValue(HttpHeaders.ContentRange).map { it.substringAfterLast('/').toLong() }
+                    .orElse(null)
             }
         }
     }

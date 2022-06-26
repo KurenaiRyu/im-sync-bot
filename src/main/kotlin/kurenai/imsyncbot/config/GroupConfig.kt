@@ -2,8 +2,6 @@ package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
 import moe.kurenai.tdlight.model.message.Message
-import okhttp3.internal.toImmutableList
-import okhttp3.internal.toImmutableMap
 import java.io.File
 
 object GroupConfig : AbstractConfig<Group>() {
@@ -112,11 +110,11 @@ object GroupConfig : AbstractConfig<Group>() {
             }
             if (!banned) filterGroups.add(config.qq)
         }
-        this.qqTg = qqTg.toImmutableMap()
-        this.tgQQ = tgQQ.toImmutableMap()
-        this.bannedGroups = bannedGroups.toImmutableList()
-        this.picBannedGroups = picBannedGroups.toImmutableList()
-        this.filterGroups = filterGroups.toImmutableList()
+        this.qqTg = qqTg.toMap()
+        this.tgQQ = tgQQ.toMap()
+        this.bannedGroups = bannedGroups.toList()
+        this.picBannedGroups = picBannedGroups.toList()
+        this.filterGroups = filterGroups.toList()
     }
 
     override fun add0(config: Group) {

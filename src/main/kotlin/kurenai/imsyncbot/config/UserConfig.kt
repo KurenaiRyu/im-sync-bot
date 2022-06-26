@@ -1,10 +1,8 @@
 package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
-import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
+import kurenai.imsyncbot.HandlerProperties
 import moe.kurenai.tdlight.model.message.Message
-import okhttp3.internal.toImmutableList
-import okhttp3.internal.toImmutableMap
 import java.io.File
 
 object UserConfig : AbstractConfig<User>() {
@@ -155,8 +153,8 @@ object UserConfig : AbstractConfig<User>() {
         setMaster(User(message.from?.id, masterQQ, message.from?.firstName, chatId = message.chat.id))
     }
 
-    fun setMaster(properties: ForwardHandlerProperties) {
-        setMaster(User(properties.masterOfTg[0], properties.masterOfQq[0]))
+    fun setMaster(properties: HandlerProperties) {
+        setMaster(User(properties.masterOfTg, properties.masterOfQq))
     }
 
     fun setMaster(user: User) {
@@ -248,14 +246,14 @@ object UserConfig : AbstractConfig<User>() {
             }
         }
 
-        idBindings = ids.toImmutableMap()
-        usernameBindings = usernames.toImmutableMap()
-        this.qqUsernames = qqUsernames.toImmutableMap()
-        this.links = links.toImmutableList()
-        this.bannedIds = bannedIds.toImmutableList()
-        this.picBannedIds = picBannedIds.toImmutableList()
-        this.admins = admins.toImmutableList()
-        this.superAdmins = superAdmins.toImmutableList()
+        idBindings = ids.toMap()
+        usernameBindings = usernames.toMap()
+        this.qqUsernames = qqUsernames.toMap()
+        this.links = links.toList()
+        this.bannedIds = bannedIds.toList()
+        this.picBannedIds = picBannedIds.toList()
+        this.admins = admins.toList()
+        this.superAdmins = superAdmins.toList()
     }
 
     override fun getConfigName(): String {

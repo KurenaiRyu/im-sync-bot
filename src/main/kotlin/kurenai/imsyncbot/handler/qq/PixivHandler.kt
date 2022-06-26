@@ -4,7 +4,7 @@
 //import kurenai.imsyncbot.config.GroupConfig.qqTg
 //import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 //import kurenai.imsyncbot.handler.Handler.Companion.END
-//import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
+//import kurenai.imsyncbot.handler.ForwardHandlerProperties
 //import kurenai.imsyncbot.telegram.send
 //import moe.kurenai.tdlight.exception.TelegramApiException
 //import moe.kurenai.tdlight.request.message.SendMessage

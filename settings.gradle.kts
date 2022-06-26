@@ -1,8 +1,13 @@
 rootProject.name = "im-sync-bot-kt"
 pluginManagement {
+    val quarkusPluginVersion: String by settings
+    val quarkusPluginId: String by settings
     repositories {
-        maven { url = uri("https://repo.spring.io/milestone") }
-        maven { url = uri("https://repo.spring.io/release") }
+        mavenCentral()
         gradlePluginPortal()
+        mavenLocal()
+    }
+    plugins {
+        id(quarkusPluginId) version quarkusPluginVersion
     }
 }

@@ -2,10 +2,14 @@ package kurenai.imsyncbot.command
 
 import com.google.common.base.CaseFormat
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.command.CommandHolder.inlineCommands
+import kurenai.imsyncbot.command.CommandHolder.qqHandlers
+import kurenai.imsyncbot.command.CommandHolder.tgHandlers
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.telegram.send
+import kurenai.imsyncbot.utils.reflections
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.inline.InlineQuery
 import moe.kurenai.tdlight.model.message.Message
@@ -18,9 +22,9 @@ object DelegatingCommand {
 
     private val log = KotlinLogging.logger {}
 
-    private val tgHandlers = ArrayList<AbstractTelegramCommand>()
-    private val qqHandlers = ArrayList<AbstractQQCommand>()
-    private val inlineCommands = HashMap<String, InlineCommandHandler>()
+    init {
+        reflections.getSubTypesOf(AbstractQQCommand::class.java)
+    }
 
     fun execute(update: Update, message: Message) {
         val command = message.entities!!
@@ -147,15 +151,6 @@ object DelegatingCommand {
                 }
         }
         return if (matched) 1 else 0
-    }
-
-    fun addTgHandle(handler: AbstractTelegramCommand) {
-        tgHandlers.removeIf { it.name == handler.name }
-        tgHandlers.add(handler)
-    }
-
-    fun addQQHandle(handler: AbstractQQCommand) {
-        qqHandlers.add(handler)
     }
 
     private fun handleHelp(message: Message) {

@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.service
 
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.ContextHolder.redisson
 import kurenai.imsyncbot.entity.FileCache
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
@@ -13,10 +14,8 @@ import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.ids
 import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.message.sourceMessage
-import org.redisson.api.RedissonClient
+import org.redisson.api.RAtomicLong
 import org.redisson.client.protocol.ScoredEntry
-import org.springframework.beans.factory.InitializingBean
-import org.springframework.stereotype.Service
 import java.io.File
 import java.text.NumberFormat
 import java.time.LocalDateTime
@@ -25,11 +24,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 
-@Service
-class CacheService(
-    private val cache: io.github.kurenairyu.cache.Cache,
-    private val redisson: RedissonClient
-) : InitializingBean {
+class CacheService {
     companion object {
         const val TG_MSG_CACHE_KEY = "TG_MSG_CACHE"
         const val QQ_MSG_CACHE_KEY = "QQ_MSG_CACHE"
@@ -44,14 +39,11 @@ class CacheService(
         val BEGIN = LocalDateTime.of(2022, 1, 1, 0, 0, 0).toEpochSecond(ZoneOffset.MIN)
     }
 
-    val hit = redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("HIT"))
-    val total = redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("TOTAL"))
+    val cache = ContextHolder.cache
+    val hit: RAtomicLong = redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("HIT"))
+    val total: RAtomicLong = redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("TOTAL"))
 
     private val log = KotlinLogging.logger {}
-
-    override fun afterPropertiesSet() {
-        ContextHolder.cacheService = this
-    }
 
     fun cache(messageChain: MessageChain, message: Message) {
         val qqMsgId: String = messageChain.cacheId()

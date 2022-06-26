@@ -7,7 +7,6 @@ import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.config.UserStatus
-import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.telegram.sendSync
 import moe.kurenai.tdlight.model.ParseMode
@@ -16,15 +15,11 @@ import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.SendMessage
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.source
-import org.springframework.stereotype.Component
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.timerTask
 
-@Component
-class LinkCommand(
-    val cacheService: CacheService,
-) : AbstractTelegramCommand() {
+class LinkCommand : AbstractTelegramCommand() {
 
     companion object {
         val holdLinks = HashMap<Int, Pair<Long, List<Message>>>()
@@ -40,6 +35,7 @@ class LinkCommand(
     override val reply = true
 
     private val timer = Timer("clearLink", false)
+    private val cacheService = ContextHolder.cacheService
 
     override fun execute(update: Update, message: Message): String? {
         val client = ContextHolder.telegramBot

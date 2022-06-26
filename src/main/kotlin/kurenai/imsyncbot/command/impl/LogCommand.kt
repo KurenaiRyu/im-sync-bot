@@ -8,10 +8,8 @@ import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.SendDocument
 import mu.KotlinLogging
-import org.springframework.stereotype.Component
 import java.io.File
 
-@Component
 class LogCommand : AbstractTelegramCommand() {
 
     private val log = KotlinLogging.logger {}

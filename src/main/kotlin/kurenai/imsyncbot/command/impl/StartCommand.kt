@@ -4,9 +4,7 @@ import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.UserConfig
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
-import org.springframework.stereotype.Component
 
-@Component
 class StartCommand : AbstractTelegramCommand() {
 
     override val help = "触发机器人初始化一些参数，如记录主人聊天id等"

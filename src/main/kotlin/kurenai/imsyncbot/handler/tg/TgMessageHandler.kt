@@ -1,14 +1,14 @@
 package kurenai.imsyncbot.handler.tg
 
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.ContextHolder.cacheService
+import kurenai.imsyncbot.ContextHolder.config
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.bannedGroups
 import kurenai.imsyncbot.config.GroupConfig.tgQQ
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
-import kurenai.imsyncbot.handler.config.ForwardHandlerProperties
-import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.sendSync
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
@@ -25,15 +25,12 @@ import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import org.springframework.stereotype.Component
 import java.io.File
 import java.io.IOException
+import javax.enterprise.context.ApplicationScoped
 
-@Component
-class TgMessageHandler(
-    properties: ForwardHandlerProperties,
-    private val cacheService: CacheService,
-) : TelegramHandler {
+@ApplicationScoped
+class TgMessageHandler : TelegramHandler {
 
     private val log = KotlinLogging.logger {}
 
@@ -41,8 +38,8 @@ class TgMessageHandler(
     private var qqMsgFormat = "\$name: \$msg"
 
     init {
-        if (properties.tgMsgFormat.contains("\$msg")) tgMsgFormat = properties.tgMsgFormat
-        if (properties.qqMsgFormat.contains("\$msg")) qqMsgFormat = properties.qqMsgFormat
+        if (config.handler.tgMsgFormat.contains("\$msg")) tgMsgFormat = config.handler.tgMsgFormat
+        if (config.handler.qqMsgFormat.contains("\$msg")) qqMsgFormat = config.handler.qqMsgFormat
     }
 
     override suspend fun onEditMessage(message: Message): Int {

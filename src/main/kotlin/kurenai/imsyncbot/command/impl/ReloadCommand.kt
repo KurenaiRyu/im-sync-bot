@@ -5,9 +5,7 @@ import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
-import org.springframework.stereotype.Component
 
-@Component
 class ReloadCommand : AbstractTelegramCommand() {
 
     override val command = "reload"

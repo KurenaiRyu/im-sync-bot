@@ -1,18 +1,33 @@
 package kurenai.imsyncbot.config
 
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.databind.*
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.github.kurenairyu.cache.Cache
+import io.github.kurenairyu.cache.redis.lettuce.LettuceCache
+import io.github.kurenairyu.cache.redis.lettuce.jackson.JacksonCodec
+import io.github.kurenairyu.cache.redis.lettuce.jackson.RecordNamingStrategyPatchModule
+import io.lettuce.core.RedisURI
+import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.ContextHolder.cache
+import kurenai.imsyncbot.ContextHolder.cacheService
+import kurenai.imsyncbot.ContextHolder.config
+import kurenai.imsyncbot.command.CommandHolder
 import kurenai.imsyncbot.humanReadableByteCountBin
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.ProxyProperties
-import kurenai.imsyncbot.telegram.TelegramBotProperties
 import kurenai.imsyncbot.utils.HttpUtil
 import mu.KotlinLogging
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.filefilter.AgeFileFilter
 import org.apache.commons.io.filefilter.SizeFileFilter
 import org.apache.commons.lang3.time.DateUtils
-import org.springframework.beans.factory.InitializingBean
-import org.springframework.stereotype.Component
+import org.redisson.Redisson
+import org.redisson.api.RedissonClient
+import org.redisson.codec.JsonJacksonCodec
+import org.redisson.config.Config
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -20,40 +35,88 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.timerTask
 
-@Component
-class BotInitializer(
-    private val tgProperties: TelegramBotProperties,
-    private val proxyProperties: ProxyProperties,
-    private val cacheService: CacheService,
-    private val cache: Cache,
-) : InitializingBean {
+object BotInitializer {
 
     private val log = KotlinLogging.logger {}
     private val largeFileSize = 200 * 1024L
     private val largeDirSize = 100 * 1024 * 1024L
+    private val tgProperties = config.bot.telegram
+    private val proxy = tgProperties.proxy
 
     private val cacheDirs = listOf("./cache/img", "./cache/doc", "./cache/file")
     private val clearCacheTimer = Timer("ClearCache", true)
 
-    override fun afterPropertiesSet() {
+    fun doInit() {
+        initBot()
+        initConfig()
+    }
+
+    fun initBot() {
+        ContextHolder.mapper = objectMapper()
+        cache = cache()
+        ContextHolder.redisson = redissonClient()
+        cacheService = CacheService()
+    }
+
+    private fun cache(): Cache {
+        val redisURI = RedisURI.builder()
+            .withHost(config.redis.host)
+            .withPort(config.redis.port)
+            .withDatabase(config.redis.database)
+            .build()
+        return LettuceCache(
+            redisURI, JacksonCodec<Any>(ContextHolder.mapper)
+        )
+    }
+
+    private fun redissonClient(): RedissonClient {
+        val redissonConfig = Config()
+        redissonConfig.codec = JsonJacksonCodec(ContextHolder.mapper)
+        redissonConfig.useSingleServer()
+            .setAddress("redis://${config.redis.host}:${config.redis.port}")
+            .setDatabase(config.redis.database)
+        return Redisson.create(redissonConfig)
+    }
+
+    private fun objectMapper(): ObjectMapper {
+        return jacksonObjectMapper()
+            .registerModules(Jdk8Module(), JavaTimeModule(), RecordNamingStrategyPatchModule())
+            .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+            .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
+            .activateDefaultTyping(
+                BasicPolymorphicTypeValidator.builder().allowIfBaseType(Any::class.java).build(),
+                ObjectMapper.DefaultTyping.EVERYTHING
+            )
+    }
+
+    fun initConfig() {
         checkRedisCodec()
         configProxy()
-        configImgBaseUrl()
+//        configImgBaseUrl()
         setUpTimer()
+        initUserConfig()
+        CommandHolder.init()
+    }
+
+    private fun initUserConfig() {
+        UserConfig.setMaster(config.handler)
     }
 
     private fun configProxy() {
-        if (proxyProperties.type != Proxy.Type.DIRECT) {
-            HttpUtil.PROXY = Proxy(proxyProperties.type, InetSocketAddress(proxyProperties.host, proxyProperties.port))
+        if (proxy.type != Proxy.Type.DIRECT) {
+            HttpUtil.PROXY = Proxy(proxy.type, InetSocketAddress(proxy.host, proxy.port))
         }
     }
 
-    private fun configImgBaseUrl() {
-        tgProperties.imgBaseUrl?.isNotBlank()?.let {
-            HttpUtil.IMG_BASE_URL = tgProperties.imgBaseUrl
-        }
-
-    }
+//    private fun configImgBaseUrl() {
+//        tgProperties.imgBaseUrl?.isNotBlank()?.let {
+//            HttpUtil.IMG_BASE_URL = tgProperties.imgBaseUrl
+//        }
+//
+//    }
 
     private fun setUpTimer() {
         clearCacheTimer.scheduleAtFixedRate(timerTask {

@@ -2,7 +2,7 @@ version: '3.5'
 services:
   bot:
 #    build: .  #自行打包镜像则去除该注释
-    image: kurenai9/im-sync-bot:1.0.1
+    image: kurenai9/im-sync-bot:test-q
     container_name: bot
     restart: always
     environment:

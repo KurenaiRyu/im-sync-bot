@@ -7,7 +7,6 @@ import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
-import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
@@ -18,19 +17,17 @@ import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.SendPhoto
 import moe.kurenai.tdlight.util.MarkdownUtil.fm2md
 import net.mamoe.mirai.message.data.source
-import org.springframework.stereotype.Component
 import java.time.Instant
 import java.time.ZoneId
 
-@Component
-class InfoCommand(
-    val cacheService: CacheService
-) : AbstractTelegramCommand() {
+class InfoCommand : AbstractTelegramCommand() {
 
     override val command = "info"
     override val help: String = "查看用户或群信息"
     override val onlyGroupMessage = true
     override val parseMode = ParseMode.MARKDOWN_V2
+
+    private val cacheService = ContextHolder.cacheService
 
     override fun execute(update: Update, message: Message): String? {
         return if (message.isReply()) {

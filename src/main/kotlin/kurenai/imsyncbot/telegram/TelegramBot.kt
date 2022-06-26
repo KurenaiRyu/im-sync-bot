@@ -3,16 +3,16 @@ package kurenai.imsyncbot.telegram
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
+import kurenai.imsyncbot.ContextHolder.cacheService
+import kurenai.imsyncbot.ContextHolder.config
 import kurenai.imsyncbot.ContextHolder.tdClient
 import kurenai.imsyncbot.ContextHolder.telegramBot
 import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.command.DelegatingCommand
-import kurenai.imsyncbot.config.BotProperties
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.qq.QQBotClient
-import kurenai.imsyncbot.service.CacheService
 import moe.kurenai.tdlight.AbstractUpdateSubscriber
 import moe.kurenai.tdlight.LongPollingTelegramBot
 import moe.kurenai.tdlight.client.TDLightClient
@@ -27,32 +27,30 @@ import moe.kurenai.tdlight.util.DefaultMapper.MAPPER
 import mu.KotlinLogging
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import org.springframework.beans.factory.InitializingBean
-import org.springframework.stereotype.Component
-import java.util.*
 import java.util.concurrent.*
 import java.util.function.Function
+import javax.enterprise.context.ApplicationScoped
+import javax.enterprise.inject.Instance
 
 /**
  * 机器人实例
  * @author Kurenai
  * @since 2021-06-30 14:05
  */
-@Component
+@ApplicationScoped
 class TelegramBot(
-    private val telegramBotProperties: TelegramBotProperties, //初始化时处理器列表
-    private val botProperties: BotProperties,
     private val handlerHolder: HandlerHolder,
-    private val callbacks: List<Callback>,
-    private val cacheService: CacheService,
+    private val callbacks: Instance<Callback>,
     private val privateChatHandler: PrivateChatHandler,
     private val qqBotClient: QQBotClient
-) : AbstractUpdateSubscriber(), InitializingBean {
+) : AbstractUpdateSubscriber() {
+
+    private final val telegramProperties = config.bot.telegram
 
     val nextMsgUpdate: ConcurrentHashMap<Long, Update> = ConcurrentHashMap()
     val nextMsgLock: ConcurrentHashMap<Long, Object> = ConcurrentHashMap()
-    val username: String = telegramBotProperties.username
-    val token: String = telegramBotProperties.token
+    val username: String = telegramProperties.username
+    val token: String = telegramProperties.token
 
     private val log = KotlinLogging.logger {}
     private lateinit var bot: LongPollingTelegramBot
@@ -72,25 +70,16 @@ class TelegramBot(
     }
     private val scope = pool.asCoroutineDispatcher()
 
-    /**
-     * Invoked by the containing `BeanFactory` after it has set all bean properties
-     * and satisfied [BeanFactoryAware], `ApplicationContextAware` etc.
-     *
-     * This method allows the bean instance to perform validation of its overall
-     * configuration and final initialization when all bean properties have been set.
-     * @throws Exception in the event of misconfiguration (such as failure to set an
-     * essential property) or if initialization fails for any other reason
-     */
-    override fun afterPropertiesSet() {
+    fun start() {
 //        GetChatMember(GroupConfig.tgQQ[0])
 
-        log.debug { "Telegram base url: ${telegramBotProperties.baseUrl}" }
+        log.debug { "Telegram base url: ${telegramProperties.baseUrl}" }
         tdClient = TDLightClient(
-            telegramBotProperties.baseUrl,
-            telegramBotProperties.token,
+            telegramProperties.baseUrl,
+            telegramProperties.token,
             isUserMode = false,
             isDebugEnabled = true,
-            updateBaseUrl = telegramBotProperties.baseUrl
+            updateBaseUrl = telegramProperties.baseUrl
         )
         qqBotClient.startCountDown.await()
         bot = LongPollingTelegramBot(listOf(this), tdClient)
@@ -122,15 +111,6 @@ class TelegramBot(
         val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message
         if (message == null) {
             log.debug { "No message" }
-            return
-        }
-
-        if (botProperties.ban.member.contains(message.from?.id)) {
-            log.debug("Ignore this message by ban member [${message.from!!.id}]")
-            return
-        }
-        if (botProperties.ban.group.contains(message.chat.id)) {
-            log.debug("Ignore this message by ban group [${message.chatId}]")
             return
         }
 

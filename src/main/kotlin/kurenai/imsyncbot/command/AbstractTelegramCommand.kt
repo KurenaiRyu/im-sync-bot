@@ -7,7 +7,7 @@ import moe.kurenai.tdlight.model.message.Update
 abstract class AbstractTelegramCommand {
 
     open val help: String = "No help information."
-    open val name: String = this.javaClass.simpleName
+    open val name: String = this.javaClass.simpleName.replace("Command", "")
     open val command: String = ""
     open val onlyUserMessage: Boolean = false
     open val onlyGroupMessage: Boolean = false

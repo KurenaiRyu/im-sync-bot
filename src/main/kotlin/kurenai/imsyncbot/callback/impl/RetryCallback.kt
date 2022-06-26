@@ -1,8 +1,8 @@
 package kurenai.imsyncbot.callback.impl
 
+import kurenai.imsyncbot.ContextHolder.cacheService
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.handler.tg.TgMessageHandler
-import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardMarkup
@@ -11,10 +11,12 @@ import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.DeleteMessage
 import moe.kurenai.tdlight.request.message.EditMessageText
 import mu.KotlinLogging
-import org.springframework.stereotype.Component
+import javax.enterprise.context.ApplicationScoped
 
-@Component
-class RetryCallback(val cacheService: CacheService, val forwardHandler: TgMessageHandler) : Callback() {
+@ApplicationScoped
+class RetryCallback(
+    val forwardHandler: TgMessageHandler
+) : Callback() {
 
     private val log = KotlinLogging.logger {}
 

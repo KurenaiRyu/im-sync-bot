@@ -5,9 +5,7 @@ import kurenai.imsyncbot.config.UserConfig
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import mu.KotlinLogging
-import org.springframework.stereotype.Component
 
-@Component
 class RemoveAdminCommand : AbstractTelegramCommand() {
 
     override val command = "removeAdmin"

@@ -1,19 +1,15 @@
 package kurenai.imsyncbot.command.impl
 
 import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.ContextHolder.cacheService
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
-import kurenai.imsyncbot.service.CacheService
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import net.mamoe.mirai.message.data.source
-import org.springframework.stereotype.Component
 
-@Component
-class UnForwardCommand(
-    val cacheService: CacheService,
-) : AbstractTelegramCommand() {
+class UnForwardCommand : AbstractTelegramCommand() {
 
     override val command = "unfwd"
     override val help: String = "排除群或用户消息（但事件仍会接受）"
