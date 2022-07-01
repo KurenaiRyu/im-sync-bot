@@ -51,7 +51,7 @@ object GroupConfig : AbstractConfig<Group>() {
     }
 
     fun removeStatus(tg: Long, status: String) {
-        items.removeIf { it.tg == tg && it.status.contains(status) }
+        items.firstOrNull { it.tg == tg && it.status.contains(status) }?.status?.remove(status)
         afterUpdate()
     }
 
