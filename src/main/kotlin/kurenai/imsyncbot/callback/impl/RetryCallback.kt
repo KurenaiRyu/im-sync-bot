@@ -1,9 +1,9 @@
 package kurenai.imsyncbot.callback.impl
 
 import kurenai.imsyncbot.callback.Callback
-import kurenai.imsyncbot.handler.tg.TgMessageHandler
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
+import kurenai.imsyncbot.tgMessageHandler
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardMarkup
 import moe.kurenai.tdlight.model.message.Message
@@ -12,15 +12,13 @@ import moe.kurenai.tdlight.request.message.DeleteMessage
 import moe.kurenai.tdlight.request.message.EditMessageText
 import mu.KotlinLogging
 
-class RetryCallback(
-    val forwardHandler: TgMessageHandler
-) : Callback() {
+class RetryCallback : Callback() {
 
     private val log = KotlinLogging.logger {}
 
     override val method: String = "retry"
 
-    override fun handle0(update: Update, message: Message): Int {
+    override suspend fun handle0(update: Update, message: Message): Int {
 
         val originMessage = CacheService.getTg(message.chat.id, message.replyToMessage?.messageId!!)
         if (originMessage == null) {
@@ -40,9 +38,7 @@ class RetryCallback(
         }.send()
 
         try {
-            suspend {
-                forwardHandler.onMessage(originMessage)
-            }
+            tgMessageHandler.onMessage(originMessage)
             DeleteMessage(chatId, messageId).send()
         } catch (e: Exception) {
             log.error(e) { e.message }

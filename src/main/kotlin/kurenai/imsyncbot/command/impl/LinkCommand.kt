@@ -10,7 +10,6 @@ import kurenai.imsyncbot.qq.QQBotClient.bot
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
-import kurenai.imsyncbot.telegram.sendSync
 import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
@@ -38,7 +37,7 @@ class LinkCommand : AbstractTelegramCommand() {
 
     private val timer = Timer("clearLink", false)
 
-    override fun execute(update: Update, message: Message): String? {
+    override suspend fun execute(update: Update, message: Message): String? {
         val replyMsg = message.replyToMessage!!
         if (replyMsg.from?.username != TelegramBot.username) return "请引用转发的qq消息"
         val qqMsg = CacheService.getQQByTg(replyMsg) ?: return "找不到该qq信息"
@@ -60,20 +59,20 @@ class LinkCommand : AbstractTelegramCommand() {
                         val tips = SendMessage(message.chatId, "请到qq群回复提示消息`accept`进行确认").apply {
                             replyToMessageId = message.messageId
                             parseMode = ParseMode.MARKDOWN_V2
-                        }.sendSync()
+                        }.send()
                         val msgId = receipt.source.ids[0]
                         holdLinks[msgId] = qqMsg.source.fromId to listOf(message, tips)
 
                         timer.schedule(timerTask {
-                            holdLinks.remove(msgId)?.let {
-                                SendMessage(message.chatId, "已超时").apply {
-                                replyToMessageId = message.messageId
-                            }.send()
                             CoroutineScope(Dispatchers.Default).launch {
-                                qqGroup.sendMessage(receipt.quote().plus("已超时"))
+                                holdLinks.remove(msgId)?.let {
+                                    SendMessage(message.chatId, "已超时").apply {
+                                        replyToMessageId = message.messageId
+                                    }.send()
+                                    qqGroup.sendMessage(receipt.quote().plus("已超时"))
+                                }
                             }
-                        }
-                    }, TimeUnit.MINUTES.toMillis(3))
+                        }, TimeUnit.MINUTES.toMillis(3))
                 }
             }
             null

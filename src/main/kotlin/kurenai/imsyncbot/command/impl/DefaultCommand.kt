@@ -11,7 +11,7 @@ class DefaultCommand : AbstractTelegramCommand() {
     override val help: String = "设置默认群"
     override val onlyGroupMessage = true
 
-    override fun execute(update: Update, message: Message): String {
+    override suspend fun execute(update: Update, message: Message): String {
         GroupConfig.default(message)
         return "设置默认群成功"
     }

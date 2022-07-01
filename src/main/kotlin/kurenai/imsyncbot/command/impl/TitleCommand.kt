@@ -31,7 +31,7 @@ class TitleCommand : AbstractTelegramCommand(), Bannable {
     override val help: String = "修改自己或他人qq头衔"
     override val onlySupperAdmin = false
 
-    override fun execute(update: Update, message: Message): String? {
+    override suspend fun execute(update: Update, message: Message): String? {
         val param = message.text!!.param()
         if (message.isReply()) {
             val replyMsg = message.replyToMessage!!
@@ -86,10 +86,13 @@ class TitleCommand : AbstractTelegramCommand(), Bannable {
         } != null
     }
 
-    private fun modifyTitle(member: NormalMember, message: Message, modifyTitle: String) {
+    private suspend fun modifyTitle(member: NormalMember, message: Message, modifyTitle: String) {
         try {
             member.specialTitle = modifyTitle
-            SendMessage(message.chatId, "qq`${member.remarkOrNameCardOrNick.fm2md()}`的头衔已修改为`${modifyTitle.fm2md()}`").apply {
+            SendMessage(
+                message.chatId,
+                "qq`${member.remarkOrNameCardOrNick.fm2md()}`的头衔已修改为`${modifyTitle.fm2md()}`"
+            ).apply {
                 this.replyToMessageId = message.messageId
                 this.parseMode = ParseMode.MARKDOWN_V2
             }.send()

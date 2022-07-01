@@ -25,7 +25,7 @@ abstract class Callback {
     open val name: String = this.javaClass.simpleName
     open val method: String = ""
 
-    open fun handle(update: Update, message: Message): Int {
+    open suspend fun handle(update: Update, message: Message): Int {
         var result = END
         try {
             result = handle0(update, message)
@@ -41,7 +41,7 @@ abstract class Callback {
         }
     }
 
-    abstract fun handle0(update: Update, message: Message): Int
+    abstract suspend fun handle0(update: Update, message: Message): Int
 
     open fun match(update: Update): Boolean {
         return match(update.callbackQuery?.data ?: "").also {
@@ -59,7 +59,7 @@ abstract class Callback {
         return update.callbackQuery?.data?.substringAfter(" ") ?: ""
     }
 
-    fun waitForMsg(update: Update, message: Message): Update? {
+    suspend fun waitForMsg(update: Update, message: Message): Update? {
         var lock = TelegramBot.nextMsgLock[message.chat.id]
         if (lock == null) {
             lock = Object()
@@ -69,7 +69,7 @@ abstract class Callback {
             lock!!.wait(TimeUnit.SECONDS.toMillis(30))
         }
         return TelegramBot.nextMsgUpdate.remove(message.chat.id) ?: run {
-            SendMessage(message.chatId.toString(), "等待消息超时").send()
+            SendMessage(message.chatId, "等待消息超时").send()
             null
         }
     }

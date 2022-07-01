@@ -14,7 +14,7 @@ class SuperAdminCommand : AbstractTelegramCommand() {
 
     private val log = KotlinLogging.logger {}
 
-    override fun execute(update: Update, message: Message): String {
+    override suspend fun execute(update: Update, message: Message): String {
         return if (message.isReply()) {
             val user = message.replyToMessage!!.from!!
             if (user.isBot) "机器人无法成为管理员"

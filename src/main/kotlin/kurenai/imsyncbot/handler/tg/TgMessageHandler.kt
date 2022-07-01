@@ -9,7 +9,7 @@ import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.qq.QQBotClient.bot
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.sendSync
+import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
 import moe.kurenai.tdlight.exception.TelegramApiException
@@ -249,9 +249,9 @@ class TgMessageHandler : TelegramHandler {
         return ret
     }
 
-    private fun getTgFile(fileId: String, fileUniqueId: String): moe.kurenai.tdlight.model.media.File {
+    private suspend fun getTgFile(fileId: String, fileUniqueId: String): moe.kurenai.tdlight.model.media.File {
         try {
-            return GetFile(fileId).sendSync()
+            return GetFile(fileId).send()
         } catch (e: TelegramApiException) {
             log.error(e) { e.message }
         }

@@ -11,7 +11,7 @@ class ReloadCommand : AbstractTelegramCommand() {
     override val command = "reload"
     override val help: String = "重新加载config目录下的配置"
 
-    override fun execute(update: Update, message: Message): String {
+    override suspend fun execute(update: Update, message: Message): String {
         GroupConfig.reload()
         UserConfig.reload()
         return "已重新加载配置"

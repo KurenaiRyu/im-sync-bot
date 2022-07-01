@@ -30,7 +30,7 @@ class InfoCommand : AbstractTelegramCommand() {
     override val onlyGroupMessage = true
     override val parseMode = ParseMode.MARKDOWN_V2
 
-    override fun execute(update: Update, message: Message): String? {
+    override suspend fun execute(update: Update, message: Message): String? {
         return if (message.isReply()) {
             val replyMessage = message.replyToMessage!!
             val user = replyMessage.from!!

@@ -21,7 +21,7 @@ class BindCommand : AbstractTelegramCommand() {
     override val parseMode = ParseMode.MARKDOWN_V2
 
 
-    override fun execute(update: Update, message: Message): String? {
+    override suspend fun execute(update: Update, message: Message): String? {
         val param = message.text?.param() ?: "参数错误"
         return if (message.isGroupMessage() || message.isSuperGroupMessage()) {
             if (message.isReply()) {

@@ -12,7 +12,7 @@ class StartCommand : AbstractTelegramCommand() {
     override val onlyUserMessage = true
     override val onlyMaster = true
 
-    override fun execute(update: Update, message: Message): String {
+    override suspend fun execute(update: Update, message: Message): String {
         UserConfig.setMaster(message)
         return "Hello, my master! \n\n" +
                 "现已更新主人的chatId[${message.chatId}]以及username[${message.from!!.username}]，当单独AT机器人的时候，转发到tg上时则会替换为主人username。\n" +

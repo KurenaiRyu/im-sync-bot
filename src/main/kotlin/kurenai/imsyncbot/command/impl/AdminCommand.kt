@@ -14,7 +14,7 @@ class AdminCommand : AbstractTelegramCommand() {
 
     private val log = KotlinLogging.logger {}
 
-    override fun execute(update: Update, message: Message): String {
+    override suspend fun execute(update: Update, message: Message): String {
         return if (message.isReply()) {
             val user = message.replyToMessage!!.from!!
             UserConfig.admin(user.id, username = user.username)

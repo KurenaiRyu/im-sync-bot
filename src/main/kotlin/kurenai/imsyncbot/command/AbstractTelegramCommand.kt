@@ -18,7 +18,7 @@ abstract class AbstractTelegramCommand {
     open val parseMode: String? = null
     open val reply: Boolean = false
 
-    abstract fun execute(update: Update, message: Message): String?
+    abstract suspend fun execute(update: Update, message: Message): String?
 
     fun String.param(): String {
         return this.replace("/$command", "").trim()

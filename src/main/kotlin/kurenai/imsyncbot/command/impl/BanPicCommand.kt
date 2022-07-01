@@ -15,7 +15,7 @@ class BanPicCommand : AbstractTelegramCommand() {
     override val help: String = "排除群或用户图片消息"
     override val onlyGroupMessage = true
 
-    override fun execute(update: Update, message: Message): String? {
+    override suspend fun execute(update: Update, message: Message): String? {
         return if (message.isReply()) {
             val replyMessage = message.replyToMessage!!
             val user = replyMessage.from!!

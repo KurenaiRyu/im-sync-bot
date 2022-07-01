@@ -20,7 +20,9 @@ import kurenai.imsyncbot.command.InlineCommandHandler
 import kurenai.imsyncbot.config.AbstractConfig
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.handler.qq.QQHandler
+import kurenai.imsyncbot.handler.qq.QQMessageHandler
 import kurenai.imsyncbot.handler.tg.TelegramHandler
+import kurenai.imsyncbot.handler.tg.TgMessageHandler
 import kurenai.imsyncbot.qq.QQBotClient
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.TelegramBot
@@ -66,7 +68,7 @@ val mapper = jacksonObjectMapper()
         ObjectMapper.DefaultTyping.EVERYTHING
     )
 
-val reflections = Reflections("kurenai.imsyncbot.config")
+val reflections = Reflections("kurenai.imsyncbot")
 val dfs = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
 val configs = ArrayList<AbstractConfig<*>>()
@@ -77,6 +79,8 @@ val inlineCommands = HashMap<String, InlineCommandHandler>()
 val qqHandlers = ArrayList<QQHandler>()
 val tgHandlers = ArrayList<TelegramHandler>()
 
+lateinit var tgMessageHandler: TgMessageHandler
+lateinit var qqMessageHandler: QQMessageHandler
 lateinit var configProperties: ConfigProperties
 lateinit var redisson: RedissonClient
 lateinit var cache: Cache
@@ -119,6 +123,7 @@ fun registerTgHandler() {
         .map { it.getDeclaredConstructor().newInstance() }
         .forEach {
             tgHandlers.add(it)
+            if (!::tgMessageHandler.isInitialized && it is TgMessageHandler) tgMessageHandler = it
             log.info("Registered telegram handler:  ${it.handleName()}(${it::class.java.simpleName})")
         }
 }
@@ -128,6 +133,7 @@ fun registerQQHandler() {
         .map { it.getDeclaredConstructor().newInstance() }
         .forEach {
             qqHandlers.add(it)
+            if (!::qqMessageHandler.isInitialized && it is QQMessageHandler) qqMessageHandler = it
             log.info("Registered qq handler:  ${it.handleName()}(${it::class.java.simpleName})")
         }
 }

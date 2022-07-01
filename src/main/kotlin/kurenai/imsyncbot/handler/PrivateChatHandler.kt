@@ -1,12 +1,14 @@
 package kurenai.imsyncbot.handler
 
-import kotlinx.coroutines.ExecutorCoroutineDispatcher
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withTimeout
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.configProperties
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.qq.QQBotClient.bot
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.sendSync
+import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
 import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.media.InputFile
@@ -25,8 +27,9 @@ import net.mamoe.mirai.event.events.FriendMessageSyncEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.message.sourceMessage
+import okhttp3.internal.notifyAll
+import okhttp3.internal.wait
 import org.apache.logging.log4j.LogManager
-import java.util.concurrent.ConcurrentHashMap
 
 object PrivateChatHandler {
 
@@ -35,11 +38,10 @@ object PrivateChatHandler {
 
     val privateChat = configProperties.handler.privateChat
     val privateChatChannel = configProperties.handler.privateChatChannel
-    val locks = ConcurrentHashMap<Int, Object>()
-    val newChannelLock = Object()
-    val msgIds = HashMap<Int, Int>()
+    val newChannelLock = Mutex()
     private val picToFileSize = configProperties.handler.picToFileSize * 1024 * 1024
-    private val contextMap = HashMap<Long, ExecutorCoroutineDispatcher>()
+
+    private var currentMessage: Message? = null
 
     suspend fun onFriendEvent(event: FriendEvent): Int {
         when (event) {
@@ -93,14 +95,14 @@ object PrivateChatHandler {
                                 if (isSync) {
                                     caption = "同步消息"
                                 }
-                            }.sendSync()
+                            }.send()
                         } else {
                             SendPhoto(privateChat.toString(), inputFile).apply {
                                 replyToMessageId = replyMsgId
                                 if (isSync) {
                                     caption = "同步消息"
                                 }
-                            }.sendSync()
+                            }.send()
                         }
                     } catch (e: Exception) {
                         log.debug("fallback to send text")
@@ -109,7 +111,7 @@ object PrivateChatHandler {
                         SendMessage(privateChat.toString(), content).apply {
                             replyToMessageId = replyMsgId
                             parseMode = ParseMode.MARKDOWN_V2
-                        }.sendSync()
+                        }.send()
                     }
                 }
                 is FileMessage -> {
@@ -117,7 +119,7 @@ object PrivateChatHandler {
                     if (isSync) content = "同步消息\n\n$content"
                     SendMessage(privateChat.toString(), content).apply {
                         replyToMessageId = replyMsgId
-                    }.sendSync()
+                    }.send()
                 }
                 is OnlineAudio -> {
                     val file = BotUtil.downloadDoc(msg.filename, msg.urlForDownload)
@@ -126,14 +128,14 @@ object PrivateChatHandler {
                         if (isSync) {
                             caption = "同步消息"
                         }
-                    }.sendSync()
+                    }.send()
                 }
                 else -> {
                     msg.contentToString().takeIf { it.isNotEmpty() }?.let {
                         val content = if (isSync) "同步消息\n\n$it" else it
                         SendMessage(privateChat.toString(), content).apply {
                             replyToMessageId = replyMsgId
-                        }.sendSync()
+                        }.send()
                     }
                 }
             }?.also { rec ->
@@ -152,13 +154,13 @@ object PrivateChatHandler {
             val friendId = CacheService.getFriendId(rootReplyMessageId) ?: run {
                 SendMessage(privateChat.toString(), "无法通过引用消息找到qq好友: $rootReplyMessageId").apply {
                     replyToMessageId = message.messageId
-                }.sendSync()
+                }.send()
                 return
             }
             val friend = bot.getFriend(friendId) ?: run {
                 SendMessage(privateChat.toString(), "找不到qq好友: $friendId").apply {
                     replyToMessageId = message.messageId
-                }.sendSync()
+                }.send()
                 return
             }
             val builder = MessageChainBuilder()
@@ -167,17 +169,17 @@ object PrivateChatHandler {
                 message.hasVoice() -> {
                     SendMessage(privateChat.toString(), "暂不支持私聊发送语音").apply {
                         replyToMessageId = message.messageId
-                    }.sendSync()
+                    }.send()
                 }
                 message.hasAudio() -> {
                     SendMessage(privateChat.toString(), "暂不支持私聊发送音频").apply {
                         replyToMessageId = message.messageId
-                    }.sendSync()
+                    }.send()
                 }
                 message.hasVideo() -> {
                     SendMessage(privateChat.toString(), "暂不支持私聊发送视频").apply {
                         replyToMessageId = message.messageId
-                    }.sendSync()
+                    }.send()
                 }
                 message.hasSticker() -> {
                     val sticker = message.sticker!!
@@ -190,7 +192,7 @@ object PrivateChatHandler {
                 message.hasDocument() -> {
                     SendMessage(privateChat.toString(), "暂不支持私聊发送文件").apply {
                         replyToMessageId = message.messageId
-                    }.sendSync()
+                    }.send()
                     return
                 }
                 message.hasPhoto() -> {
@@ -213,43 +215,45 @@ object PrivateChatHandler {
         }
     }
 
-    fun getStartMsg(friend: Friend): Int? {
+    suspend fun getStartMsg(friend: Friend): Int? {
         var messageId = CacheService.getPrivateChannelMessageId(friend.id)
-        synchronized(newChannelLock) {
-            log.debug("Locked by ${friend.id}")
-            if (messageId == null) {
-                val rec = bot.getFriend(friend.id)?.let {
-                    SendPhoto(privateChatChannel.toString(), InputFile(bot.getFriend(friend.id)?.avatarUrl!!)).apply {
-                        caption = "昵称：#${friend.nick}\n备注：#${friend.remark}\n#id${friend.id}\n"
-                    }.sendSync()
-                } ?: SendMessage(privateChatChannel.toString(), "昵称：${friend.nick}\n备注：${friend.remark}\n#id${friend.id}\n").sendSync()
+        var count = 0
 
-                val lock = Object()
-                locks[rec.messageId!!] = lock
-                synchronized(lock) {
-                    log.debug("Wait ${rec.messageId}")
-                    lock.wait(10 * 1000L)
+        while (!newChannelLock.tryLock() && count < 3) {
+            count++
+            delay(5000)
+        }
+        if (count >= 3) {
+            newChannelLock.unlock()
+        } else if (newChannelLock.isLocked) {
+            kotlin.runCatching {
+                withTimeout(10000) {
+                    val f = bot.getFriend(friend.id)?.let {
+                        SendPhoto(
+                            privateChatChannel.toString(),
+                            InputFile(bot.getFriend(friend.id)?.avatarUrl!!)
+                        ).apply {
+                            caption = "昵称：#${friend.nick}\n备注：#${friend.remark}\n#id${friend.id}\n"
+                        }.send()
+                    }
+                    newChannelLock.wait()
+                    currentMessage?.messageId?.let {
+                        messageId = it
+                        CacheService.cachePrivateChat(friend.id, it)
+                    }
                 }
-                log.debug("Wake up ${rec.messageId}, receive ${msgIds[rec.messageId]}")
-                messageId = msgIds.remove(rec.messageId) ?: return null
-                CacheService.cachePrivateChat(friend.id, messageId!!)
-            }
+            }.onFailure { newChannelLock.unlock() }
         }
         return messageId
     }
 
-    fun onChannelForward(update: Update) {
-        val message = update.message!!
+    suspend fun onChannelForward(update: Update) {
         log.debug("${this::class.java}#onChannelForward")
-        val lock = locks.remove(message.forwardFromMessageId) ?: return
-        msgIds[message.forwardFromMessageId!!] = message.messageId!!
-        synchronized(lock) {
-            lock.notifyAll()
-            log.debug("Notify ${message.forwardFromMessageId}")
-        }
+        currentMessage = update.message!!
+        newChannelLock.notifyAll()
     }
 
-    private fun Message.getRootReplyMessageId(): Int {
+    private suspend fun Message.getRootReplyMessageId(): Int {
         return if (this.isReply()) {
             CacheService.getTg(this.chat.id, this.replyToMessage!!.messageId!!)?.getRootReplyMessageId()
                 ?: this.messageId!!

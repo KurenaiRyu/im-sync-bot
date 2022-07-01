@@ -15,7 +15,7 @@ class ForwardCommand : AbstractTelegramCommand() {
     override val help: String = "解除排除群或用户消息"
     override val onlyGroupMessage = true
 
-    override fun execute(update: Update, message: Message): String {
+    override suspend fun execute(update: Update, message: Message): String {
         return if (message.isReply()) {
             val user = message.replyToMessage!!.from!!
             if (user.isBot && user.username == TelegramBot.username) {

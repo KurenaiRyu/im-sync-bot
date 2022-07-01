@@ -24,7 +24,7 @@ class RecallCommand : AbstractTelegramCommand() {
     override val onlyReply: Boolean = true
     override val reply: Boolean = true
 
-    override fun execute(update: Update, message: Message): String? {
+    override suspend fun execute(update: Update, message: Message): String? {
         val replyMsg = message.replyToMessage!!
         return try {
             CoroutineScope(Dispatchers.Default).launch {

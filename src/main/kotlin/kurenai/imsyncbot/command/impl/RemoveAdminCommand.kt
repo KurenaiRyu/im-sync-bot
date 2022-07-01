@@ -15,7 +15,7 @@ class RemoveAdminCommand : AbstractTelegramCommand() {
 
     private val log = KotlinLogging.logger {}
 
-    override fun execute(update: Update, message: Message): String {
+    override suspend fun execute(update: Update, message: Message): String {
         val reply = message.replyToMessage!!
         val user = reply.from!!
         UserConfig.removeAdmin(user.id)

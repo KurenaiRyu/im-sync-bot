@@ -15,7 +15,7 @@ class UnbanPicCommand : AbstractTelegramCommand() {
     override val help: String = "解除排除群或用户图片消息"
     override val onlyGroupMessage = true
 
-    override fun execute(update: Update, message: Message): String {
+    override suspend fun execute(update: Update, message: Message): String {
         return if (message.isReply()) {
             val reply = message.replyToMessage!!
             val user = reply.from!!

@@ -16,7 +16,7 @@ class UnbindCommand : AbstractTelegramCommand() {
     override val onlyAdmin = false
     override val onlySupperAdmin = true
 
-    override fun execute(update: Update, message: Message): String {
+    override suspend fun execute(update: Update, message: Message): String {
         val param = message.text!!.param()
         return if (param.isNotBlank()) {
             try {

@@ -20,7 +20,6 @@ import java.io.File
 import java.text.NumberFormat
 import java.time.LocalDateTime
 import java.time.ZoneOffset
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 
@@ -43,13 +42,17 @@ object CacheService {
     private val log = KotlinLogging.logger {}
 
     fun cache(messageChain: MessageChain, message: Message) {
-        val qqMsgId: String = messageChain.cacheId()
-        val tgMsgId: String = message.cacheId()
+        try {
+            val qqMsgId: String = messageChain.cacheId()
+            val tgMsgId: String = message.cacheId()
 
-        cache.put(QQ_TG_MSG_ID_CACHE_KEY, qqMsgId, tgMsgId, TTL)
-        cache.put(TG_QQ_MSG_ID_CACHE_KEY, tgMsgId, qqMsgId, TTL)
-        cache.put(QQ_MSG_CACHE_KEY, qqMsgId, messageChain.serializeToJsonString(), TTL)
-        cache(message)
+            cache.put(QQ_TG_MSG_ID_CACHE_KEY, qqMsgId, tgMsgId, TTL)
+            cache.put(TG_QQ_MSG_ID_CACHE_KEY, tgMsgId, qqMsgId, TTL)
+            cache.put(QQ_MSG_CACHE_KEY, qqMsgId, messageChain.serializeToJsonString(), TTL)
+            cache(message)
+        } catch (e: Exception) {
+            log.warn("缓存信息失败", e)
+        }
     }
 
     fun cache(receipt: MessageReceipt<*>, message: Message) {
@@ -153,23 +156,22 @@ object CacheService {
         }
     }
 
-    fun getTg(message: Message): Message? {
+    suspend fun getTg(message: Message): Message? {
         return getTg(message.chat.id, message.messageId!!)
     }
 
-    fun getTg(chatId: Long, messageId: Int): Message? {
-        return cache.get(TG_MSG_CACHE_KEY, getTgCacheId(chatId, messageId)) ?: getOnlineTg(chatId.toString(), messageId)?.join()
+    suspend fun getTg(chatId: Long, messageId: Int): Message? {
+        return cache.get(TG_MSG_CACHE_KEY, getTgCacheId(chatId, messageId)) ?: getOnlineTg(chatId.toString(), messageId)
     }
 
-    fun getOnlineTg(chatId: String?, messageId: Int): CompletableFuture<Message>? {
+    suspend fun getOnlineTg(chatId: String?, messageId: Int): Message? {
         if (chatId == null) return null
-        return GetMessageInfo(chatId, messageId).send().thenApply {
+        return GetMessageInfo(chatId, messageId).send().also {
             cache(it)
-            return@thenApply it
         }
     }
 
-    fun getTgByQQ(group: Long, id: Int): Message? {
+    suspend fun getTgByQQ(group: Long, id: Int): Message? {
         return getTgIdByQQ(group, id)?.let { pair ->
             getTg(pair.first, pair.second)
         }

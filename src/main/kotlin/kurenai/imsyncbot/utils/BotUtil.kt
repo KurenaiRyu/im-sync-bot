@@ -7,7 +7,7 @@ import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.config.GroupConfig.tgQQ
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.sendSync
+import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.exception.TelegramApiException
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
 import moe.kurenai.tdlight.request.GetFile
@@ -52,9 +52,9 @@ object BotUtil {
         return ret
     }
 
-    fun getTgFile(fileId: String, fileUniqueId: String): moe.kurenai.tdlight.model.media.File {
+    suspend fun getTgFile(fileId: String, fileUniqueId: String): moe.kurenai.tdlight.model.media.File {
         try {
-            return GetFile(fileId).sendSync()
+            return GetFile(fileId).send()
         } catch (e: TelegramApiException) {
             log.error(e) { e.message }
         }

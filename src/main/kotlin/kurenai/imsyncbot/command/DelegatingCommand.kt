@@ -26,7 +26,7 @@ object DelegatingCommand {
         reflections.getSubTypesOf(AbstractQQCommand::class.java)
     }
 
-    fun execute(update: Update, message: Message) {
+    suspend fun execute(update: Update, message: Message) {
         val command = message.entities!!
             .first { it.type == MessageEntityType.BOT_COMMAND }
             .text!!
@@ -153,7 +153,7 @@ object DelegatingCommand {
         return if (matched) 1 else 0
     }
 
-    private fun handleHelp(message: Message) {
+    private suspend fun handleHelp(message: Message) {
         val sb = StringBuilder("Command list")
         for (handler in tgCommands) {
             sb.append("\n----------------\n")

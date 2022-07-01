@@ -8,7 +8,7 @@ import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.configProperties
 import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import kurenai.imsyncbot.handler.PrivateChatHandler
-import kurenai.imsyncbot.handler.qq.QQMessageHandler
+import kurenai.imsyncbot.qqMessageHandler
 import kurenai.imsyncbot.redisson
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
@@ -153,7 +153,7 @@ object QQBotClient {
                                                                     withContext(Dispatchers.IO) {
                                                                         q.poll(30, TimeUnit.SECONDS)
                                                                     } ?: continue
-                                                                QQMessageHandler.onGroupMessage(
+                                                                qqMessageHandler.onGroupMessage(
                                                                     group,
                                                                     message.deserializeJsonToMessageChain()
                                                                 )
@@ -181,10 +181,10 @@ object QQBotClient {
                             }
                         }
                         is MessageRecallEvent.GroupRecall -> {
-                            QQMessageHandler.onRecall(event)
+                            qqMessageHandler.onRecall(event)
                         }
                         is GroupEvent -> {
-                            QQMessageHandler.onGroupEvent(event)
+                            qqMessageHandler.onGroupEvent(event)
                         }
                     }
 
@@ -272,28 +272,29 @@ object QQBotClient {
                 master.sendMessage(message).quote()
                     .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: (${e::class.simpleName}) ${e.message}")
             )
-            SendMessage(BotUtil.getTgChatByQQ(event.group.id).toString(), event.message.contentToString()).send()
-                .handle { _, case ->
-                    case?.let {
-                        log.error("Report error fail.", case)
-                    }
-                }
+            kotlin.runCatching {
+                SendMessage(BotUtil.getTgChatByQQ(event.group.id).toString(), event.message.contentToString()).send()
+            }.onFailure {
+                log.error("Report error fail.", it)
+            }
         }
     }
 
-    private fun sendRemindMsg(event: GroupAwareMessageEvent) {
+    private suspend fun sendRemindMsg(event: GroupAwareMessageEvent) {
         if (UserConfig.masterUsername.isBlank()) return
         val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
-        SendMessage(
-            BotUtil.getTgChatByQQ(event.group.id).toString(),
-            "#提醒 #id${event.sender.id} #group${event.group.id}\n $content"
-        ).apply {
-            entities =
-                listOf(MessageEntity(MessageEntityType.TEXT_MENTION, 1, 3).apply { user = User(UserConfig.masterTg) })
-        }.send().handle { _, case ->
-            case?.let {
-                log.error("Send remind message fail.", case)
-            }
+        kotlin.runCatching {
+            SendMessage(
+                BotUtil.getTgChatByQQ(event.group.id).toString(),
+                "#提醒 #id${event.sender.id} #group${event.group.id}\n $content"
+            ).apply {
+                entities =
+                    listOf(MessageEntity(MessageEntityType.TEXT_MENTION, 1, 3).apply {
+                        user = User(UserConfig.masterTg)
+                    })
+            }.send()
+        }.onFailure {
+            log.error("Send remind message fail.", it)
         }
     }
 

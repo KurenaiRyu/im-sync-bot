@@ -15,7 +15,7 @@ class UnlinkCommand : AbstractTelegramCommand() {
     override val onlyGroupMessage = true
     override val reply = true
 
-    override fun execute(update: Update, message: Message): String {
+    override suspend fun execute(update: Update, message: Message): String {
         val user = if (message.isReply()) {
             if (!UserConfig.superAdmins.contains(message.from?.id)) return "只允许超级管理员管理他人信息"
             if (message.replyToMessage?.from?.username == TelegramBot.username) {

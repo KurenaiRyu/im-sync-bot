@@ -24,7 +24,7 @@ class TitleQQCommand : AbstractQQCommand() {
         }
     }
 
-    private fun modifyTitle(group: Group, event: MessageEvent, modifyTitle: String) {
+    private suspend fun modifyTitle(group: Group, event: MessageEvent, modifyTitle: String) {
         CoroutineScope(Dispatchers.Default).launch {
             group.getMember(event.sender.id)?.let {
                 try {

@@ -12,7 +12,7 @@ class StatusCommand : AbstractTelegramCommand() {
     override val help: String = "bot运行状态"
     override val onlySupperAdmin = false
 
-    override fun execute(update: Update, message: Message): String {
+    override suspend fun execute(update: Update, message: Message): String {
         val runtime = Runtime.getRuntime()
         val arr = arrayOf(
             runtime.maxMemory() - runtime.totalMemory() + runtime.freeMemory(),

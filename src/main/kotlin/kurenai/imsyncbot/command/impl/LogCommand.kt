@@ -16,7 +16,7 @@ class LogCommand : AbstractTelegramCommand() {
     override val help: String = "获取日志文件"
     override val command: String = "log"
 
-    override fun execute(update: Update, message: Message): String? {
+    override suspend fun execute(update: Update, message: Message): String? {
         return try {
             val msg = update.message!!
             val file = File(BotConstant.LOG_FILE_PATH)

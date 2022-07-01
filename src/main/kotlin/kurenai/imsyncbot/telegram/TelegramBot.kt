@@ -2,7 +2,10 @@ package kurenai.imsyncbot.telegram
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.callbacks
 import kurenai.imsyncbot.command.DelegatingCommand
@@ -27,8 +30,10 @@ import moe.kurenai.tdlight.util.DefaultMapper.MAPPER
 import mu.KotlinLogging
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import java.util.concurrent.*
-import java.util.function.Function
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 /**
  * 机器人实例
@@ -182,34 +187,30 @@ object TelegramBot : AbstractUpdateSubscriber() {
 
 val log: Logger = LogManager.getLogger()
 val mainClientLock = Object()
+val clientLock = Mutex()
 
-fun <T> Request<ResponseWrapper<T>>.send(): CompletableFuture<out T> {
-    return client.send(this).handle { result, case ->
-        return@handle case?.let {
-            try {
-                CompletableFuture.completedFuture(this.sendSync())
-            } catch (e: Exception) {
-                log.error(e.message, e)
-                CompletableFuture.failedFuture(e)
-            }
-        } ?: CompletableFuture.completedFuture(result)
-    }.thenCompose(Function.identity())
-}
-
-fun <T> Request<ResponseWrapper<T>>.sendSync(): T {
-    synchronized(mainClientLock) {
-        while (true) {
-            try {
-                return client.sendSync(this)
-            } catch (e: TelegramApiRequestException) {
-                val retryAfter = e.response?.parameters?.retryAfter
-                if (retryAfter != null) {
-                    log.info("Wait for ${retryAfter}s")
-                    mainClientLock.wait(retryAfter.toLong() * 1000)
-                } else {
-                    throw e
+suspend fun <T> Request<ResponseWrapper<T>>.send(): T {
+    var count = 0
+    var lastEx: Throwable? = null
+    while (count < 3) {
+        clientLock.withLock {
+            kotlin.runCatching {
+                client.sendSync(this@send)
+            }.onFailure {
+                lastEx = it
+                if (it is TelegramApiRequestException) {
+                    it.response?.parameters?.retryAfter?.let { retryAfter ->
+                        log.info("Wait for ${retryAfter}s")
+                        delay(retryAfter * 1000L)
+                    }
                 }
+                log.error(it.message, it)
+                count++
+            }.onSuccess {
+                return it
             }
         }
     }
+    log.warn("重试3次失败")
+    throw lastEx ?: Exception("重试3次失败")
 }
