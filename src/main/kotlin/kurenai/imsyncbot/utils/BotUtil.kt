@@ -3,10 +3,10 @@ package kurenai.imsyncbot.utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
-import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.config.GroupConfig.tgQQ
+import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.sendSync
 import moe.kurenai.tdlight.exception.TelegramApiException
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
@@ -34,7 +34,6 @@ object BotUtil {
 
     @Throws(TelegramApiException::class, IOException::class)
     suspend fun getImage(friend: Contact, fileId: String, fileUniqueId: String): Image? {
-        val client = ContextHolder.telegramBot
         val file = getTgFile(fileId, fileUniqueId)
         val image = if (file.filePath!!.lowercase().endsWith(".webp")) {
             webp2png(file)
@@ -69,7 +68,7 @@ object BotUtil {
     suspend fun downloadImg(filename: String, url: String, reject: Boolean = false): File {
         val image = File(getImagePath(filename))
         return download(image, url, reject).also {
-            ContextHolder.cacheService.cacheImg(image)
+            CacheService.cacheImg(image)
         }
     }
 

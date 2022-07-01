@@ -1,8 +1,8 @@
 package kurenai.imsyncbot.callback.impl
 
-import kurenai.imsyncbot.ContextHolder.cacheService
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.handler.tg.TgMessageHandler
+import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardMarkup
@@ -11,9 +11,7 @@ import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.DeleteMessage
 import moe.kurenai.tdlight.request.message.EditMessageText
 import mu.KotlinLogging
-import javax.enterprise.context.ApplicationScoped
 
-@ApplicationScoped
 class RetryCallback(
     val forwardHandler: TgMessageHandler
 ) : Callback() {
@@ -24,7 +22,7 @@ class RetryCallback(
 
     override fun handle0(update: Update, message: Message): Int {
 
-        val originMessage = cacheService.getTg(message.chat.id, message.replyToMessage?.messageId!!)
+        val originMessage = CacheService.getTg(message.chat.id, message.replyToMessage?.messageId!!)
         if (originMessage == null) {
             EditMessageText("转发失败：缓存中无法找到该条消息，无法重试").apply {
                 this.chatId = message.chatId

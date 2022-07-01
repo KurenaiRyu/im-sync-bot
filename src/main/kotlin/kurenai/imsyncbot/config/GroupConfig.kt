@@ -14,7 +14,7 @@ object GroupConfig : AbstractConfig<Group>() {
     var bannedGroups = emptyList<Long>()
     var picBannedGroups = emptyList<Long>()
     var filterGroups = emptyList<Long>()
-    override val configs = ArrayList<Group>()
+    override val items = ArrayList<Group>()
     override val file = File("./config/group.json")
     override val typeRef = object : TypeReference<ArrayList<Group>>() {}
 
@@ -42,16 +42,16 @@ object GroupConfig : AbstractConfig<Group>() {
     }
 
     fun statusContain(tg: Long, status: String): Boolean {
-        return configs.any { it.tg == tg && it.status.contains(status) }
+        return items.any { it.tg == tg && it.status.contains(status) }
     }
 
     fun addStatus(tg: Long, status: String) {
-        configs.firstOrNull { it.tg == tg && !it.status.contains(status) }?.status?.add(status)
+        items.firstOrNull { it.tg == tg && !it.status.contains(status) }?.status?.add(status)
         afterUpdate()
     }
 
     fun removeStatus(tg: Long, status: String) {
-        configs.removeIf { it.tg == tg && it.status.contains(status) }
+        items.removeIf { it.tg == tg && it.status.contains(status) }
         afterUpdate()
     }
 
@@ -60,12 +60,12 @@ object GroupConfig : AbstractConfig<Group>() {
     }
 
     fun remove(tg: Long) {
-        configs.removeIf { it.tg == tg }
+        items.removeIf { it.tg == tg }
         afterUpdate()
     }
 
     fun default(message: Message) {
-        val defaultGroup = configs.firstOrNull { it.status.contains(GroupStatus.DEFAULT.name) }
+        val defaultGroup = items.firstOrNull { it.status.contains(GroupStatus.DEFAULT.name) }
         if (defaultGroup != null) {
             add(Group(message.chat.id, tgQQ[message.chat.id] ?: defaultGroup.qq, message.chat.title!!, defaultGroup.status))
         } else {
@@ -86,7 +86,7 @@ object GroupConfig : AbstractConfig<Group>() {
         val bannedGroups = ArrayList<Long>()
         val picBannedGroups = ArrayList<Long>()
         val filterGroups = ArrayList<Long>()
-        for (config in configs) {
+        for (config in items) {
             qqTg[config.qq] = config.tg
             tgQQ[config.tg] = config.qq
 
@@ -118,14 +118,14 @@ object GroupConfig : AbstractConfig<Group>() {
     }
 
     override fun add0(config: Group) {
-        configs.removeIf { it.tg == config.tg }
-        configs.add(config)
+        items.removeIf { it.tg == config.tg }
+        items.add(config)
     }
 
     override fun addAll0(configs: Collection<Group>) {
         val tgs = configs.map { it.tg }
-        GroupConfig.configs.removeIf { tgs.contains(it.tg) }
-        GroupConfig.configs.addAll(configs)
+        GroupConfig.items.removeIf { tgs.contains(it.tg) }
+        GroupConfig.items.addAll(configs)
     }
 
     override fun getConfigName(): String {

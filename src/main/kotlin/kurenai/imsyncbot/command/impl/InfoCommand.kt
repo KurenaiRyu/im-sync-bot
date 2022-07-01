@@ -3,10 +3,13 @@ package kurenai.imsyncbot.command.impl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.dfs
+import kurenai.imsyncbot.qq.QQBotClient.bot
+import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
@@ -27,21 +30,19 @@ class InfoCommand : AbstractTelegramCommand() {
     override val onlyGroupMessage = true
     override val parseMode = ParseMode.MARKDOWN_V2
 
-    private val cacheService = ContextHolder.cacheService
-
     override fun execute(update: Update, message: Message): String? {
         return if (message.isReply()) {
             val replyMessage = message.replyToMessage!!
             val user = replyMessage.from!!
-            if (user.isBot && user.username == ContextHolder.telegramBot.username) {
-                val qqMsg = cacheService.getQQByTg(replyMessage)
+            if (user.isBot && user.username == TelegramBot.username) {
+                val qqMsg = CacheService.getQQByTg(replyMessage)
                 if (qqMsg != null) {
                     val userId = qqMsg.source.fromId
-                    val qqGroup = GroupConfig.tgQQ[message.chat.id]?.let { ContextHolder.qqBot.getGroup(it) }
+                    val qqGroup = GroupConfig.tgQQ[message.chat.id]?.let { bot.getGroup(it) }
                     if (qqGroup == null) {
                         return "找不到绑定的qq群"
                     } else {
-                        val config = UserConfig.configs.firstOrNull { it.qq == userId }
+                        val config = UserConfig.items.firstOrNull { it.qq == userId }
                         val member = qqGroup[userId]
                         if (member != null) {
 
@@ -62,13 +63,13 @@ class InfoCommand : AbstractTelegramCommand() {
                             list.add(
                                 "入群时间: `${
                                     Instant.ofEpochSecond(member.joinTimestamp.toLong()).atZone(ZoneId.systemDefault())
-                                        .format(ContextHolder.dfs).fm2md()
+                                        .format(dfs).fm2md()
                                 }`"
                             )
                             list.add(
                                 "最后发言: `${
                                     Instant.ofEpochSecond(member.lastSpeakTimestamp.toLong())
-                                        .atZone(ZoneId.systemDefault()).format(ContextHolder.dfs).fm2md()
+                                        .atZone(ZoneId.systemDefault()).format(dfs).fm2md()
                                 }`"
                             )
                             if (config?.status?.isNotEmpty() == true)
@@ -76,7 +77,7 @@ class InfoCommand : AbstractTelegramCommand() {
 
                             CoroutineScope(Dispatchers.IO).launch {
                                 val file = BotUtil.downloadImg("avatar-${member.id}.png", member.avatarUrl)
-                                SendPhoto(message.chatId.toString(), InputFile(file)).apply {
+                                SendPhoto(message.chatId, InputFile(file)).apply {
                                     caption = list.joinToString("\n")
                                     parseMode = ParseMode.MARKDOWN_V2
                                 }.send()
@@ -97,12 +98,12 @@ class InfoCommand : AbstractTelegramCommand() {
                 list.joinToString("\n")
             }
         } else {
-            val group = GroupConfig.tgQQ[message.chat.id]?.let { ContextHolder.qqBot.getGroup(it) }
+            val group = GroupConfig.tgQQ[message.chat.id]?.let { bot.getGroup(it) }
             if (group == null) {
                 return "找不到绑定的qq群"
             } else {
                 val list = ArrayList<String>()
-                val config = GroupConfig.configs.firstOrNull { it.tg == message.chat.id }
+                val config = GroupConfig.items.firstOrNull { it.tg == message.chat.id }
                 list.add("绑定群id: `${group.id}`")
                 list.add("绑定群名称: `${group.name.format2Markdown()}`")
                 list.add("绑定群群主: `${group.owner.nick.format2Markdown()}`\\(`${group.owner.id}`\\)")

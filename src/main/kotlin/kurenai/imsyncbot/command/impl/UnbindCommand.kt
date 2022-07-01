@@ -1,10 +1,10 @@
 package kurenai.imsyncbot.command.impl
 
-import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.ContextHolder.cacheService
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.telegram.TelegramBot
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import net.mamoe.mirai.message.data.source
@@ -29,8 +29,8 @@ class UnbindCommand : AbstractTelegramCommand() {
             if (message.isReply()) {
                 val reply = message.replyToMessage!!
                 val user = reply.from!!
-                if (user.username == ContextHolder.telegramBot.username) {
-                    val qqMsg = cacheService.getQQByTg(reply)
+                if (user.username == TelegramBot.username) {
+                    val qqMsg = CacheService.getQQByTg(reply)
                     if (qqMsg != null) {
                         UserConfig.unbindUsername(qqMsg.source.fromId)
                         "qq[${qqMsg.source.fromId}] 解绑名称成功"

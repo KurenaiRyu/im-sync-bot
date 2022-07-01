@@ -3,14 +3,13 @@ package kurenai.imsyncbot.qq
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.ContextHolder.config
-import kurenai.imsyncbot.ContextHolder.redisson
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.configProperties
 import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.handler.qq.QQMessageHandler
+import kurenai.imsyncbot.redisson
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
 import moe.kurenai.tdlight.model.MessageEntityType
@@ -33,14 +32,8 @@ import org.redisson.api.RBlockingQueue
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import javax.annotation.PreDestroy
-import javax.enterprise.context.ApplicationScoped
 
-@ApplicationScoped
-class QQBotClient(
-    private val messageHandle: QQMessageHandler,
-    private val privateChatHandler: PrivateChatHandler,
-) {
+object QQBotClient {
 
     private val log = LogManager.getLogger()
     val startCountDown = CountDownLatch(1)
@@ -48,10 +41,10 @@ class QQBotClient(
     private val queueMap = HashMap<String, RBlockingQueue<String?>>()
     private val dispatcherMap = HashMap<String, ExecutorCoroutineDispatcher>()
     private val defaultScope = CoroutineScope(Dispatchers.Default)
-    val bot = BotFactory.newBot(config.bot.qq.account, config.bot.qq.password) {
-        cacheDir = File("./cache/${config.bot.qq.account}")
+    val bot = BotFactory.newBot(configProperties.bot.qq.account, configProperties.bot.qq.password) {
+        cacheDir = File("./cache/${configProperties.bot.qq.account}")
         fileBasedDeviceInfo("./config/device.json") // 使用 device.json 存储设备信息
-        protocol = config.bot.qq.protocol // 切换协议
+        protocol = configProperties.bot.qq.protocol // 切换协议
         highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
 //        val file = File(BotConstant.LOG_FILE_PATH)
 //        redirectBotLogToFile(file)
@@ -67,7 +60,6 @@ class QQBotClient(
             log.info("Login qq bot...")
             bot.login()
             log.info("Started qq-bot ${bot.nick}(${bot.id})")
-            ContextHolder.qqBot = bot
             val filter = GlobalEventChannel.filter { event ->
 
                 return@filter when (event) {
@@ -126,7 +118,7 @@ class QQBotClient(
                                                                     withContext(Dispatchers.IO) {
                                                                         q.poll(30, TimeUnit.SECONDS)
                                                                     } ?: continue
-                                                                privateChatHandler.onFriendMessage(
+                                                                PrivateChatHandler.onFriendMessage(
                                                                     friend,
                                                                     message.deserializeJsonToMessageChain()
                                                                 )
@@ -161,7 +153,7 @@ class QQBotClient(
                                                                     withContext(Dispatchers.IO) {
                                                                         q.poll(30, TimeUnit.SECONDS)
                                                                     } ?: continue
-                                                                messageHandle.onGroupMessage(
+                                                                QQMessageHandler.onGroupMessage(
                                                                     group,
                                                                     message.deserializeJsonToMessageChain()
                                                                 )
@@ -189,10 +181,10 @@ class QQBotClient(
                             }
                         }
                         is MessageRecallEvent.GroupRecall -> {
-                            messageHandle.onRecall(event)
+                            QQMessageHandler.onRecall(event)
                         }
                         is GroupEvent -> {
-                            messageHandle.onGroupEvent(event)
+                            QQMessageHandler.onGroupEvent(event)
                         }
                     }
 
@@ -238,6 +230,9 @@ class QQBotClient(
                     log.error("[message-$messageCount]${e.message}", e)
                 }
             }
+            Runtime.getRuntime().addShutdownHook(Thread {
+                destroy()
+            })
             startCountDown.countDown()
         }
     }
@@ -272,7 +267,7 @@ class QQBotClient(
             val message = event.message
             val sender = event.sender
             val group = event.group
-            val master = ContextHolder.qqBot.getFriend(UserConfig.masterQQ)
+            val master = bot.getFriend(UserConfig.masterQQ)
             master?.takeIf { it.id != 0L }?.sendMessage(
                 master.sendMessage(message).quote()
                     .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: (${e::class.simpleName}) ${e.message}")
@@ -302,7 +297,6 @@ class QQBotClient(
         }
     }
 
-    @PreDestroy
     fun destroy() {
         try {
             log.info("Close qq bot...")

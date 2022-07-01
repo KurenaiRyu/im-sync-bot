@@ -1,10 +1,10 @@
 package kurenai.imsyncbot.command.impl
 
-import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.ContextHolder.cacheService
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.telegram.TelegramBot
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import net.mamoe.mirai.message.data.source
@@ -19,8 +19,8 @@ class BanPicCommand : AbstractTelegramCommand() {
         return if (message.isReply()) {
             val replyMessage = message.replyToMessage!!
             val user = replyMessage.from!!
-            if (user.isBot && user.username == ContextHolder.telegramBot.username) {
-                val qqMsg = cacheService.getQQByTg(replyMessage)
+            if (user.isBot && user.username == TelegramBot.username) {
+                val qqMsg = CacheService.getQQByTg(replyMessage)
                 if (qqMsg != null) {
                     UserConfig.banPic(qqMsg.source.fromId)
                     "qq[${qqMsg.source.fromId}] 已排除图片转发"

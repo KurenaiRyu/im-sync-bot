@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import kurenai.imsyncbot.configs
 import java.io.File
 
 val configDefaultMapper: ObjectMapper = jacksonObjectMapper()
@@ -12,12 +13,12 @@ val configDefaultMapper: ObjectMapper = jacksonObjectMapper()
 abstract class AbstractConfig<T> {
 
     open val mapper = configDefaultMapper
-    abstract val configs: ArrayList<T>
+    abstract val items: ArrayList<T>
     protected abstract val typeRef: TypeReference<ArrayList<T>>
     protected abstract val file: File
 
     init {
-        ConfigHolder.configs.add(this)
+        configs.add(this)
     }
 
     fun save() {
@@ -25,7 +26,7 @@ abstract class AbstractConfig<T> {
             file.parentFile.mkdirs()
             file.createNewFile()
         }
-        mapper.writeValue(file, configs)
+        mapper.writeValue(file, items)
         refresh()
     }
 
@@ -35,8 +36,8 @@ abstract class AbstractConfig<T> {
 
     fun load() {
         if (file.exists()) {
-            configs.clear()
-            configs.addAll(mapper.readValue(file, typeRef))
+            items.clear()
+            items.addAll(mapper.readValue(file, typeRef))
             refresh()
         }
     }

@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
-import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.command.AbstractTelegramCommand
+import kurenai.imsyncbot.service.CacheService
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import java.text.NumberFormat
@@ -22,8 +22,8 @@ class StatusCommand : AbstractTelegramCommand() {
         )
             .map { it / 1024 / 1024 }
             .map { "${it}m" }
-        val total = ContextHolder.cacheService.total.get()
-        val hit = ContextHolder.cacheService.hit.get()
+        val total = CacheService.total.get()
+        val hit = CacheService.hit.get()
         val formatter = NumberFormat.getPercentInstance()
         return """
             总可用内存: ${arr[0]}/${arr[1]}

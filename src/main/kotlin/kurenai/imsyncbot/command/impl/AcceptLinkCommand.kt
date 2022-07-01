@@ -34,5 +34,4 @@ class AcceptLinkCommand : AbstractQQCommand() {
         return 0
     }
 
-
 }

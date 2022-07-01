@@ -1,14 +1,14 @@
 package kurenai.imsyncbot.handler.tg
 
-import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.ContextHolder.cacheService
-import kurenai.imsyncbot.ContextHolder.config
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.bannedGroups
 import kurenai.imsyncbot.config.GroupConfig.tgQQ
 import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.configProperties
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
+import kurenai.imsyncbot.qq.QQBotClient.bot
+import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.sendSync
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
@@ -27,9 +27,7 @@ import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import java.io.File
 import java.io.IOException
-import javax.enterprise.context.ApplicationScoped
 
-@ApplicationScoped
 class TgMessageHandler : TelegramHandler {
 
     private val log = KotlinLogging.logger {}
@@ -38,15 +36,15 @@ class TgMessageHandler : TelegramHandler {
     private var qqMsgFormat = "\$name: \$msg"
 
     init {
-        if (config.handler.tgMsgFormat.contains("\$msg")) tgMsgFormat = config.handler.tgMsgFormat
-        if (config.handler.qqMsgFormat.contains("\$msg")) qqMsgFormat = config.handler.qqMsgFormat
+        if (configProperties.handler.tgMsgFormat.contains("\$msg")) tgMsgFormat = configProperties.handler.tgMsgFormat
+        if (configProperties.handler.qqMsgFormat.contains("\$msg")) qqMsgFormat = configProperties.handler.qqMsgFormat
     }
 
     override suspend fun onEditMessage(message: Message): Int {
         if (!tgQQ.containsKey(message.chat.id)) {
             return CONTINUE
         }
-        cacheService.getQQByTg(message)?.recall()
+        CacheService.getQQByTg(message)?.recall()
         return onMessage(message)
     }
 
@@ -57,7 +55,7 @@ class TgMessageHandler : TelegramHandler {
             return CONTINUE
         }
         if (!tgQQ.containsKey(message.chat.id)) {
-            log.info { "ignore no config group" }
+            log.info { "ignore no configProperties group" }
             return CONTINUE
         }
         if (bannedGroups.contains(message.chat.id)) {
@@ -69,10 +67,9 @@ class TgMessageHandler : TelegramHandler {
             return CONTINUE
         }
 
-        val bot = ContextHolder.qqBot
         val quoteMsgChain =
             message.replyToMessage?.let {
-                cacheService.getQQByTg(it)
+                CacheService.getQQByTg(it)
             }
         val groupId = quoteMsgChain?.source?.targetId ?: tgQQ.getOrDefault(message.chat.id, GroupConfig.defaultQQGroup)
         if (groupId == 0L) return CONTINUE
@@ -99,7 +96,7 @@ class TgMessageHandler : TelegramHandler {
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
                     formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.caption!!, builder)
-                    cacheService.cache(group.sendMessage(builder.build()), message)
+                    CacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
             message.hasVideo() -> {
@@ -109,7 +106,7 @@ class TgMessageHandler : TelegramHandler {
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
                     formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.caption!!, builder)
-                    cacheService.cache(group.sendMessage(builder.build()), message)
+                    CacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
             message.hasAnimation() -> {
@@ -120,7 +117,7 @@ class TgMessageHandler : TelegramHandler {
                     gifFile.toExternalResource().use {
                         builder.add(group.uploadImage(it))
                         formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, "", builder)
-                        cacheService.cache(group.sendMessage(builder.build()), message)
+                        CacheService.cache(group.sendMessage(builder.build()), message)
                     }
                 }
             }
@@ -132,7 +129,7 @@ class TgMessageHandler : TelegramHandler {
                         gifFile.toExternalResource().use {
                             builder.add(group.uploadImage(it))
                             formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, "", builder)
-                            cacheService.cache(group.sendMessage(builder.build()), message)
+                            CacheService.cache(group.sendMessage(builder.build()), message)
                         }
                     }
                     return CONTINUE
@@ -144,7 +141,7 @@ class TgMessageHandler : TelegramHandler {
                     formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, "", builder)
                 }
                 group.sendMessage(builder.build()).let {
-                    cacheService.cache(it, message)
+                    CacheService.cache(it, message)
                 }
             }
             message.hasDocument() -> {
@@ -155,7 +152,7 @@ class TgMessageHandler : TelegramHandler {
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
                     formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, caption, builder)
-                    cacheService.cache(group.sendMessage(builder.build()), message)
+                    CacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
             message.hasPhoto() -> {
@@ -168,12 +165,12 @@ class TgMessageHandler : TelegramHandler {
                     }
                     .mapNotNull { getImage(group, it.fileId, it.fileUniqueId) }.forEach(builder::add)
                 formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, caption, builder)
-                cacheService.cache(group.sendMessage(builder.build()), message)
+                CacheService.cache(group.sendMessage(builder.build()), message)
             }
             message.hasText() -> {
                 val builder = MessageChainBuilder()
                 formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.text!!, builder)
-                cacheService.cache(group.sendMessage(builder.build()), message)
+                CacheService.cache(group.sendMessage(builder.build()), message)
             }
         }
         return CONTINUE
@@ -252,7 +249,7 @@ class TgMessageHandler : TelegramHandler {
         return ret
     }
 
-    private suspend fun getTgFile(fileId: String, fileUniqueId: String): moe.kurenai.tdlight.model.media.File {
+    private fun getTgFile(fileId: String, fileUniqueId: String): moe.kurenai.tdlight.model.media.File {
         try {
             return GetFile(fileId).sendSync()
         } catch (e: TelegramApiException) {

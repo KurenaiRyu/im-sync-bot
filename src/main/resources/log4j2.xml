@@ -7,15 +7,27 @@
         <Console name="Console" target="SYSTEM_OUT">
             <ThresholdFilter level="trace" onMatch="ACCEPT" onMisMatch="DENY"/>
             <PatternLayout
-                    pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}} %highlight{${LOG_LEVEL_PATTERN:-5%p}}{FATAL=red blink, ERROR=red, WARN=yellow bold, INFO=green, DEBUG=green bold, TRACE=blue} %style{%processId}{magenta} --- [%t] %style{%c}{cyan} : %m%n%ex"/>
+                    pattern="%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}} %highlight{${LOG_LEVEL_PATTERN:-%5p}}{FATAL=red blink, ERROR=red, WARN=yellow bold, INFO=green, DEBUG=green bold, TRACE=blue} %style{%processId}{magenta} --- [%t] %style{%c{4}}{cyan} : %m%n%ex"/>
         </Console>
-        <RandomAccessFile name="RandomAccessFile" filename="${path}/async.log" immediateFlush="false" append="true">
-            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
-        </RandomAccessFile>
+        <RollingRandomAccessFile name="RandomAccessFile" filename="${path}/im-sync-bot.log"
+                                 filePattern="${path}/$${date:yyyy-MM}/manga-spider-%d{yyyy-MM-dd-HH}-%i.log.zip"
+                                 immediateFlush="false" append="true">
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <PatternLayout
+                    pattern="%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}} ${LOG_LEVEL_PATTERN:-%5p} %processId --- [%t] %c : %m%n%ex"/>
+            <!--            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>-->
+            <!--            <DefaultRolloverStrategy max="24">-->
+            <!--                <Delete basePath="${path}" maxDepth="2">-->
+            <!--                    <IfLastModified age="24H" />-->
+            <!--                </Delete>-->
+            <!--            </DefaultRolloverStrategy>-->
+        </RollingRandomAccessFile>
     </Appenders>
     <Loggers>
         <!-- avoid duplicated logs with additivity=false -->
-        <Logger name="moe.kurenai" level="debug" additivity="false">
+        <Logger name="kurenai.imsyncbot" level="debug" additivity="false">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="RandomAccessFile"/>
         </Logger>

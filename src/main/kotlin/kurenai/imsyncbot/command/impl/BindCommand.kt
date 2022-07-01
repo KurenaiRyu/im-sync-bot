@@ -1,9 +1,11 @@
 package kurenai.imsyncbot.command.impl
 
-import kurenai.imsyncbot.ContextHolder
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.qq.QQBotClient.bot
+import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
 import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.message.Message
@@ -18,19 +20,16 @@ class BindCommand : AbstractTelegramCommand() {
     override val onlySupperAdmin = false
     override val parseMode = ParseMode.MARKDOWN_V2
 
-    private val cacheService = ContextHolder.cacheService
 
     override fun execute(update: Update, message: Message): String? {
-        val client = ContextHolder.telegramBot
-        val qqBot = ContextHolder.qqBot
         val param = message.text?.param() ?: "参数错误"
         return if (message.isGroupMessage() || message.isSuperGroupMessage()) {
             if (message.isReply()) {
                 val replyMessage = message.replyToMessage!!
                 if (param.isNotBlank()) {
                     val user = replyMessage.from!!
-                    if (user.username == client.username) {
-                        val qqMsg = cacheService.getQQByTg(replyMessage) ?: return "找不到该qq信息"
+                    if (user.username == TelegramBot.username) {
+                        val qqMsg = CacheService.getQQByTg(replyMessage) ?: return "找不到该qq信息"
                         UserConfig.bindName(qq = qqMsg.source.fromId, bindingName = param)
                         "qq`${qqMsg.source.fromId}` 绑定名称为 `${param.format2Markdown()}`"
                     } else {
@@ -44,7 +43,7 @@ class BindCommand : AbstractTelegramCommand() {
                 if (UserConfig.superAdmins.contains(message.from!!.id)) {
                     try {
                         val qq = param.toLong()
-                        qqBot.getGroup(qq)?.let {
+                        bot.getGroup(qq)?.let {
                             GroupConfig.add(message.chat.id, qq, message.chat.title!!)
                             "绑定成功\n\n" +
                                     "绑定QQ群id: `${it.id}`\n" +
@@ -60,8 +59,10 @@ class BindCommand : AbstractTelegramCommand() {
             }
         } else if (message.isUserMessage() && UserConfig.superAdmins.contains(message.from!!.id)) {
             val usernameBinds =
-                UserConfig.configs.filter { it.bindingName != null }.joinToString("\n") { "`${it.username?.format2Markdown() ?: it.tg}` \\<\\=\\> `${it.bindingName!!.format2Markdown()}`" }
-            val groupBindings = GroupConfig.configs.joinToString("\n") { "`${it.tg}` \\<\\=\\> `${it.qq}` \\#${qqBot.getGroup(it.qq)?.name?.format2Markdown() ?: "找不到该QQ群"}" }
+                UserConfig.items.filter { it.bindingName != null }
+                    .joinToString("\n") { "`${it.username?.format2Markdown() ?: it.tg}` \\<\\=\\> `${it.bindingName!!.format2Markdown()}`" }
+            val groupBindings =
+                GroupConfig.items.joinToString("\n") { "`${it.tg}` \\<\\=\\> `${it.qq}` \\#${bot.getGroup(it.qq)?.name?.format2Markdown() ?: "找不到该QQ群"}" }
             "用户名绑定：\n$usernameBinds\n\nQ群绑定：\n$groupBindings"
         } else null
     }

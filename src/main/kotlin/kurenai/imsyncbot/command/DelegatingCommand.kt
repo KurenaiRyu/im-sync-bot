@@ -1,14 +1,14 @@
 package kurenai.imsyncbot.command
 
 import com.google.common.base.CaseFormat
-import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.command.CommandHolder.inlineCommands
-import kurenai.imsyncbot.command.CommandHolder.qqHandlers
-import kurenai.imsyncbot.command.CommandHolder.tgHandlers
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.exception.BotException
+import kurenai.imsyncbot.inlineCommands
+import kurenai.imsyncbot.qqCommands
+import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
+import kurenai.imsyncbot.tgCommands
 import kurenai.imsyncbot.utils.reflections
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.inline.InlineQuery
@@ -31,7 +31,7 @@ object DelegatingCommand {
             .first { it.type == MessageEntityType.BOT_COMMAND }
             .text!!
             .replace("/", "")
-            .replace("@${ContextHolder.telegramBot.username}", "")
+            .replace("@${TelegramBot.username}", "")
         if (command == "help") {
             handleHelp(message)
             return
@@ -39,7 +39,7 @@ object DelegatingCommand {
         var reply = true
         var parseMode: String? = null
         var msg: String? = null
-        for (handler in tgHandlers) {
+        for (handler in tgCommands) {
             if (handler.command == command) {
                 log.debug { "Match ${handler.name}" }
                 val isSupperAdmin = UserConfig.superAdmins.contains(message.from?.id)
@@ -129,7 +129,7 @@ object DelegatingCommand {
                     }
                 }
                 2 -> {
-                    val handler = inlineCommands[args[0]]?.run {
+                    inlineCommands[args[0]]?.run {
                         log.info("Match command ${javaClass.name}")
                         execute(update, inlineQuery, args[1])
                     }
@@ -143,8 +143,8 @@ object DelegatingCommand {
 
     suspend fun execute(event: MessageEvent): Int {
         var matched = false
-        for (handler in qqHandlers) {
-            if (GroupConfig.configs.any { it.qq == event.subject.id && it.status.contains(handler.getCommandBannedStatus()) })
+        for (handler in qqCommands) {
+            if (GroupConfig.items.any { it.qq == event.subject.id && it.status.contains(handler.getCommandBannedStatus()) })
                 if (handler.execute(event) == 1) {
                     matched = true
                     break
@@ -155,7 +155,7 @@ object DelegatingCommand {
 
     private fun handleHelp(message: Message) {
         val sb = StringBuilder("Command list")
-        for (handler in tgHandlers) {
+        for (handler in tgCommands) {
             sb.append("\n----------------\n")
             sb.append("/${handler.command} ${handler.name}\n")
             sb.append(handler.help)

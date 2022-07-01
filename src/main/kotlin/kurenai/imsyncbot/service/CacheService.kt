@@ -1,8 +1,8 @@
 package kurenai.imsyncbot.service
 
-import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.ContextHolder.redisson
+import kurenai.imsyncbot.cache
 import kurenai.imsyncbot.entity.FileCache
+import kurenai.imsyncbot.redisson
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.request.message.GetMessageInfo
@@ -24,22 +24,19 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 
-class CacheService {
-    companion object {
-        const val TG_MSG_CACHE_KEY = "TG_MSG_CACHE"
-        const val QQ_MSG_CACHE_KEY = "QQ_MSG_CACHE"
-        const val TG_QQ_MSG_ID_CACHE_KEY = "TG_QQ_MSG_ID_CACHE"
-        const val QQ_TG_MSG_ID_CACHE_KEY = "QQ_TG_MSG_ID_CACHE"
-        const val TG_FILE_CACHE_KEY = "TG_FILE_CACHE"
-        const val TG_FILE_CACHE_TTL_KEY = "TG_FILE_CACHE_TTL"
-        const val TG_IMG_CACHE_KEY = "TG_IMG_CACHE"
-        const val QQ_TG_PRIVATE_MSG_ID_CACHE_KEY = "QQ_TG_PRIVATE_MSG_ID_CACHE"
-        const val TG_QQ_PRIVATE_MSG_ID_CACHE_KEY = "TG_QQ_PRIVATE_MSG_ID_CACHE"
-        val TTL = TimeUnit.DAYS.toMillis(5)
-        val BEGIN = LocalDateTime.of(2022, 1, 1, 0, 0, 0).toEpochSecond(ZoneOffset.MIN)
-    }
+object CacheService {
+    const val TG_MSG_CACHE_KEY = "TG_MSG_CACHE"
+    const val QQ_MSG_CACHE_KEY = "QQ_MSG_CACHE"
+    const val TG_QQ_MSG_ID_CACHE_KEY = "TG_QQ_MSG_ID_CACHE"
+    const val QQ_TG_MSG_ID_CACHE_KEY = "QQ_TG_MSG_ID_CACHE"
+    const val TG_FILE_CACHE_KEY = "TG_FILE_CACHE"
+    const val TG_FILE_CACHE_TTL_KEY = "TG_FILE_CACHE_TTL"
+    const val TG_IMG_CACHE_KEY = "TG_IMG_CACHE"
+    const val QQ_TG_PRIVATE_MSG_ID_CACHE_KEY = "QQ_TG_PRIVATE_MSG_ID_CACHE"
+    const val TG_QQ_PRIVATE_MSG_ID_CACHE_KEY = "TG_QQ_PRIVATE_MSG_ID_CACHE"
+    val TTL = TimeUnit.DAYS.toMillis(5)
+    val BEGIN = LocalDateTime.of(2022, 1, 1, 0, 0, 0).toEpochSecond(ZoneOffset.MIN)
 
-    val cache = ContextHolder.cache
     val hit: RAtomicLong = redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("HIT"))
     val total: RAtomicLong = redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("TOTAL"))
 

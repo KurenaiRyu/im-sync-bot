@@ -1,6 +1,6 @@
 package kurenai.imsyncbot.callback
 
-import kurenai.imsyncbot.ContextHolder
+import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
@@ -60,16 +60,15 @@ abstract class Callback {
     }
 
     fun waitForMsg(update: Update, message: Message): Update? {
-        val client = ContextHolder.telegramBot
-        var lock = client.nextMsgLock[message.chat.id]
+        var lock = TelegramBot.nextMsgLock[message.chat.id]
         if (lock == null) {
             lock = Object()
-            client.nextMsgLock.putIfAbsent(message.chat.id, lock)?.let { lock = it }
+            TelegramBot.nextMsgLock.putIfAbsent(message.chat.id, lock)?.let { lock = it }
         }
         synchronized(lock!!) {
             lock!!.wait(TimeUnit.SECONDS.toMillis(30))
         }
-        return client.nextMsgUpdate.remove(message.chat.id) ?: run {
+        return TelegramBot.nextMsgUpdate.remove(message.chat.id) ?: run {
             SendMessage(message.chatId.toString(), "等待消息超时").send()
             null
         }

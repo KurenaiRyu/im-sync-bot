@@ -1,8 +1,16 @@
 FROM eclipse-temurin:17.0.1_12-jdk-alpine
-MAINTAINER kurenai233@yahoo.com
+
 RUN apk add --no-cache ffmpeg libwebp libwebp-tools
-WORKDIR /workspace
-COPY ./build/libs/im-sync-bot-kt*.jar ./bot.jar
-# 修改为上海时区,不需要则删除
-RUN cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
-ENTRYPOINT ["java", "-jar", "-Dspring.config.location=./config/config.yaml", "./bot.jar"]
+
+ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en'
+
+# We make four distinct layers so if there are application changes the library layers can be re-used
+COPY --chown=185 build/libs/lib/* /deployments/lib/
+COPY --chown=185 build/libs/*.jar /deployments/
+
+EXPOSE 8080
+USER 185
+
+WORKDIR /deployments
+
+ENTRYPOINT ["java", "-jar", "/deployments/im-sync-bot.jar"]

@@ -6,15 +6,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext
-import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.ContextHolder.cacheService
-import kurenai.imsyncbot.ContextHolder.config
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.configProperties
 import kurenai.imsyncbot.entity.FileCache
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
+import kurenai.imsyncbot.qq.QQBotClient.bot
+import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.telegram.sendSync
 import kurenai.imsyncbot.utils.BotUtil
@@ -39,20 +39,18 @@ import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-import javax.enterprise.context.ApplicationScoped
 import kotlin.math.min
 
-@ApplicationScoped
-class QQMessageHandler : QQHandler {
+object QQMessageHandler : QQHandler {
 
     private val log = KotlinLogging.logger {}
 
     private val xmlMapper = XmlMapper()
     private val jsonMapper = ObjectMapper()
-    private val picToFileSize = config.handler.picToFileSize * 1024 * 1024
+    private val picToFileSize = configProperties.handler.picToFileSize * 1024 * 1024
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
-    private var enableRecall = config.handler.enableRecall
+    private var enableRecall = configProperties.handler.enableRecall
     private var groupForwardContext = ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
         LinkedBlockingQueue(20),
         object : ThreadFactory {
@@ -65,8 +63,8 @@ class QQMessageHandler : QQHandler {
         }).asCoroutineDispatcher()
 
     init {
-        if (config.handler.tgMsgFormat.contains("\$msg")) tgMsgFormat = config.handler.tgMsgFormat
-        if (config.handler.qqMsgFormat.contains("\$msg")) qqMsgFormat = config.handler.qqMsgFormat
+        if (configProperties.handler.tgMsgFormat.contains("\$msg")) tgMsgFormat = configProperties.handler.tgMsgFormat
+        if (configProperties.handler.qqMsgFormat.contains("\$msg")) qqMsgFormat = configProperties.handler.qqMsgFormat
     }
 
     @Throws(Exception::class)
@@ -74,7 +72,7 @@ class QQMessageHandler : QQHandler {
         val messageSource = messageChain.source
         val sender = group.getOrFail(messageSource.fromId)
         val senderName = BotUtil.formatUsername(
-            UserConfig.idBindings[sender.id] ?: ContextHolder.qqBot.getFriend(sender.id)?.remarkOrNick
+            UserConfig.idBindings[sender.id] ?: bot.getFriend(sender.id)?.remarkOrNick
             ?: (sender as Member).remarkOrNameCardOrNick
         )
         val content = messageChain.contentToString()
@@ -98,7 +96,7 @@ class QQMessageHandler : QQHandler {
 
     @Throws(TelegramApiException::class)
     override suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {
-        cacheService.getTgByQQ(event.group.id, event.messageIds[0])?.let { message ->
+        CacheService.getTgByQQ(event.group.id, event.messageIds[0])?.let { message ->
             if (enableRecall) {
                 DeleteMessage(message.chatId, message.messageId!!).send()
             } else {
@@ -182,7 +180,7 @@ class QQMessageHandler : QQHandler {
         if (rejectPic) log.debug { "Reject picture" }
 
         val replyId =
-            messageChain[QuoteReply.Key]?.let { cacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }
+            messageChain[QuoteReply.Key]?.let { CacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }
 
         val (content, atEntities) = messageChain.getContentAndAtEntities(group, replyId != null)
 
@@ -215,7 +213,7 @@ class QQMessageHandler : QQHandler {
             val mediaUrls = ArrayList<String>()
             val medias = messageChain.filterIsInstance<Image>()
                 .map { image ->
-                    cacheService.getFile(image.imageId)?.let {
+                    CacheService.getFile(image.imageId)?.let {
                         return@map InputMediaPhoto(InputFile(it.fileId).apply { fileName = image.imageId })
                     }
 
@@ -258,7 +256,7 @@ class QQMessageHandler : QQHandler {
                 val aspectRatio = image.width.toFloat() / image.height.toFloat()
                 var sendByFile =
                     aspectRatio > 10 || aspectRatio < 0.1 || image.width > 1920 || image.height > 1920 || image.size > picToFileSize
-                val inputFile = cacheService.getFile(image.imageId).let {
+                val inputFile = CacheService.getFile(image.imageId).let {
                     if (it == null) {
 
                         val url: String = image.queryUrl()
@@ -364,7 +362,7 @@ class QQMessageHandler : QQHandler {
                 replyToMessageId = replyId?.second
                 if (atEntities.isNotEmpty()) entities = atEntities
             }.sendSync().also { m ->
-                cacheService.cache(messageChain, m)
+                CacheService.cache(messageChain, m)
             }
         }
         return CONTINUE
@@ -472,7 +470,7 @@ class QQMessageHandler : QQHandler {
                     val name: String
                     val tgBindName = UserConfig.qqUsernames[target] ?: UserConfig.idBindings[target]
                     name = if (tgBindName == null || tgBindName.isBlank()) {
-                        val qqBindName = ContextHolder.qqBot.getFriend(target)?.remarkOrNick?.takeIf { it.isNotBlank() }
+                        val qqBindName = bot.getFriend(target)?.remarkOrNick?.takeIf { it.isNotBlank() }
                             ?: group.getMember(target)?.remarkOrNameCardOrNick?.takeIf { it.isNotBlank() }
                             ?: target.toString()
                         " @$qqBindName "
@@ -525,14 +523,14 @@ class QQMessageHandler : QQHandler {
                         this.replyToMessageId = replyId?.second
                         this.media = list
                     }.sendSync().also { result ->
-                        cacheService.cache(chain, result[0])
+                        CacheService.cache(chain, result[0])
                     }
                 } else if (list.size == 1) {
                     SendPhoto(chatId, list[0].media).apply {
                         this.replyToMessageId = replyId?.second
                         this.caption = list[0].caption
                     }.sendSync().also { result ->
-                        cacheService.cache(chain, result)
+                        CacheService.cache(chain, result)
                     }
                 }
             } catch (e: Exception) {
@@ -568,7 +566,7 @@ class QQMessageHandler : QQHandler {
             this.parseMode = ParseMode.MARKDOWN_V2
             if (atEntities.isNotEmpty()) entities = atEntities
         }.sendSync().also { rec ->
-            cacheService.cache(chain, rec)
+            CacheService.cache(chain, rec)
         }
     }
 
@@ -592,10 +590,10 @@ class QQMessageHandler : QQHandler {
                 }
                 else -> null
             }?.let { fileId ->
-                cacheService.cacheFile(qqFileId, FileCache(fileId, imageSize))
+                CacheService.cacheFile(qqFileId, FileCache(fileId, imageSize))
             }
         }
-        cacheService.cache(chain, recMsg)
+        CacheService.cache(chain, recMsg)
     }
 
     private fun changeMsgFormatCmd(text: String): Boolean {

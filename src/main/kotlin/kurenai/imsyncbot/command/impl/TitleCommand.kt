@@ -3,12 +3,12 @@ package kurenai.imsyncbot.command.impl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kurenai.imsyncbot.ContextHolder.cacheService
-import kurenai.imsyncbot.ContextHolder.qqBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.command.Bannable
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.qq.QQBotClient.bot
+import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.message.Message
@@ -40,13 +40,13 @@ class TitleCommand : AbstractTelegramCommand(), Bannable {
                 UserConfig.superAdmins.firstOrNull { message.from?.id == it }?.also {
                     if (!handleLinkCase(from, message, param)) {
                         CoroutineScope(Dispatchers.Default).launch {
-                            val qqMsg = cacheService.getQQByTg(replyMsg)
+                            val qqMsg = CacheService.getQQByTg(replyMsg)
                             if (qqMsg == null) {
                                 SendMessage(message.chatId, "未能找到对应的qq消息").apply {
                                     replyToMessageId = message.messageId
                                 }.send()
                             } else {
-                                qqBot.getGroup(qqMsg.source.targetId)?.getMember(qqMsg.source.fromId)?.also {
+                                bot.getGroup(qqMsg.source.targetId)?.getMember(qqMsg.source.fromId)?.also {
                                     modifyTitle(it, message, param)
                                 } ?: kotlin.run {
                                     SendMessage(message.chatId, "未能找到对应的qq用户或群组").apply {
@@ -79,7 +79,7 @@ class TitleCommand : AbstractTelegramCommand(), Bannable {
     private fun handleLinkCase(target: User, message: Message, modifyTitle: String): Boolean {
         return UserConfig.links.firstOrNull { it.tg == target.id && it.qq != null }?.also { user ->
             CoroutineScope(Dispatchers.Default).launch {
-                GroupConfig.tgQQ[message.chat.id]?.let { qqBot.getGroup(it) }?.getMember(user.qq!!)?.also {
+                GroupConfig.tgQQ[message.chat.id]?.let { bot.getGroup(it) }?.getMember(user.qq!!)?.also {
                     modifyTitle(it, message, modifyTitle)
                 }
             }

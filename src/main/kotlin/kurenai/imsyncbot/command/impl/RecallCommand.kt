@@ -3,9 +3,9 @@ package kurenai.imsyncbot.command.impl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kurenai.imsyncbot.ContextHolder
-import kurenai.imsyncbot.ContextHolder.cacheService
 import kurenai.imsyncbot.command.AbstractTelegramCommand
+import kurenai.imsyncbot.qq.QQBotClient.bot
+import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
@@ -28,11 +28,11 @@ class RecallCommand : AbstractTelegramCommand() {
         val replyMsg = message.replyToMessage!!
         return try {
             CoroutineScope(Dispatchers.Default).launch {
-                val qqMsg = cacheService.getQQByTg(replyMsg)
+                val qqMsg = CacheService.getQQByTg(replyMsg)
                 if (qqMsg == null)
                     SendMessage(message.chatId, "未能找到对应的qq消息").send()
                 else {
-                    ContextHolder.qqBot.getGroup(qqMsg.source.targetId)?.recallMessage(qqMsg)
+                    bot.getGroup(qqMsg.source.targetId)?.recallMessage(qqMsg)
                     DeleteMessage(message.chatId, replyMsg.messageId!!).send()
                     DeleteMessage(message.chatId, message.messageId!!).send()
                 }

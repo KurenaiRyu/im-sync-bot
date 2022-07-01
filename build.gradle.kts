@@ -1,11 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("io.quarkus")
     kotlin("jvm") version "1.6.21"
-    kotlin("plugin.spring") version "1.6.21"
-    kotlin("plugin.allopen") version "1.6.21"
-    kotlin("plugin.noarg") version "1.6.21"
     kotlin("kapt") version "1.6.21"
     application
 }
@@ -55,18 +51,11 @@ dependencies {
     //td-light-sdk
     implementation("moe.kurenai.tdlight", "td-light-sdk", "0.0.1-SNAPSHOT")
 
-    //quarkus
-    implementation(enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}"))
-    implementation("io.quarkus:quarkus-kotlin")
-    implementation("io.quarkus:quarkus-arc")
-    implementation("io.quarkus:quarkus-config-yaml")
-    implementation("org.jboss.logmanager:log4j2-jboss-logmanager")
-    testImplementation("io.quarkus:quarkus-junit5")
-
+    val log4j = "2.17.2"
     //logging
-    implementation("org.apache.logging.log4j:log4j-core")
-    implementation("org.apache.logging.log4j:log4j-api")
-    implementation("com.lmax:disruptor")
+    implementation("org.apache.logging.log4j:log4j-core:$log4j")
+    implementation("org.apache.logging.log4j:log4j-api:$log4j")
+    implementation("com.lmax:disruptor:3.4.4")
 
     //kotlin
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
@@ -88,6 +77,8 @@ dependencies {
     implementation("org.redisson:redisson:3.17.3")
 
     implementation("org.reflections", "reflections", "0.10.2")
+
+    testApi(kotlin("test"))
 }
 
 application {
@@ -97,12 +88,6 @@ application {
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
-}
-
-allOpen {
-    annotation("javax.ws.rs.Path")
-    annotation("javax.enterprise.context.ApplicationScoped")
-    annotation("io.quarkus.test.junit.QuarkusTest")
 }
 
 tasks.withType<KotlinCompile> {
@@ -118,18 +103,29 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
+tasks.register<Delete>("clearLib") {
+    delete("$buildDir/libs/lib")
 }
 
-tasks.quarkusDev {
-    compilerOptions {
-        compiler("kotlin").args(listOf("-Werror"))
-    }
+tasks.register<Copy>("copyLib") {
+    from(configurations.runtimeClasspath)
+    into("$buildDir/libs/lib")
 }
-tasks.quarkusBuild {
-    nativeArgs {
-        "container-build" to true
-        "builder-image" to "quay.io/quarkus/ubi-quarkus-native-image:22.0-java17"
+
+tasks.jar {
+    dependsOn("clearLib")
+    dependsOn("copyLib")
+    exclude("**/*.jar")
+    manifest {
+        attributes["Manifest-Version"] = "1.0"
+        attributes["Multi-Release"] = "true"
+        attributes["Main-Class"] = "kurenai.imsyncbot.MainKt"
+        attributes["Class-Path"] =
+            configurations.runtimeClasspath.get().files.map { "lib/${it.name}" }.joinToString(" ")
     }
+    archiveFileName.set("${rootProject.name}.jar")
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
 }

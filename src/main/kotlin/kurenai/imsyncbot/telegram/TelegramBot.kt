@@ -3,16 +3,16 @@ package kurenai.imsyncbot.telegram
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
-import kurenai.imsyncbot.ContextHolder.cacheService
-import kurenai.imsyncbot.ContextHolder.config
-import kurenai.imsyncbot.ContextHolder.tdClient
-import kurenai.imsyncbot.ContextHolder.telegramBot
-import kurenai.imsyncbot.HandlerHolder
 import kurenai.imsyncbot.callback.Callback
+import kurenai.imsyncbot.callbacks
 import kurenai.imsyncbot.command.DelegatingCommand
+import kurenai.imsyncbot.configProperties
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.qq.QQBotClient
+import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.telegram.TelegramBot.client
+import kurenai.imsyncbot.tgHandlers
 import moe.kurenai.tdlight.AbstractUpdateSubscriber
 import moe.kurenai.tdlight.LongPollingTelegramBot
 import moe.kurenai.tdlight.client.TDLightClient
@@ -29,28 +29,21 @@ import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.util.concurrent.*
 import java.util.function.Function
-import javax.enterprise.context.ApplicationScoped
-import javax.enterprise.inject.Instance
 
 /**
  * 机器人实例
  * @author Kurenai
  * @since 2021-06-30 14:05
  */
-@ApplicationScoped
-class TelegramBot(
-    private val handlerHolder: HandlerHolder,
-    private val callbacks: Instance<Callback>,
-    private val privateChatHandler: PrivateChatHandler,
-    private val qqBotClient: QQBotClient
-) : AbstractUpdateSubscriber() {
+object TelegramBot : AbstractUpdateSubscriber() {
 
-    private final val telegramProperties = config.bot.telegram
+    private final val telegramProperties = configProperties.bot.telegram
 
     val nextMsgUpdate: ConcurrentHashMap<Long, Update> = ConcurrentHashMap()
     val nextMsgLock: ConcurrentHashMap<Long, Object> = ConcurrentHashMap()
     val username: String = telegramProperties.username
     val token: String = telegramProperties.token
+    lateinit var client: TDLightClient
 
     private val log = KotlinLogging.logger {}
     private lateinit var bot: LongPollingTelegramBot
@@ -74,16 +67,15 @@ class TelegramBot(
 //        GetChatMember(GroupConfig.tgQQ[0])
 
         log.debug { "Telegram base url: ${telegramProperties.baseUrl}" }
-        tdClient = TDLightClient(
+        client = TDLightClient(
             telegramProperties.baseUrl,
             telegramProperties.token,
             isUserMode = false,
             isDebugEnabled = true,
             updateBaseUrl = telegramProperties.baseUrl
         )
-        qqBotClient.startCountDown.await()
-        bot = LongPollingTelegramBot(listOf(this), tdClient)
-        telegramBot = this
+        QQBotClient.startCountDown.await()
+        bot = LongPollingTelegramBot(listOf(this), client)
         log.info { "Started telegram-bot $username" }
     }
 
@@ -141,15 +133,15 @@ class TelegramBot(
             DelegatingCommand.execute(update, message)
         } else if (update.hasInlineQuery()) {
             DelegatingCommand.handleInlineQuery(update, update.inlineQuery!!)
-        } else if (message.chat.id == privateChatHandler.privateChat) {
-            privateChatHandler.onPrivateChat(update)
+        } else if (message.chat.id == PrivateChatHandler.privateChat) {
+            PrivateChatHandler.onPrivateChat(update)
         } else if ((message.isGroupMessage() || message.isSuperGroupMessage())) {
             if (update.hasMessage()) {
-                for (handler in handlerHolder.currentTgHandlerList) {
+                for (handler in tgHandlers) {
                     if (handler.onMessage(message) == END) break
                 }
             } else if (update.hasEditedMessage()) {
-                for (handler in handlerHolder.currentTgHandlerList) {
+                for (handler in tgHandlers) {
                     if (handler.onEditMessage(update.editedMessage!!) == END) break
                 }
             }
@@ -177,9 +169,11 @@ class TelegramBot(
             SendMessage(message.chatId, "#$topic\n${e.message}").apply {
                 this.replyToMessageId = message.messageId
                 this.replyMarkup =
-                    InlineKeyboardMarkup(listOf(listOf(InlineKeyboardButton("重试").apply { this.callbackData = "retry" })))
+                    InlineKeyboardMarkup(listOf(listOf(InlineKeyboardButton("重试").apply {
+                        this.callbackData = "retry"
+                    })))
             }.send()
-            cacheService.cache(message)
+            CacheService.cache(message)
         } catch (e: Exception) {
             log.error(e) { e.message }
         }
@@ -190,7 +184,7 @@ val log: Logger = LogManager.getLogger()
 val mainClientLock = Object()
 
 fun <T> Request<ResponseWrapper<T>>.send(): CompletableFuture<out T> {
-    return tdClient.send(this).handle { result, case ->
+    return client.send(this).handle { result, case ->
         return@handle case?.let {
             try {
                 CompletableFuture.completedFuture(this.sendSync())
@@ -206,7 +200,7 @@ fun <T> Request<ResponseWrapper<T>>.sendSync(): T {
     synchronized(mainClientLock) {
         while (true) {
             try {
-                return tdClient.sendSync(this)
+                return client.sendSync(this)
             } catch (e: TelegramApiRequestException) {
                 val retryAfter = e.response?.parameters?.retryAfter
                 if (retryAfter != null) {
