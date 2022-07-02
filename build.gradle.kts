@@ -121,7 +121,7 @@ tasks.jar {
         attributes["Multi-Release"] = "true"
         attributes["Main-Class"] = "kurenai.imsyncbot.MainKt"
         attributes["Class-Path"] =
-            configurations.runtimeClasspath.get().files.map { "lib/${it.name}" }.joinToString(" ")
+            configurations.runtimeClasspath.get().files.joinToString(" ") { "lib/${it.name}" }
     }
     archiveFileName.set("${rootProject.name}.jar")
 }

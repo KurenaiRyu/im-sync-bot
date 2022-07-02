@@ -10,6 +10,7 @@ import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.callbacks
 import kurenai.imsyncbot.command.DelegatingCommand
 import kurenai.imsyncbot.configProperties
+import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.qq.QQBotClient
@@ -27,10 +28,8 @@ import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.Request
 import moe.kurenai.tdlight.request.message.SendMessage
 import moe.kurenai.tdlight.util.DefaultMapper.MAPPER
-import mu.KotlinLogging
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -42,15 +41,13 @@ import java.util.concurrent.TimeUnit
  */
 object TelegramBot : AbstractUpdateSubscriber() {
 
-    private final val telegramProperties = configProperties.bot.telegram
+    private val telegramProperties = configProperties.bot.telegram
 
-    val nextMsgUpdate: ConcurrentHashMap<Long, Update> = ConcurrentHashMap()
-    val nextMsgLock: ConcurrentHashMap<Long, Object> = ConcurrentHashMap()
     val username: String = telegramProperties.username
     val token: String = telegramProperties.token
     lateinit var client: TDLightClient
 
-    private val log = KotlinLogging.logger {}
+    private val log = LogManager.getLogger()
     private lateinit var bot: LongPollingTelegramBot
 
     private val pool = ThreadPoolExecutor(
@@ -71,7 +68,7 @@ object TelegramBot : AbstractUpdateSubscriber() {
     fun start() {
 //        GetChatMember(GroupConfig.tgQQ[0])
 
-        log.debug { "Telegram base url: ${telegramProperties.baseUrl}" }
+        log.debug("Telegram base url: ${telegramProperties.baseUrl}")
         client = TDLightClient(
             telegramProperties.baseUrl,
             telegramProperties.token,
@@ -81,7 +78,7 @@ object TelegramBot : AbstractUpdateSubscriber() {
         )
         QQBotClient.startCountDown.await()
         bot = LongPollingTelegramBot(listOf(this), client)
-        log.info { "Started telegram-bot $username" }
+        log.info("Started telegram-bot $username")
     }
 
     override fun onComplete0() {
@@ -95,7 +92,10 @@ object TelegramBot : AbstractUpdateSubscriber() {
             try {
                 onUpdateReceivedSuspend(update)
             } catch (e: Exception) {
-                reportError(update, e)
+                reportError(
+                    update,
+                    BotException("Error on update received: ${e.message ?: e::class.java.simpleName}", e)
+                )
             }
         }
     }
@@ -107,18 +107,8 @@ object TelegramBot : AbstractUpdateSubscriber() {
         log.debug("onUpdateReceived: {}", MAPPER.writeValueAsString(update))
         val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message
         if (message == null) {
-            log.debug { "No message" }
+            log.debug("No message")
             return
-        }
-
-        if (message.isUserMessage()) {
-            //TODO 还需要加入之前的用户，不然别的用户发送信息则会出问题
-            nextMsgLock.remove(message.chat.id)?.let {
-                nextMsgUpdate.putIfAbsent(message.chat.id, update)
-                synchronized(it) {
-                    it.notify()
-                }
-            }
         }
 
         if (update.hasCallbackQuery()) {
@@ -129,7 +119,7 @@ object TelegramBot : AbstractUpdateSubscriber() {
                     }
                 }
             } catch (e: Exception) {
-                log.error(e) { e.message }
+                log.error(e.message, e)
                 reportError(update, e, "执行回调失败", false)
             }
         }
@@ -154,7 +144,7 @@ object TelegramBot : AbstractUpdateSubscriber() {
     }
 
     suspend fun reportError(update: Update, e: Throwable, topic: String = "转发失败", canRetry: Boolean = true) {
-        log.error(e) { e.message }
+        log.error(e.message ?: e::class.java.simpleName, e)
         try {
             val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message ?: return
 
@@ -180,13 +170,12 @@ object TelegramBot : AbstractUpdateSubscriber() {
             }.send()
             CacheService.cache(message)
         } catch (e: Exception) {
-            log.error(e) { e.message }
+            log.error(e.message, e)
         }
     }
 }
 
 val log: Logger = LogManager.getLogger()
-val mainClientLock = Object()
 val clientLock = Mutex()
 
 suspend fun <T> Request<ResponseWrapper<T>>.send(): T {
@@ -203,6 +192,8 @@ suspend fun <T> Request<ResponseWrapper<T>>.send(): T {
                         log.info("Wait for ${retryAfter}s")
                         delay(retryAfter * 1000L)
                     }
+                } else {
+                    throw it
                 }
                 log.error(it.message, it)
                 count++
@@ -212,5 +203,7 @@ suspend fun <T> Request<ResponseWrapper<T>>.send(): T {
         }
     }
     log.warn("重试3次失败")
-    throw lastEx ?: Exception("重试3次失败")
+    throw lastEx?.let {
+        BotException(it.message ?: "重试3次失败", it)
+    } ?: BotException("重试3次失败")
 }

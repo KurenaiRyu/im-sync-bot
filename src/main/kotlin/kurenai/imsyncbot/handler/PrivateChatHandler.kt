@@ -1,8 +1,9 @@
 package kurenai.imsyncbot.handler
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.launch
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.configProperties
 import kurenai.imsyncbot.handler.Handler.Companion.END
@@ -27,9 +28,10 @@ import net.mamoe.mirai.event.events.FriendMessageSyncEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.message.sourceMessage
-import okhttp3.internal.notifyAll
-import okhttp3.internal.wait
 import org.apache.logging.log4j.LogManager
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 object PrivateChatHandler {
 
@@ -38,7 +40,8 @@ object PrivateChatHandler {
 
     val privateChat = configProperties.handler.privateChat
     val privateChatChannel = configProperties.handler.privateChatChannel
-    val newChannelLock = Mutex()
+    val newChannelLock = ReentrantLock()
+    val newChannelCondition = newChannelLock.newCondition()
     private val picToFileSize = configProperties.handler.picToFileSize * 1024 * 1024
 
     private var currentMessage: Message? = null
@@ -67,7 +70,7 @@ object PrivateChatHandler {
         var replyMsgId =
             chain[QuoteReply.Key]?.let { CacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }?.second
         if (replyMsgId == null) {
-            replyMsgId = getStartMsg(friend) ?: return
+            replyMsgId = getStartMsg(friend)
         }
         for (msg in chain) {
             when (msg) {
@@ -224,33 +227,43 @@ object PrivateChatHandler {
             delay(5000)
         }
         if (count >= 3) {
-            newChannelLock.unlock()
-        } else if (newChannelLock.isLocked) {
+            if (newChannelLock.isLocked) {
+                newChannelLock.unlock()
+            }
+        } else if (newChannelLock.isHeldByCurrentThread) {
             kotlin.runCatching {
-                withTimeout(10000) {
-                    val f = bot.getFriend(friend.id)?.let {
-                        SendPhoto(
-                            privateChatChannel.toString(),
-                            InputFile(bot.getFriend(friend.id)?.avatarUrl!!)
-                        ).apply {
-                            caption = "昵称：#${friend.nick}\n备注：#${friend.remark}\n#id${friend.id}\n"
-                        }.send()
-                    }
-                    newChannelLock.wait()
-                    currentMessage?.messageId?.let {
-                        messageId = it
-                        CacheService.cachePrivateChat(friend.id, it)
-                    }
+                bot.getFriend(friend.id)?.let {
+                    SendPhoto(
+                        privateChatChannel.toString(),
+                        InputFile(bot.getFriend(friend.id)?.avatarUrl!!)
+                    ).apply {
+                        caption = "昵称：#${friend.nick}\n备注：#${friend.remark}\n#id${friend.id}\n"
+                    }.send()
                 }
-            }.onFailure { newChannelLock.unlock() }
+                log.debug("Wait for new channel message")
+                newChannelCondition.await(1, TimeUnit.MINUTES)
+                log.debug("New channel message received: ${currentMessage?.messageId}")
+                currentMessage?.messageId?.let {
+                    messageId = it
+                    CacheService.cachePrivateChat(friend.id, it)
+                }
+            }.onFailure {
+                log.debug("getStartMsg error", it)
+            }
+            newChannelLock.unlock()
         }
         return messageId
     }
 
     suspend fun onChannelForward(update: Update) {
-        log.debug("${this::class.java}#onChannelForward")
-        currentMessage = update.message!!
-        newChannelLock.notifyAll()
+        CoroutineScope(Dispatchers.Default).launch {
+            log.debug("${this::class.java}#onChannelForward")
+            currentMessage = update.message!!
+            newChannelLock.withLock {
+                newChannelCondition.signalAll()
+            }
+            log.debug("Signal with message id: ${update.message?.messageId}")
+        }
     }
 
     private suspend fun Message.getRootReplyMessageId(): Int {
