@@ -1,0 +1,17 @@
+bot:
+  telegram:
+    token: 1234567:adgcgasdfadf # tg机器人token
+    username: your_bot_name  # tg机器人用户名
+  #    base-url: http://api:8081  # 本地api
+  qq:
+    account: 12354547  # qq账号
+    password: your-qq-password # qq密码
+    protocol: ANDROID_PAD #ANDROID_PAD | ANDROID_PHONE | ANDROID_WATCH
+handler:
+  forward:
+    master-of-tg: 12345678 #主人 tg id
+    master-of-qq: 87654321 #主人 qq 账号
+    tgMsgFormat: "$name$newline$newline$msg"  #tg消息格式化
+    qqMsgFormat: "$name: $msg" # qq消息格式化
+redis:
+  host: redis #默认用容器内redis，不需要修改

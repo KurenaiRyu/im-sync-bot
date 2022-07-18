@@ -27,7 +27,11 @@
     </Appenders>
     <Loggers>
         <!-- avoid duplicated logs with additivity=false -->
-        <Logger name="kurenai.imsyncbot" level="debug" additivity="false">
+        <Logger name="kurenai.imsyncbot" level="info" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="RandomAccessFile"/>
+        </Logger>
+        <Logger name="moe.kurenai" level="info" additivity="false">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="RandomAccessFile"/>
         </Logger>

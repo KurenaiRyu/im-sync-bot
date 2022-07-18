@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.qq
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.config.GroupConfig
@@ -25,8 +26,6 @@ import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.MessageChain.Companion.deserializeJsonToMessageChain
 import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
 import net.mamoe.mirai.message.data.PlainText
-import net.mamoe.mirai.utils.md5
-import net.mamoe.mirai.utils.toUHexString
 import org.apache.logging.log4j.LogManager
 import org.redisson.api.RBlockingQueue
 import java.io.File
@@ -39,10 +38,9 @@ object QQBotClient {
     val startCountDown = CountDownLatch(1)
 
     private val queueMap = HashMap<String, RBlockingQueue<String?>>()
-    private val dispatcherMap = HashMap<String, ExecutorCoroutineDispatcher>()
-    private val defaultScope = CoroutineScope(Dispatchers.Default)
+    private val scopeMap = HashMap<Long, CoroutineScope>()
     val bot = BotFactory.newBot(configProperties.bot.qq.account, configProperties.bot.qq.password) {
-        cacheDir = File("./cache/${configProperties.bot.qq.account}")
+        cacheDir = File("./mirai/${configProperties.bot.qq.account}")
         fileBasedDeviceInfo("./config/device.json") // 使用 device.json 存储设备信息
         protocol = configProperties.bot.qq.protocol // 切换协议
         highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
@@ -55,212 +53,152 @@ object QQBotClient {
     val mapLock: Mutex = Mutex()
 
     @OptIn(DelicateCoroutinesApi::class)
-    fun start() {
-        defaultScope.launch {
-            log.info("Login qq bot...")
-            bot.login()
-            log.info("Started qq-bot ${bot.nick}(${bot.id})")
-            val filter = GlobalEventChannel.filter { event ->
+    suspend fun start() = runBlocking {
+        log.info("Login qq bot...")
+        bot.login()
+        log.info("Started qq-bot ${bot.nick}(${bot.id})")
+        val filter = GlobalEventChannel.filter { event ->
 
-                return@filter when (event) {
-                    is GroupAwareMessageEvent -> {
-                        val groupId = event.group.id
-                        if (GroupConfig.filterGroups.isNotEmpty() && !GroupConfig.filterGroups.contains(groupId)) {
-                            false
-                        } else {
-                            !GroupConfig.bannedGroups.contains(groupId) && !UserConfig.bannedIds.contains(event.sender.id)
-                        }.also { result ->
-                            if (!result) {
-                                event.message.filterIsInstance<At>()
-                                    .firstOrNull { it.target == UserConfig.masterQQ }
-                                    ?.let { defaultScope.launch { sendRemindMsg(event) } }
-                            }
-                        }
-                    }
-                    is BotOfflineEvent.Dropped -> {
-                        File("").inputStream().md5().toUHexString()
-                        log.warn("QQ bot dropped.")
+            return@filter when (event) {
+                is GroupAwareMessageEvent -> {
+                    val groupId = event.group.id
+                    if (GroupConfig.filterGroups.isNotEmpty() && !GroupConfig.filterGroups.contains(groupId)) {
                         false
-                    }
-                    else -> {
-                        true
+                    } else {
+                        !GroupConfig.bannedGroups.contains(groupId) && !UserConfig.bannedIds.contains(event.sender.id)
+                    }.also { result ->
+                        if (!result) {
+                            event.message.filterIsInstance<At>()
+                                .firstOrNull { it.target == UserConfig.masterQQ }
+                                ?.let { sendRemindMsg(event) }
+                        }
                     }
                 }
+                is BotOfflineEvent.Dropped -> {
+                    log.warn("QQ bot dropped.")
+                    false
+                }
+                else -> {
+                    true
+                }
             }
+        }
 
-            filter.subscribeAlways<Event> { event ->
-                try {
-                    messageCount = (messageCount + 1) and Int.MAX_VALUE
-                    val c = messageCount
-                    log.debug("message-$c $event")
+        filter.subscribeAlways<Event> { event ->
+            try {
+                messageCount = (messageCount + 1) and Int.MAX_VALUE
+                val c = messageCount
+                log.debug("message-$c $event")
 
-                    when (event) {
-                        is MessageEvent -> {
-                            val json = event.message.serializeToJsonString()
-                            when (event) {
-                                is FriendMessageEvent -> {
-                                    val queueName = "QUEUE:FRIEND:${event.friend.id}"
-                                    var queue = queueMap[queueName]
-                                    if (queue == null) {
-                                        mapLock.withLock {
-                                            queue = queueMap[queueName] ?: let {
-                                                redisson.getBlockingQueue<String?>(queueName).also { q ->
-                                                    queueMap[queueName] = q
-                                                    val dispatcher = dispatcherMap[queueName]
-                                                        ?: newSingleThreadContext("friend#${event.friend.id}").also {
-                                                            dispatcherMap[queueName] = it
+                when (event) {
+                    is MessageEvent -> {
+                        val json = event.message.serializeToJsonString()
+                        when (event) {
+                            is FriendMessageEvent -> {
+                                val id = event.friend.id
+                                val queueName = "QUEUE:FRIEND:$id"
+                                val queue = redisson.getBlockingQueue<String?>(queueName)
+                                var scope = scopeMap[id]
+                                if (scope == null) {
+                                    mapLock.withLock {
+                                        scope = scopeMap[id]
+                                        if (scope == null) {
+                                            scopeMap[id] =
+                                                CoroutineScope(newSingleThreadContext("${event.friend.nameCardOrNick}(${event.friend.id})"))
+                                        }
+                                        scope = scopeMap[id]
+                                        scope!!.launch {
+                                            val friend = event.friend
+                                            while (isActive) {
+                                                try {
+                                                    val message =
+                                                        queue.pollAsync(10, TimeUnit.MINUTES)
+                                                            .toCompletableFuture()
+                                                            .await()
+                                                    if (message != null) {
+                                                        PrivateChatHandler.onFriendMessage(
+                                                            friend,
+                                                            message.deserializeJsonToMessageChain()
+                                                        )
+                                                    } else {
+                                                        mapLock.withLock {
+                                                            scopeMap.remove(friend.id)
                                                         }
-                                                    CoroutineScope(dispatcher).launch {
-                                                        val friend = event.friend
-                                                        while (defaultScope.isActive) {
-                                                            try {
-                                                                val message =
-                                                                    withContext(Dispatchers.IO) {
-                                                                        q.poll(30, TimeUnit.SECONDS)
-                                                                    } ?: continue
-                                                                PrivateChatHandler.onFriendMessage(
-                                                                    friend,
-                                                                    message.deserializeJsonToMessageChain()
-                                                                )
-                                                            } catch (e: Exception) {
-                                                                log.warn(e.message)
-                                                            }
-                                                        }
+                                                        this.cancel()
+                                                    }
+                                                } catch (e: Exception) {
+                                                    log.error(e.message, e)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                queue.add(json)
+                            }
+                            is GroupAwareMessageEvent -> {
+                                val id = event.group.id
+                                val queueName = "QUEUE:GROUP:$id"
+                                val queue = redisson.getBlockingQueue<String?>(queueName)
+                                var scope = scopeMap[id]
+                                if (scope == null) {
+                                    mapLock.withLock {
+                                        scope = scopeMap[id]
+                                        if (scope == null) {
+                                            scopeMap[id] =
+                                                CoroutineScope(newSingleThreadContext("${event.group.name}(${event.group.id})"))
+                                        }
+                                        scope = scopeMap[id]
+                                        scope!!.launch {
+                                            val group = event.group
+                                            while (isActive) {
+                                                try {
+                                                    val message =
+                                                        queue.pollAsync(30, TimeUnit.SECONDS).toCompletableFuture()
+                                                            .await() ?: continue
+                                                    qqMessageHandler.onGroupMessage(
+                                                        group,
+                                                        message.deserializeJsonToMessageChain()
+                                                    )
+                                                } catch (e: ImSyncBotRuntimeException) {
+                                                    log.warn(e.message)
+                                                } catch (e: Exception) {
+                                                    log.error("处理信息失败，发送失败报告。", e)
+                                                    try {
+                                                        reportError(event, e)
+                                                    } catch (e: Exception) {
+                                                        log.error("发送报告失败。", e)
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                    queue!!.add(json)
                                 }
-                                is GroupAwareMessageEvent -> {
-                                    val queueName = "QUEUE:GROUP:${event.group.id}"
-                                    var queue = queueMap[queueName]
-                                    if (queue == null) {
-                                        mapLock.withLock {
-                                            queue = queueMap[queueName] ?: let {
-                                                redisson.getBlockingQueue<String?>(queueName).also { q ->
-                                                    queueMap[queueName] = q
-                                                    val dispatcher = dispatcherMap[queueName]
-                                                        ?: newSingleThreadContext("friend#${event.group.id}").also {
-                                                            dispatcherMap[queueName] = it
-                                                        }
-                                                    CoroutineScope(dispatcher).launch {
-                                                        val group = event.group
-                                                        while (defaultScope.isActive) {
-                                                            try {
-                                                                val message =
-                                                                    withContext(Dispatchers.IO) {
-                                                                        q.poll(30, TimeUnit.SECONDS)
-                                                                    } ?: continue
-                                                                qqMessageHandler.onGroupMessage(
-                                                                    group,
-                                                                    message.deserializeJsonToMessageChain()
-                                                                )
-                                                            } catch (e: ImSyncBotRuntimeException) {
-                                                                log.warn(e.message)
-                                                            } catch (e: Exception) {
-                                                                log.error("处理信息失败，发送失败报告。", e)
-                                                                try {
-                                                                    reportError(event, e)
-                                                                } catch (e: Exception) {
-                                                                    log.error("发送报告失败。", e)
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    queue!!.add(json)
-                                }
-                                else -> {
-                                    log.trace("未支持事件 ${event.javaClass} 的处理")
-                                }
+                                queue.add(json)
+                            }
+                            else -> {
+                                log.trace("未支持事件 ${event.javaClass} 的处理")
                             }
                         }
-                        is MessageRecallEvent.GroupRecall -> {
-                            qqMessageHandler.onRecall(event)
-                        }
-                        is GroupEvent -> {
-                            qqMessageHandler.onGroupEvent(event)
-                        }
                     }
-
-
-//                    when (event) {
-//                        is FriendEvent -> {
-//                            when (event) {
-//                                is FriendMessageEvent -> {
-//                                }
-//                            }
-//
-//
-//                            CoroutineScope(handlerScope).launch {
-//                                measureTimeMillis {
-//                                    privateChatHandler.onFriendEvent(event)
-//                                }.let {
-//                                    log.debug { "message-$c ${it}ms" }
-//                                }
-//                            }
-//                        }
-//                        is MessageEvent -> {
-//                            CoroutineScope(handlerScope).launch {
-//                                measureTimeMillis {
-//                                    if (DelegatingCommand.execute(event) == 0) handle(event)
-//                                }.let {
-//                                    log.debug { "message-$c ${it}ms" }
-//                                }
-//                            }
-//                        }
-//                        is MessageRecallEvent.GroupRecall -> {
-//                            forwardHandler.onRecall(event)
-//                        }
-//                        is GroupEvent -> {
-//                            forwardHandler.onGroupEvent(event)
-//                        }
-//                        else -> {
-//                            log.trace { "未支持事件 ${event.javaClass} 的处理" }
-//                        }
-//                    }
-                } catch (e: CancellationException) {
-                    log.error("[message-$messageCount]Coroutine was canceled: ${e.message}", e)
-                } catch (e: Exception) {
-                    log.error("[message-$messageCount]${e.message}", e)
+                    is MessageRecallEvent.GroupRecall -> {
+                        qqMessageHandler.onRecall(event)
+                    }
+                    is GroupEvent -> {
+                        qqMessageHandler.onGroupEvent(event)
+                    }
                 }
-            }
-            Runtime.getRuntime().addShutdownHook(Thread {
-                destroy()
-            })
-            startCountDown.countDown()
-        }
-    }
 
-//    private suspend fun handle(event: Event) {
-//        try {
-//            for (handler in handlerHolder.currentQQHandlerList) {
-//                val result = when (event) {
-//                    is GroupAwareMessageEvent -> {
-//                        handler.onGroupMessage(event)
-//                    }
-//                    else -> {
-//                        CONTINUE
-//                    }
-//                }
-//                if (result == END) break
-//            }
-//        } catch (e: ImSyncBotRuntimeException) {
-//            log.warn { e.message }
-//        } catch (e: Exception) {
-//            log.error(e) { "处理信息失败，发送失败报告。" }
-//            try {
-//                reportError(event, e)
-//            } catch (e: Exception) {
-//                log.error(e) { "发送报告失败。" }
-//            }
-//        }
-//    }
+            } catch (e: CancellationException) {
+                log.error("[message-$messageCount]Coroutine was canceled: ${e.message}", e)
+            } catch (e: Exception) {
+                log.error("[message-$messageCount]${e.message}", e)
+            }
+        }
+        Runtime.getRuntime().addShutdownHook(Thread {
+            destroy()
+        })
+        startCountDown.countDown()
+    }
 
     suspend fun reportError(event: Event, e: Throwable) {
         if (event is GroupAwareMessageEvent) {

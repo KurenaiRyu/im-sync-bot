@@ -9,10 +9,6 @@ plugins {
 group = "moe.kurenai.bot"
 version = "0.0.1-SNAPSHOT"
 
-val quarkusPlatformGroupId: String by project
-val quarkusPlatformArtifactId: String by project
-val quarkusPlatformVersion: String by project
-
 repositories {
     mavenLocal()
     maven { url = uri("https://repo.spring.io/milestone") }
@@ -36,7 +32,7 @@ fun gpr(url: String): (MavenArtifactRepository).() -> Unit {
 
 dependencies {
 
-    val miraiVersion = "2.11.1"
+    val miraiVersion = "2.12.0"
 
     //mirai
     implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {

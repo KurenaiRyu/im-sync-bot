@@ -2,24 +2,19 @@ version: '3.5'
 services:
   bot:
 #    build: .  #自行打包镜像则去除该注释
-    image: kurenai9/im-sync-bot:test-q
+    image: kurenai9/im-sync-bot:1.1.0
     container_name: bot
     restart: always
-    environment:
-#      BASE_URL: "http://api:8081" #本地api配置
-      REDIS_HOST: "redis"
-    # 调整时区
-    # entrypoint: ["java", "-jar", "-Dspring.config.location=config.yaml", "-XX:+UseZGC", "-Duser.timezone=GMT+08", "./bot.jar"]
     logging:
       driver: "json-file"
       options:
-        max-size: "200m"
-        max-file: "3"
+        max-size: "50m"
     volumes:
-#      - ./api-data/:/var/lib/telegram-bot-api/ #本地api配置
-      - ./config/:/workspace/config/
-      - ./cache:/workspace/cache
-      - ./logs:/workspace/logs
+      #      - ./api-data/:/var/lib/telegram-bot-api/ #本地api配置
+      - ./config/:/deployments/config/
+      - ./config/config.yaml:/deployments/application.yaml
+      - ./cache:/deployments/cache
+      - ./logs:/deployments/logs
     depends_on:
       - redis
 #      - api  #本地api则去掉注释

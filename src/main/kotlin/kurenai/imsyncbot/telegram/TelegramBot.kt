@@ -1,9 +1,6 @@
 package kurenai.imsyncbot.telegram
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.callback.Callback
@@ -65,7 +62,7 @@ object TelegramBot : AbstractUpdateSubscriber() {
     }
     private val scope = pool.asCoroutineDispatcher()
 
-    fun start() {
+    suspend fun start() {
 //        GetChatMember(GroupConfig.tgQQ[0])
 
         log.debug("Telegram base url: ${telegramProperties.baseUrl}")
@@ -76,7 +73,9 @@ object TelegramBot : AbstractUpdateSubscriber() {
             isDebugEnabled = true,
             updateBaseUrl = telegramProperties.baseUrl
         )
-        QQBotClient.startCountDown.await()
+        withContext(Dispatchers.IO) {
+            QQBotClient.startCountDown.await()
+        }
         bot = LongPollingTelegramBot(listOf(this), client)
         log.info("Started telegram-bot $username")
     }

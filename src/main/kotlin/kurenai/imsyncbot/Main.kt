@@ -12,6 +12,7 @@ import io.github.kurenairyu.cache.redis.lettuce.LettuceCache
 import io.github.kurenairyu.cache.redis.lettuce.jackson.JacksonCodec
 import io.github.kurenairyu.cache.redis.lettuce.jackson.RecordNamingStrategyPatchModule
 import io.lettuce.core.RedisURI
+import kotlinx.coroutines.runBlocking
 import kurenai.imsyncbot.Main.Companion.log
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.command.AbstractQQCommand
@@ -44,6 +45,7 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.timerTask
+import kotlin.io.path.Path
 
 /**
  * @author Kurenai
@@ -89,7 +91,7 @@ fun main() {
     start()
 }
 
-fun start() {
+fun start() = runBlocking {
     loadProperties()
     init()
     QQBotClient.start()
@@ -198,7 +200,13 @@ private fun setUpTimer() {
     clearCacheTimer.scheduleAtFixedRate(timerTask {
         for (cacheDir in cacheDirs) {
             try {
-                val dir = File(cacheDir)
+                val path = Path(cacheDir)
+                val dir = File(path.toUri())
+                if (!dir.exists()) {
+                    log.warn("${path.toUri()} not exist!")
+                    continue
+                }
+
                 val sizeOfDir = FileUtils.sizeOfDirectory(dir)
                 log.info("Cache folder [${dir.name}] size: ${sizeOfDir.humanReadableByteCountBin()}")
                 val filesToDelete = ArrayList<File>()
