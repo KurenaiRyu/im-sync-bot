@@ -32,7 +32,8 @@ im同步机器人，现主要同步（转发）tg跟qq群。
         qqMsgFormat: "$name: $msg" # qq消息格式化
     ```
 2. 如果你有之前qq机器人生成过得 `device.json`，则只需要把他放入项目根目录下然后进行下面的第3步即可。没有则如下操作：  
-   输入命令 `docker-compose up bot` 等待运行。如果碰到登录验证问题按照提示输入， 查看到生成device.json文件后，即可`ctrl + C`中断运行。  
+   输入命令 `docker-compose up -T bot` 等待运行。如果碰到登录验证问题按照提示输入，
+   查看到生成device.json文件后，即可`ctrl + C`中断运行。  
    想要跳过则需要把 [Mirai](https://github.com/mamoe/mirai) 生成的device.json文件放入根目录下。
 3. 输入命令 `docker-compose up -d` 后台运行程序
 
