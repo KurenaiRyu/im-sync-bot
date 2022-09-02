@@ -103,7 +103,7 @@ object TelegramBot : AbstractUpdateSubscriber() {
     }
 
     suspend fun onUpdateReceivedSuspend(update: Update) {
-        log.debug("onUpdateReceived: {}", MAPPER.writeValueAsString(update))
+        log.info("onUpdateReceived: {}", MAPPER.writeValueAsString(update))
         val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message
         if (message == null) {
             log.debug("No message")
@@ -118,7 +118,6 @@ object TelegramBot : AbstractUpdateSubscriber() {
                     }
                 }
             } catch (e: Exception) {
-                log.error(e.message, e)
                 reportError(update, e, "执行回调失败", false)
             }
         }
@@ -142,8 +141,8 @@ object TelegramBot : AbstractUpdateSubscriber() {
         }
     }
 
-    suspend fun reportError(update: Update, e: Throwable, topic: String = "转发失败", canRetry: Boolean = true) {
-        log.error(e.message ?: e::class.java.simpleName, e)
+    suspend fun reportError(update: Update, throwable: Throwable, topic: String = "转发失败", canRetry: Boolean = true) {
+        log.error(throwable.message ?: throwable::class.java.simpleName, throwable)
         try {
             val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message ?: return
 
@@ -160,7 +159,8 @@ object TelegramBot : AbstractUpdateSubscriber() {
 //                send(EditMessageText.builder().chatId(it).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
 //            }
 
-            SendMessage(message.chatId, "#$topic\n${e.message}").apply {
+            val errorMsg = "#$topic\n${throwable::class.simpleName}: ${throwable.message?.replace(configProperties.bot.telegram.token, "{token}")}"
+            SendMessage(message.chatId, errorMsg).apply {
                 this.replyToMessageId = message.messageId
                 this.replyMarkup =
                     InlineKeyboardMarkup(listOf(listOf(InlineKeyboardButton("重试").apply {
@@ -169,7 +169,7 @@ object TelegramBot : AbstractUpdateSubscriber() {
             }.send()
             CacheService.cache(message)
         } catch (e: Exception) {
-            log.error(e.message, e)
+            log.error("Report error task fail: ${e.message}", e)
         }
     }
 }
@@ -182,22 +182,25 @@ suspend fun <T> Request<ResponseWrapper<T>>.send(): T {
     var lastEx: Throwable? = null
     while (count < 3) {
         clientLock.withLock {
-            kotlin.runCatching {
-                client.sendSync(this@send)
-            }.onFailure {
-                lastEx = it
-                if (it is TelegramApiRequestException) {
-                    it.response?.parameters?.retryAfter?.let { retryAfter ->
-                        log.info("Wait for ${retryAfter}s")
-                        delay(retryAfter * 1000L)
+            try {
+                return client.sendSync(this@send)
+            } catch (e: Exception) {
+                lastEx = e
+                when (e) {
+                    is TelegramApiRequestException -> {
+                        e.response?.parameters?.retryAfter?.also { retryAfter ->
+                            log.info("Wait for ${retryAfter}s")
+                            delay(retryAfter * 1000L)
+                        } ?: run {
+                            throw e
+                        }
                     }
-                } else {
-                    throw it
+
+                    else -> {
+                        throw e
+                    }
                 }
-                log.error(it.message, it)
                 count++
-            }.onSuccess {
-                return it
             }
         }
     }

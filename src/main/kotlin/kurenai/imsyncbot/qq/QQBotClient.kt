@@ -27,7 +27,6 @@ import net.mamoe.mirai.message.data.MessageChain.Companion.deserializeJsonToMess
 import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
 import net.mamoe.mirai.message.data.PlainText
 import org.apache.logging.log4j.LogManager
-import org.redisson.api.RBlockingQueue
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -37,7 +36,6 @@ object QQBotClient {
     private val log = LogManager.getLogger()
     val startCountDown = CountDownLatch(1)
 
-    private val queueMap = HashMap<String, RBlockingQueue<String?>>()
     private val scopeMap = HashMap<Long, CoroutineScope>()
     val bot = BotFactory.newBot(configProperties.bot.qq.account, configProperties.bot.qq.password) {
         cacheDir = File("./mirai/${configProperties.bot.qq.account}")
@@ -52,36 +50,39 @@ object QQBotClient {
     var messageCount = 0
     val mapLock: Mutex = Mutex()
 
-    @OptIn(DelicateCoroutinesApi::class)
     suspend fun start() = runBlocking {
         log.info("Login qq bot...")
         bot.login()
         log.info("Started qq-bot ${bot.nick}(${bot.id})")
         val filter = GlobalEventChannel.filter { event ->
-
-            return@filter when (event) {
-                is GroupAwareMessageEvent -> {
-                    val groupId = event.group.id
-                    if (GroupConfig.filterGroups.isNotEmpty() && !GroupConfig.filterGroups.contains(groupId)) {
-                        false
-                    } else {
-                        !GroupConfig.bannedGroups.contains(groupId) && !UserConfig.bannedIds.contains(event.sender.id)
-                    }.also { result ->
-                        if (!result) {
-                            event.message.filterIsInstance<At>()
-                                .firstOrNull { it.target == UserConfig.masterQQ }
-                                ?.let { sendRemindMsg(event) }
+            return@filter kotlin.runCatching {
+                when (event) {
+                    is GroupAwareMessageEvent -> {
+                        val groupId = event.group.id
+                        if (GroupConfig.filterGroups.isNotEmpty() && !GroupConfig.filterGroups.contains(groupId)) {
+                            false
+                        } else {
+                            !GroupConfig.bannedGroups.contains(groupId) && !UserConfig.bannedIds.contains(event.sender.id)
+                        }.also { result ->
+                            if (!result) {
+                                event.message.filterIsInstance<At>().firstOrNull { it.target == UserConfig.masterQQ }
+                                    ?.let { sendRemindMsg(event) }
+                            }
                         }
                     }
+
+                    is BotOfflineEvent.Dropped -> {
+                        log.warn("QQ bot dropped.")
+                        false
+                    }
+
+                    else -> {
+                        true
+                    }
                 }
-                is BotOfflineEvent.Dropped -> {
-                    log.warn("QQ bot dropped.")
-                    false
-                }
-                else -> {
-                    true
-                }
-            }
+            }.onFailure {
+                log.error(it.message, it)
+            }.getOrDefault(false)
         }
 
         filter.subscribeAlways<Event> { event ->
@@ -127,7 +128,7 @@ object QQBotClient {
                                                         this.cancel()
                                                     }
                                                 } catch (e: Exception) {
-                                                    log.error(e.message, e)
+                                                    reportError(event, e)
                                                 }
                                             }
                                         }
@@ -162,12 +163,7 @@ object QQBotClient {
                                                 } catch (e: ImSyncBotRuntimeException) {
                                                     log.warn(e.message)
                                                 } catch (e: Exception) {
-                                                    log.error("处理信息失败，发送失败报告。", e)
-                                                    try {
-                                                        reportError(event, e)
-                                                    } catch (e: Exception) {
-                                                        log.error("发送报告失败。", e)
-                                                    }
+                                                    reportError(event, e)
                                                 }
                                             }
                                         }
@@ -200,21 +196,29 @@ object QQBotClient {
         startCountDown.countDown()
     }
 
-    suspend fun reportError(event: Event, e: Throwable) {
-        if (event is GroupAwareMessageEvent) {
-            val message = event.message
-            val sender = event.sender
-            val group = event.group
-            val master = bot.getFriend(UserConfig.masterQQ)
-            master?.takeIf { it.id != 0L }?.sendMessage(
-                master.sendMessage(message).quote()
-                    .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: (${e::class.simpleName}) ${e.message}")
-            )
-            kotlin.runCatching {
-                SendMessage(BotUtil.getTgChatByQQ(event.group.id).toString(), event.message.contentToString()).send()
-            }.onFailure {
-                log.error("Report error fail.", it)
+    suspend fun reportError(event: Event, throwable: Throwable) {
+        log.error(throwable.message, throwable)
+        try {
+            if (event is GroupAwareMessageEvent) {
+                val message = event.message
+                val sender = event.sender
+                val group = event.group
+                val master = bot.getFriend(UserConfig.masterQQ)
+                master?.takeIf { it.id != 0L }?.sendMessage(
+                    master.sendMessage(message).quote()
+                        .plus("group: ${group.name}(${group.id}), sender: ${sender.nameCardOrNick}(${sender.id})\n\n消息发送失败: (${throwable::class.simpleName}) ${throwable.message}")
+                )
+                kotlin.runCatching {
+                    SendMessage(
+                        BotUtil.getTgChatByQQ(event.group.id).toString(),
+                        event.message.contentToString()
+                    ).send()
+                }.onFailure {
+                    log.error("Report error fail.", it)
+                }.getOrNull()
             }
+        } catch (e: Exception) {
+            log.error("Report error fail: ${e.message}", e)
         }
     }
 
