@@ -91,8 +91,8 @@ object BotUtil {
         return path?.substring(path.lastIndexOf('.').plus(1)) ?: ""
     }
 
-    fun formatUsername(username: String): String {
-        return username.replace("https://", "_", true)
+    fun String.formatUsername(): String {
+        return this.replace("https://", "_", true)
             .replace("http://", "", true)
             .replace(".", "_")
             .replace("/", "_")

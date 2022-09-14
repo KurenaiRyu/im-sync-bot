@@ -12,7 +12,9 @@ import io.github.kurenairyu.cache.redis.lettuce.LettuceCache
 import io.github.kurenairyu.cache.redis.lettuce.jackson.JacksonCodec
 import io.github.kurenairyu.cache.redis.lettuce.jackson.RecordNamingStrategyPatchModule
 import io.lettuce.core.RedisURI
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kurenai.imsyncbot.Main.Companion.log
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.command.AbstractQQCommand
@@ -33,6 +35,7 @@ import org.apache.commons.io.filefilter.AgeFileFilter
 import org.apache.commons.io.filefilter.SizeFileFilter
 import org.apache.commons.lang3.time.DateUtils
 import org.apache.logging.log4j.LogManager
+import org.apache.logging.log4j.Logger
 import org.redisson.Redisson
 import org.redisson.api.RedissonClient
 import org.redisson.codec.JsonJacksonCodec
@@ -54,7 +57,7 @@ import kotlin.io.path.Path
 
 class Main {
     companion object {
-        val log = LogManager.getLogger()
+        val log: Logger = LogManager.getLogger()
     }
 }
 
@@ -87,15 +90,11 @@ lateinit var configProperties: ConfigProperties
 lateinit var redisson: RedissonClient
 lateinit var cache: Cache
 
-fun main() {
-    start()
-}
-
-fun start() = runBlocking {
+suspend fun main() {
     loadProperties()
     init()
-    QQBotClient.start()
-    TelegramBot.start()
+    CoroutineScope(Dispatchers.Default).launch { TelegramBot.start() }
+    CoroutineScope(Dispatchers.Default).launch { QQBotClient.start() }
 }
 
 fun loadProperties() {

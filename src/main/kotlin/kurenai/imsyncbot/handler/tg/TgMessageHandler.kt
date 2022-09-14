@@ -204,7 +204,8 @@ class TgMessageHandler : TelegramHandler {
     ) {
         val msg = if (quoteMsgChain != null) {
             builder.add(quoteMsgChain.quote())
-            content.takeIf { it.isNotEmpty() } ?: " "
+//            content.takeIf { it.isNotEmpty() } ?: " "
+            content
         } else {
             content
         }

@@ -40,7 +40,7 @@ object DelegatingCommand {
         var parseMode: String? = null
         var msg: String? = null
         for (handler in tgCommands) {
-            if (handler.command == command) {
+            if (handler.command.lowercase() == command.lowercase()) {
                 log.debug { "Match ${handler.name}" }
                 val isSupperAdmin = UserConfig.superAdmins.contains(message.from?.id)
                 val param = message.text?.replace("/${handler.command}", "")?.trim()

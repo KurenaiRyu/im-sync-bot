@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.telegram
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.callback.Callback
@@ -15,8 +16,8 @@ import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.TelegramBot.client
 import kurenai.imsyncbot.tgHandlers
 import moe.kurenai.tdlight.AbstractUpdateSubscriber
-import moe.kurenai.tdlight.LongPollingTelegramBot
-import moe.kurenai.tdlight.client.TDLightClient
+import moe.kurenai.tdlight.LongPollingCoroutineTelegramBot
+import moe.kurenai.tdlight.client.TDLightCoroutineClient
 import moe.kurenai.tdlight.exception.TelegramApiRequestException
 import moe.kurenai.tdlight.model.ResponseWrapper
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
@@ -24,28 +25,47 @@ import moe.kurenai.tdlight.model.keyboard.InlineKeyboardMarkup
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.Request
 import moe.kurenai.tdlight.request.message.SendMessage
+import moe.kurenai.tdlight.util.CoroutineUtil.childScopeContext
 import moe.kurenai.tdlight.util.DefaultMapper.MAPPER
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * 机器人实例
  * @author Kurenai
  * @since 2021-06-30 14:05
  */
-object TelegramBot : AbstractUpdateSubscriber() {
+object TelegramBot : AbstractUpdateSubscriber(), CoroutineScope {
 
     private val telegramProperties = configProperties.bot.telegram
 
+    var statusChannel = Channel<TelegramBotStatus>(Channel.BUFFERED)
     val username: String = telegramProperties.username
     val token: String = telegramProperties.token
-    lateinit var client: TDLightClient
+    lateinit var client: TDLightCoroutineClient
 
     private val log = LogManager.getLogger()
-    private lateinit var bot: LongPollingTelegramBot
+    private lateinit var bot: LongPollingCoroutineTelegramBot
+    override val coroutineContext: CoroutineContext = CoroutineName("TelegramBot").plus(
+        CoroutineExceptionHandler { context, e ->
+            log.error(context[CoroutineName]?.let { "Exception in coroutine '${it.name}'." }
+                ?: "Exception in unnamed coroutine.", e)
+        })
+        .childScopeContext(EmptyCoroutineContext)
+        .apply {
+            job.invokeOnCompletion {
+                kotlin.runCatching {
+                    client.close()
+                }.onFailure {
+                    if (it !is CancellationException) log.error(it)
+                }
+            }
+        }
 
     private val pool = ThreadPoolExecutor(
         1, 1, 1L, TimeUnit.MILLISECONDS,
@@ -66,18 +86,23 @@ object TelegramBot : AbstractUpdateSubscriber() {
 //        GetChatMember(GroupConfig.tgQQ[0])
 
         log.debug("Telegram base url: ${telegramProperties.baseUrl}")
-        client = TDLightClient(
+        client = TDLightCoroutineClient(
             telegramProperties.baseUrl,
             telegramProperties.token,
             isUserMode = false,
             isDebugEnabled = true,
             updateBaseUrl = telegramProperties.baseUrl
         )
-        withContext(Dispatchers.IO) {
-            QQBotClient.startCountDown.await()
+        statusChannel.send(Initialized)
+        var qqBotStatus = QQBotClient.statusChannel.receive()
+        while (qqBotStatus !is QQBotClient.Initialized) {
+            log.debug("QQ bot status: ${qqBotStatus.javaClass.simpleName}")
+            qqBotStatus = QQBotClient.statusChannel.receive()
         }
-        bot = LongPollingTelegramBot(listOf(this), client)
-        log.info("Started telegram-bot $username")
+        bot = LongPollingCoroutineTelegramBot(listOf(this), client).apply {
+            coroutineContext = coroutineContext.childScopeContext(this@TelegramBot.coroutineContext)
+        }
+        bot.start()
     }
 
     override fun onComplete0() {
@@ -172,6 +197,11 @@ object TelegramBot : AbstractUpdateSubscriber() {
             log.error("Report error task fail: ${e.message}", e)
         }
     }
+
+    sealed interface TelegramBotStatus
+
+    object Initializing : TelegramBotStatus
+    object Initialized : TelegramBotStatus
 }
 
 val log: Logger = LogManager.getLogger()
@@ -183,7 +213,7 @@ suspend fun <T> Request<ResponseWrapper<T>>.send(): T {
     while (count < 3) {
         clientLock.withLock {
             try {
-                return client.sendSync(this@send)
+                return client.send(this@send)
             } catch (e: Exception) {
                 lastEx = e
                 when (e) {

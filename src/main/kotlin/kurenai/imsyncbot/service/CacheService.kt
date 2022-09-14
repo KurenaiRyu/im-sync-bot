@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.service
 
 import kurenai.imsyncbot.cache
-import kurenai.imsyncbot.entity.FileCache
+import kurenai.imsyncbot.domain.FileCache
 import kurenai.imsyncbot.redisson
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message

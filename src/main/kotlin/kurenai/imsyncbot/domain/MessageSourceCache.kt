@@ -1,4 +1,4 @@
-package kurenai.imsyncbot.entity
+package kurenai.imsyncbot.domain
 
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceKind
