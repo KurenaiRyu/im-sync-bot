@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.6.21"
-    kotlin("kapt") version "1.6.21"
+    kotlin("jvm") version "1.7.10"
+    kotlin("kapt") version "1.7.10"
     application
 }
 
@@ -15,6 +15,7 @@ repositories {
     maven { url = uri("https://maven.aliyun.com/repository/public/") }
     maven { url = uri("https://maven.aliyun.com/repository/spring/") }
     maven { url = uri("https://repo.spring.io/release") }
+    maven { url = uri("https://jitpack.io") }
     maven(gpr("https://maven.pkg.github.com/KurenaiRyu/tdlight-sdk"))
     maven(gpr("https://maven.pkg.github.com/KurenaiRyu/simple-cache"))
     mavenCentral()
@@ -32,7 +33,7 @@ fun gpr(url: String): (MavenArtifactRepository).() -> Unit {
 
 dependencies {
 
-    val miraiVersion = "2.12.0"
+    val miraiVersion = "2.13.0-M1"
 
     //mirai
     implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {
@@ -45,7 +46,12 @@ dependencies {
     implementation("net.mamoe", "mirai-core-utils-jvm", miraiVersion)
 
     //td-light-sdk
-    implementation("moe.kurenai.tdlight", "td-light-sdk", "0.0.1-SNAPSHOT")
+    implementation("moe.kurenai.tdlight", "td-light-sdk", "0.1.0-SNAPSHOT")
+
+    val ktor = "2.1.0"
+    implementation("io.ktor:ktor-client-core:${ktor}")
+    implementation("io.ktor:ktor-client-okhttp:${ktor}")
+    implementation("io.ktor:ktor-client-encoding:${ktor}")
 
     val log4j = "2.17.2"
     //logging
@@ -70,7 +76,7 @@ dependencies {
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
     implementation("io.github.kurenairyu", "simple-cache", "1.2.0-SNAPSHOT")
 
-    implementation("org.redisson:redisson:3.17.3")
+    implementation("org.redisson:redisson:3.17.6")
 
     implementation("org.reflections", "reflections", "0.10.2")
 
