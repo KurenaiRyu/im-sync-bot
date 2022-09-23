@@ -109,7 +109,6 @@ fun init() {
 
     checkRedisCodec()
     configProxy()
-    setUpTimer()
     initUserConfig()
 
     registerTgCommand()
@@ -195,6 +194,7 @@ private val largeDirSize = 100 * 1024 * 1024L
 private val cacheDirs = listOf("./cache/img", "./cache/doc", "./cache/file")
 private val clearCacheTimer = Timer("ClearCache", true)
 
+@Deprecated("No effect")
 private fun setUpTimer() {
     clearCacheTimer.scheduleAtFixedRate(timerTask {
         for (cacheDir in cacheDirs) {
