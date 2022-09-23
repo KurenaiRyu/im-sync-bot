@@ -21,6 +21,9 @@ import net.mamoe.mirai.contact.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.ForwardMessage
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
+import net.mamoe.mirai.utils.MiraiExperimentalApi
+import org.jsoup.Jsoup
+import org.jsoup.parser.Parser
 
 /**
  * 信息上下文
@@ -42,20 +45,30 @@ data class GroupMessageContext(
 
     private var tgMsgFormat = if (configProperties.handler.tgMsgFormat.contains("\$msg")) configProperties.handler.tgMsgFormat else "\$name: \$msg"
     private var qqMsgFormat = if (configProperties.handler.qqMsgFormat.contains("\$msg")) configProperties.handler.qqMsgFormat else "\$name: \$msg"
+    private var type: MessageType? = null
 
     val simpleContent: String = messageChain.contentToString()
     val chatId: String = (GroupConfig.qqTg[group.id] ?: GroupConfig.defaultTgGroup).toString()
     val replyId: Int? by lazy { messageChain[QuoteReply.Key]?.let { CacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }?.second }
     val hasReply = replyId != null
     val rejectPic: Boolean = GroupConfig.picBannedGroups.contains(group.id)
-    val type: MessageType by lazy { handleType(messageChain) }
+    val normalType: Normal = Normal()
 
-    private fun handleType(messageChain: MessageChain): MessageType {
+    suspend fun getType() = type ?: handleType(messageChain).also { type = it }
+
+    @OptIn(MiraiExperimentalApi::class)
+    private suspend fun handleType(messageChain: MessageChain): MessageType {
         return if (messageChain.contains(RichMessage.Key)) {
             val content = messageChain[RichMessage.Key]!!.content
             try {
-                Rich(xmlMapper.readValue(content, QQRichMessage::class.java))
-            } catch (e: StreamReadException) {
+                val document = Jsoup.parse(content, Parser.xmlParser())
+                val uuid = document.selectXpath("//image").attr("uuid")
+                if (uuid.isNotBlank()) {
+                    SingleImage(Image(uuid), true)
+                } else {
+                    Rich(xmlMapper.readValue(content, QQRichMessage::class.java))
+                }
+            } catch (e: Exception) {
                 try {
                     App(jsonMapper.readValue(content, QQAppMessage::class.java))
                 } catch (e: StreamReadException) {
@@ -123,6 +136,15 @@ data class GroupMessageContext(
         else content
     }
 
+    /**
+     * 格式化消息
+     *
+     * 字符串应经过markdown格式化，返回值已markdown格式化
+     *
+     * @param senderId
+     * @param senderName
+     * @return
+     */
     private fun String.formatMsg(senderId: Long, senderName: String? = null): String {
         return tgMsgFormat.fm2md().replace(BotUtil.NEWLINE_PATTERN.fm2md(), "\n", true)
             .replace(BotUtil.ID_PATTERN.fm2md(), senderId.toString(), true)
@@ -154,7 +176,7 @@ data class GroupMessageContext(
         val url: String? = msg.url?.handleUrl()
         val telegramMessage: SendMessage = SendMessage(
             chatId,
-            (url?.formatMsg(senderId, senderName) ?: simpleContent).fm2md()
+            (url?.fm2md()?.formatMsg(senderId, senderName) ?: simpleContent)
         ).apply {
             parseMode = ParseMode.MARKDOWN_V2
             replyId?.let { replyToMessageId = replyId }
@@ -165,14 +187,14 @@ data class GroupMessageContext(
         val url: String? = (msg.meta.news?.jumpUrl ?: msg.meta.detail1?.qqdocurl)?.handleUrl()
         val telegramMessage: SendMessage = SendMessage(
             chatId,
-            (url?.formatMsg(senderId, senderName) ?: simpleContent).fm2md()
+            (url?.fm2md()?.formatMsg(senderId, senderName) ?: simpleContent)
         ).apply {
             parseMode = ParseMode.MARKDOWN_V2
             replyId?.let { replyToMessageId = replyId }
         }
     }
 
-    inner class SingleImage(val image: Image) : MessageType {
+    inner class SingleImage(val image: Image, val onlyImage: Boolean = false) : MessageType {
 
         val ratio: Float = image.width / image.height.toFloat()
         val shouldBeFile: Boolean = !image.isEmoji &&
@@ -180,16 +202,26 @@ data class GroupMessageContext(
 
         suspend fun getImageMessage(): SendPhoto {
             return SendPhoto(chatId, InputFile(image.queryUrl())).apply {
-                caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
-                parseMode = ParseMode.MARKDOWN_V2
+                if (!onlyImage) {
+                    caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
+                    parseMode = ParseMode.MARKDOWN_V2
+                } else {
+                    caption = "".formatMsg(senderId, senderName)
+                    parseMode = ParseMode.MARKDOWN_V2
+                }
                 replyId?.let { replyToMessageId = replyId }
             }
         }
 
         suspend fun getFileMessage(): SendDocument {
             return SendDocument(chatId, InputFile(image.queryUrl())).apply {
-                caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
-                parseMode = ParseMode.MARKDOWN_V2
+                if (!onlyImage) {
+                    caption = "".formatMsg(senderId, senderName)
+                    parseMode = ParseMode.MARKDOWN_V2
+                } else {
+                    caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
+                    parseMode = ParseMode.MARKDOWN_V2
+                }
                 replyId?.let { replyToMessageId = replyId }
             }
         }

@@ -39,21 +39,25 @@ class QQMessageHandler : QQHandler {
     }
 
     @Throws(Exception::class)
-    @Suppress("IMPLICIT_CAST_TO_ANY", "UNCHECKED_CAST")
+    @Suppress("UNCHECKED_CAST")
     override suspend fun onGroupMessage(context: GroupMessageContext): Int {
-        val messageType = context.type
+        val messageType = context.getType()
         val list = if (messageType is GroupMessageContext.Forward) messageType.contextList else listOf(context)
         for (c in list) {
-            val t = c.type
-            when (t) {
-                is GroupMessageContext.App -> t.telegramMessage.send()
-                is GroupMessageContext.GifImage -> t.getTelegramMessage().send()
-                is GroupMessageContext.MultiImage -> t.getTelegramMessage().send()
-                is GroupMessageContext.Rich -> t.telegramMessage.send()
-                is GroupMessageContext.SingleImage -> if (t.shouldBeFile) t.getFileMessage().send() else t.getImageMessage().send()
-                is GroupMessageContext.Normal -> t.telegramMessage.send()
-                else -> null
-            }?.also { message ->
+            val t = c.getType()
+            kotlin.runCatching {
+                when (t) {
+                    is GroupMessageContext.App -> t.telegramMessage.send()
+                    is GroupMessageContext.GifImage -> t.getTelegramMessage().send()
+                    is GroupMessageContext.MultiImage -> t.getTelegramMessage().send()
+                    is GroupMessageContext.Rich -> t.telegramMessage.send()
+                    is GroupMessageContext.SingleImage -> if (t.shouldBeFile) t.getFileMessage().send() else t.getImageMessage().send()
+                    is GroupMessageContext.Normal -> t.telegramMessage.send()
+                    else -> null
+                }
+            }.recoverCatching {
+                c.normalType.telegramMessage.send()
+            }.getOrThrow()?.also { message ->
                 log.debug("Sent ${mapper.writeValueAsString(message)}")
                 if (message is Message) {
                     CacheService.cache(context.messageChain, message)
