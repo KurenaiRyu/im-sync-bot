@@ -14,6 +14,7 @@ import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.qq.QQBotClient
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.TelegramBot.client
+import kurenai.imsyncbot.telegram.TelegramBot.token
 import kurenai.imsyncbot.tgHandlers
 import moe.kurenai.tdlight.AbstractUpdateSubscriber
 import moe.kurenai.tdlight.LongPollingCoroutineTelegramBot
@@ -208,10 +209,10 @@ val log: Logger = LogManager.getLogger()
 val clientLock = Mutex()
 
 suspend fun <T> Request<ResponseWrapper<T>>.send(): T {
-    var count = 0
     var lastEx: Throwable? = null
-    while (count < 3) {
-        clientLock.withLock {
+    clientLock.withLock {
+        var count = 0
+        while (count <= 0) {
             try {
                 return client.send(this@send)
             } catch (e: Exception) {
@@ -222,20 +223,19 @@ suspend fun <T> Request<ResponseWrapper<T>>.send(): T {
                             log.info("Wait for ${retryAfter}s")
                             delay(retryAfter * 1000L)
                         } ?: run {
-                            throw e
+                            log.warn("消息发送失败", e)
                         }
                     }
 
                     else -> {
-                        throw e
+                        log.warn("消息发送失败", e)
                     }
                 }
                 count++
             }
         }
     }
-    log.warn("重试3次失败")
     throw lastEx?.let {
-        BotException(it.message ?: "重试3次失败", it)
-    } ?: BotException("重试3次失败")
+        BotException(it.message?.replace(token, "{mask}") ?: "信息发送失败")
+    } ?: BotException("信息发送失败")
 }
