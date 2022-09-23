@@ -10,11 +10,13 @@
                     pattern="%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}} %highlight{${LOG_LEVEL_PATTERN:-%5p}}{FATAL=red blink, ERROR=red, WARN=yellow bold, INFO=green, DEBUG=green bold, TRACE=blue} %style{%processId}{magenta} --- [%t] %style{%c{4}}{cyan} : %m%n%ex"/>
         </Console>
         <RollingRandomAccessFile name="RandomAccessFile" filename="${path}/im-sync-bot.log"
-                                 filePattern="${path}/$${date:yyyy-MM}/manga-spider-%d{yyyy-MM-dd-HH}-%i.log.zip"
+                                 filePattern="${path}/$${date:yyyy-MM}/im-sync-bot-%d{yyyy-MM-dd}-%i.log.zip"
                                  immediateFlush="false" append="true">
             <Policies>
                 <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="250MB"/>
             </Policies>
+            <DefaultRolloverStrategy max="7"/>
             <PatternLayout
                     pattern="%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}} ${LOG_LEVEL_PATTERN:-%5p} %processId --- [%t] %c : %m%n%ex"/>
             <!--            <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>-->
