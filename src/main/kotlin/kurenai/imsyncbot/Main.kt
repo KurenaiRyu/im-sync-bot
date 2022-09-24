@@ -93,6 +93,7 @@ lateinit var cache: Cache
 suspend fun main() {
     loadProperties()
     init()
+    setUpTimer()
     CoroutineScope(Dispatchers.Default).launch { TelegramBot.start() }
     CoroutineScope(Dispatchers.Default).launch { QQBotClient.start() }
 }
@@ -191,13 +192,12 @@ private fun configProxy() {
 private val largeFileSize = 200 * 1024L
 private val largeDirSize = 100 * 1024 * 1024L
 
-private val cacheDirs = listOf("./cache/img", "./cache/doc", "./cache/file")
+private val cachePath = "./cache"
 private val clearCacheTimer = Timer("ClearCache", true)
 
-@Deprecated("No effect")
 private fun setUpTimer() {
     clearCacheTimer.scheduleAtFixedRate(timerTask {
-        for (cacheDir in cacheDirs) {
+        for (cacheDir in File(cachePath).list() ?: emptyArray()) {
             try {
                 val path = Path(cacheDir)
                 val dir = File(path.toUri())
@@ -234,7 +234,7 @@ private fun setUpTimer() {
                 log.error(e.message, e)
             }
         }
-    }, 5000L, TimeUnit.MINUTES.toMillis(10))
+    }, 5000L, TimeUnit.MINUTES.toMillis(60))
 }
 
 private fun doDeleteCacheFile(filesToDelete: List<File>) {

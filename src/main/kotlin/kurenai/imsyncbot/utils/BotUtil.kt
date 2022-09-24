@@ -7,6 +7,7 @@ import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.qqTg
 import kurenai.imsyncbot.config.GroupConfig.tgQQ
 import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.exception.TelegramApiException
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
@@ -17,6 +18,7 @@ import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import java.io.File
 import java.io.IOException
+import java.util.*
 
 
 object BotUtil {
@@ -59,6 +61,17 @@ object BotUtil {
             log.error(e) { e.message }
         }
         return moe.kurenai.tdlight.model.media.File(fileId, fileUniqueId)
+    }
+
+    suspend fun downloadTgFile(fileId: String, fileUniqueId: String): File {
+        val tgFile = GetFile(fileId).send()
+        val cacheFile = tgFile.filePath?.let { File(it) }
+        return if (cacheFile?.exists() == true) {
+            cacheFile
+        } else {
+            val url = tgFile.getFileUrl(TelegramBot.token)
+            downloadDoc(tgFile.filePath?.substringAfterLast("/") ?: UUID.randomUUID().toString(), url)
+        }
     }
 
     suspend fun downloadDoc(filename: String, url: String, reject: Boolean = false): File {

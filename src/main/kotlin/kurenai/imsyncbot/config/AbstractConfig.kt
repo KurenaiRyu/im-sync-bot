@@ -15,7 +15,7 @@ abstract class AbstractConfig<T> {
     open val mapper = configDefaultMapper
     abstract val items: ArrayList<T>
     protected abstract val typeRef: TypeReference<ArrayList<T>>
-    protected abstract val file: File
+    abstract val file: File
 
     init {
         configs.add(this)
@@ -30,15 +30,16 @@ abstract class AbstractConfig<T> {
         refresh()
     }
 
-    fun reload() {
-        load()
-    }
+    fun reload() = load()
 
-    fun load() {
+    fun load(file: File = this.file) {
         if (file.exists()) {
-            items.clear()
-            items.addAll(mapper.readValue(file, typeRef))
-            refresh()
+            val configs = mapper.readValue(file, typeRef)
+            if (configs.isNotEmpty()) {
+                items.clear()
+                items.addAll(configs)
+                refresh()
+            }
         }
     }
 

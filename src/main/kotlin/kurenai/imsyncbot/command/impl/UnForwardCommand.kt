@@ -13,7 +13,6 @@ class UnForwardCommand : AbstractTelegramCommand() {
 
     override val command = "unfwd"
     override val help: String = "排除群或用户消息（但事件仍会接受）"
-    override val onlyGroupMessage = true
 
     override suspend fun execute(update: Update, message: Message): String? {
         return if (message.isReply()) {
