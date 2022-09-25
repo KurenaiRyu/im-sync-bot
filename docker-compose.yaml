@@ -2,7 +2,7 @@ version: '3.5'
 services:
   bot:
 #    build: .  #自行打包镜像则去除该注释
-    image: kurenai9/im-sync-bot:1.1.0
+    image: kurenai9/im-sync-bot:1.2.0
     container_name: bot
     restart: always
     logging:
@@ -11,6 +11,7 @@ services:
         max-size: "50m"
     volumes:
       #      - ./api-data/:/var/lib/telegram-bot-api/ #本地api配置
+      - ./mirai/:/deployments/mirai/
       - ./config/:/deployments/config/
       - ./config/config.yaml:/deployments/application.yaml
       - ./cache:/deployments/cache
