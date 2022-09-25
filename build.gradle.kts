@@ -74,6 +74,7 @@ dependencies {
     implementation("org.apache.commons:commons-io:1.3.2")
     implementation("com.esotericsoftware", "kryo", "5.1.1")
     implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
+    implementation("org.jsoup:jsoup:1.15.3")
     implementation("io.github.kurenairyu", "simple-cache", "1.2.0-SNAPSHOT")
 
     implementation("org.redisson:redisson:3.17.6")
