@@ -48,7 +48,6 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.timerTask
-import kotlin.io.path.Path
 
 /**
  * @author Kurenai
@@ -192,22 +191,20 @@ private fun configProxy() {
 private val largeFileSize = 200 * 1024L
 private val largeDirSize = 100 * 1024 * 1024L
 
-private val cachePath = "./cache"
+private const val cachePath = "./cache"
 private val clearCacheTimer = Timer("ClearCache", true)
 
 private fun setUpTimer() {
     clearCacheTimer.scheduleAtFixedRate(timerTask {
-        for (cacheDir in File(cachePath).list() ?: emptyArray()) {
+        for (dirFile in File(cachePath).listFiles() ?: emptyArray()) {
             try {
-                val path = Path(cacheDir)
-                val dir = File(path.toUri())
-                if (!dir.exists()) {
-                    log.warn("${path.toUri()} not exist!")
+                if (!dirFile.exists()) {
+                    log.warn("${dirFile.absolutePath} not exist!")
                     continue
                 }
 
-                val sizeOfDir = FileUtils.sizeOfDirectory(dir)
-                log.info("Cache folder [${dir.name}] size: ${sizeOfDir.humanReadableByteCountBin()}")
+                val sizeOfDir = FileUtils.sizeOfDirectory(dirFile)
+                log.info("Cache folder [${dirFile.name}] size: ${sizeOfDir.humanReadableByteCountBin()}")
                 val filesToDelete = ArrayList<File>()
                 val files = CacheService.getNotExistFiles()?.map { File(it.value) }
                 if (files?.isNotEmpty() == true) filesToDelete.addAll(filesToDelete)
@@ -216,14 +213,14 @@ private fun setUpTimer() {
                 if (sizeOfDir > largeDirSize) {
                     filesToDelete.addAll(
                         FileUtils.listFiles(
-                            dir,
+                            dirFile,
                             SizeFileFilter(largeFileSize),
                             null
                         ) as Collection<File>
                     )
                     filesToDelete.addAll(
                         FileUtils.listFiles(
-                            dir,
+                            dirFile,
                             AgeFileFilter(oldestAllowedFileDate),
                             null
                         ) as Collection<File>
