@@ -1,5 +1,6 @@
 package kurenai.imsyncbot.handler.tg
 
+import jodd.util.StringPool
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.GroupConfig.bannedGroups
 import kurenai.imsyncbot.config.GroupConfig.tgQQ
@@ -13,17 +14,16 @@ import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
 import moe.kurenai.tdlight.exception.TelegramApiException
+import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.media.PhotoSize
 import moe.kurenai.tdlight.model.message.Message
+import moe.kurenai.tdlight.model.message.MessageEntity
 import moe.kurenai.tdlight.request.GetFile
 import mu.KotlinLogging
 import net.mamoe.mirai.contact.Group
-import net.mamoe.mirai.message.data.Image
-import net.mamoe.mirai.message.data.MessageChain
-import net.mamoe.mirai.message.data.MessageChainBuilder
+import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
-import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import java.io.File
 import java.io.IOException
@@ -95,7 +95,7 @@ class TgMessageHandler : TelegramHandler {
                 uploadAndSend(group, file)
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
-                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.caption!!, builder)
+                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.captionEntities, message.caption, builder)
                     CacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
@@ -105,7 +105,7 @@ class TgMessageHandler : TelegramHandler {
                 uploadAndSend(group, file, video.fileName ?: video.fileId.plus(".mp4"))
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
-                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.caption!!, builder)
+                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.captionEntities, message.caption, builder)
                     CacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
@@ -116,7 +116,7 @@ class TgMessageHandler : TelegramHandler {
                 BotUtil.mp42gif(animation.fileId, tgFile)?.let { gifFile ->
                     gifFile.toExternalResource().use {
                         builder.add(group.uploadImage(it))
-                        formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, "", builder)
+                        formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
                         CacheService.cache(group.sendMessage(builder.build()), message)
                     }
                 }
@@ -128,7 +128,7 @@ class TgMessageHandler : TelegramHandler {
                     BotUtil.mp42gif(sticker.fileId, getTgFile(sticker.fileId, sticker.fileUniqueId))?.let { gifFile ->
                         gifFile.toExternalResource().use {
                             builder.add(group.uploadImage(it))
-                            formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, "", builder)
+                            formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
                             CacheService.cache(group.sendMessage(builder.build()), message)
                         }
                     }
@@ -138,7 +138,7 @@ class TgMessageHandler : TelegramHandler {
                     formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, sticker.emoji ?: "NaN", builder)
                 } else {
                     getImage(group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
-                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, "", builder)
+                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
                 }
                 group.sendMessage(builder.build()).let {
                     CacheService.cache(it, message)
@@ -151,7 +151,7 @@ class TgMessageHandler : TelegramHandler {
                 if (!isMaster) group.sendMessage("Upload by $senderName.")
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
-                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, caption, builder)
+                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.captionEntities, message.caption, builder)
                     CacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
@@ -164,12 +164,12 @@ class TgMessageHandler : TelegramHandler {
                         }
                     }
                     .mapNotNull { getImage(group, it.fileId, it.fileUniqueId) }.forEach(builder::add)
-                formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, caption, builder)
+                formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.captionEntities, message.caption, builder)
                 CacheService.cache(group.sendMessage(builder.build()), message)
             }
             message.hasText() -> {
                 val builder = MessageChainBuilder()
-                formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.text!!, builder)
+                formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.entities, message.text, builder)
                 CacheService.cache(group.sendMessage(builder.build()), message)
             }
         }
@@ -199,17 +199,39 @@ class TgMessageHandler : TelegramHandler {
         isMaster: Boolean,
         id: Long,
         username: String,
+        entities: List<MessageEntity>?,
+        content: String?,
+        builder: MessageChainBuilder,
+    ) {
+        var msg = content ?: ""
+        entities?.forEach { entity ->
+            val user = entity.user
+            if (user != null) {
+                UserConfig.items.find { it.tg == user.id }?.qq
+            } else if (entity.type == MessageEntityType.MENTION) {
+                UserConfig.items.find { it.username == username }?.qq
+            } else {
+                null
+            }?.let {
+                builder.add(At(it))
+                msg = msg.removeRange(entity.offset, entity.offset + entity.length)
+            }
+        }
+        formatMsgAndQuote(quoteMsgChain, isMaster, id, username, msg, builder)
+    }
+
+    private fun formatMsgAndQuote(
+        quoteMsgChain: MessageChain?,
+        isMaster: Boolean,
+        id: Long,
+        username: String,
         content: String,
         builder: MessageChainBuilder,
     ) {
-        val msg = if (quoteMsgChain != null) {
+        if (quoteMsgChain != null) {
             builder.add(quoteMsgChain.quote())
-//            content.takeIf { it.isNotEmpty() } ?: " "
-            content
-        } else {
-            content
         }
-        builder.add(formatMsg(isMaster, id, username, msg))
+        builder.add(formatMsg(isMaster, id, username, content))
     }
 
     private fun formatMsg(
