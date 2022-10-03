@@ -33,8 +33,11 @@ class RecallCommand : AbstractTelegramCommand() {
                     SendMessage(message.chatId, "未能找到对应的qq消息").send()
                 else {
                     bot.getGroup(qqMsg.source.targetId)?.recallMessage(qqMsg)
-                    DeleteMessage(message.chatId, replyMsg.messageId!!).send()
-                    DeleteMessage(message.chatId, message.messageId!!).send()
+                    if (!DeleteMessage(message.chatId, replyMsg.messageId!!).send()) {
+                        SendMessage("已删除", message.chatId).send()
+                    } else {
+                        DeleteMessage(message.chatId, message.messageId!!).send()
+                    }
                 }
             }
             null

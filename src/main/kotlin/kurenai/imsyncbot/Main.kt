@@ -196,7 +196,7 @@ private val clearCacheTimer = Timer("ClearCache", true)
 
 private fun setUpTimer() {
     clearCacheTimer.scheduleAtFixedRate(timerTask {
-        for (dirFile in File(cachePath).listFiles() ?: emptyArray()) {
+        for (dirFile in File(cachePath).listFiles()?.filter { it.isDirectory } ?: emptyList()) {
             try {
                 if (!dirFile.exists()) {
                     log.warn("${dirFile.absolutePath} not exist!")
