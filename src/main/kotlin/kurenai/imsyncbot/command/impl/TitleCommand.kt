@@ -3,11 +3,10 @@ package kurenai.imsyncbot.command.impl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.command.Bannable
-import kurenai.imsyncbot.config.GroupConfig
-import kurenai.imsyncbot.config.UserConfig
-import kurenai.imsyncbot.qq.QQBotClient.bot
+import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.ParseMode
@@ -32,13 +31,14 @@ class TitleCommand : AbstractTelegramCommand(), Bannable {
     override val onlySupperAdmin = false
 
     override suspend fun execute(update: Update, message: Message): String? {
+        val bot = getBotOrThrow()
         val param = message.text!!.param()
         if (message.isReply()) {
             val replyMsg = message.replyToMessage!!
             try {
                 val from = replyMsg.from!!
-                UserConfig.superAdmins.firstOrNull { message.from?.id == it }?.also {
-                    if (!handleLinkCase(from, message, param)) {
+                bot.userConfig.superAdmins.firstOrNull { message.from?.id == it }?.also {
+                    if (!handleLinkCase(bot, from, message, param)) {
                         CoroutineScope(Dispatchers.Default).launch {
                             val qqMsg = CacheService.getQQByTg(replyMsg)
                             if (qqMsg == null) {
@@ -46,7 +46,7 @@ class TitleCommand : AbstractTelegramCommand(), Bannable {
                                     replyToMessageId = message.messageId
                                 }.send()
                             } else {
-                                bot.getGroup(qqMsg.source.targetId)?.getMember(qqMsg.source.fromId)?.also {
+                                bot.qq.qqBot.getGroup(qqMsg.source.targetId)?.getMember(qqMsg.source.fromId)?.also {
                                     modifyTitle(it, message, param)
                                 } ?: kotlin.run {
                                     SendMessage(message.chatId, "未能找到对应的qq用户或群组").apply {
@@ -67,7 +67,7 @@ class TitleCommand : AbstractTelegramCommand(), Bannable {
             }
         } else {
             val from = message.from!!
-            if (!handleLinkCase(from, message, param)) {
+            if (!handleLinkCase(bot, from, message, param)) {
                 SendMessage(message.chatId, "未能找到对应的qq用户").apply {
                     this.replyToMessageId = message.messageId
                 }.send()
@@ -76,10 +76,10 @@ class TitleCommand : AbstractTelegramCommand(), Bannable {
         return null
     }
 
-    private fun handleLinkCase(target: User, message: Message, modifyTitle: String): Boolean {
-        return UserConfig.links.firstOrNull { it.tg == target.id && it.qq != null }?.also { user ->
+    private fun handleLinkCase(bot: ImSyncBot, target: User, message: Message, modifyTitle: String): Boolean {
+        return bot.userConfig.links.firstOrNull { it.tg == target.id && it.qq != null }?.also { user ->
             CoroutineScope(Dispatchers.Default).launch {
-                GroupConfig.tgQQ[message.chat.id]?.let { bot.getGroup(it) }?.getMember(user.qq!!)?.also {
+                bot.groupConfig.tgQQ[message.chat.id]?.let { bot.qq.qqBot.getGroup(it) }?.getMember(user.qq!!)?.also {
                     modifyTitle(it, message, modifyTitle)
                 }
             }

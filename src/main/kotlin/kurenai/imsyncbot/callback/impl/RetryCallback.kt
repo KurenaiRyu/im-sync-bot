@@ -1,9 +1,9 @@
 package kurenai.imsyncbot.callback.impl
 
 import kurenai.imsyncbot.callback.Callback
+import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
-import kurenai.imsyncbot.tgMessageHandler
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardMarkup
 import moe.kurenai.tdlight.model.message.Message
@@ -38,7 +38,7 @@ class RetryCallback : Callback() {
         }.send()
 
         try {
-            tgMessageHandler.onMessage(originMessage)
+            getBotOrThrow().tgMessageHandler.onMessage(originMessage)
             DeleteMessage(chatId, messageId).send()
         } catch (e: Exception) {
             log.error(e) { e.message }

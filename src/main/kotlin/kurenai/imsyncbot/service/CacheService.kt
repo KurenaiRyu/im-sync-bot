@@ -1,8 +1,7 @@
 package kurenai.imsyncbot.service
 
-import kurenai.imsyncbot.cache
 import kurenai.imsyncbot.domain.FileCache
-import kurenai.imsyncbot.redisson
+import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.request.message.GetMessageInfo
@@ -36,53 +35,55 @@ object CacheService {
     val TTL = TimeUnit.DAYS.toMillis(5)
     val BEGIN = LocalDateTime.of(2022, 1, 1, 0, 0, 0).toEpochSecond(ZoneOffset.MIN)
 
-    val hit: RAtomicLong = redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("HIT"))
-    val total: RAtomicLong = redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("TOTAL"))
+    suspend fun hit(): RAtomicLong = getBotOrThrow().redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("HIT"))
+    suspend fun total(): RAtomicLong = getBotOrThrow().redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("TOTAL"))
 
     private val log = KotlinLogging.logger {}
 
-    fun cache(messageChain: MessageChain, message: Message) {
+    suspend fun cache(messageChain: MessageChain, message: Message) {
+        val bot = getBotOrThrow()
         try {
             val qqMsgId: String = messageChain.cacheId()
             val tgMsgId: String = message.cacheId()
 
-            cache.put(QQ_TG_MSG_ID_CACHE_KEY, qqMsgId, tgMsgId, TTL)
-            cache.put(TG_QQ_MSG_ID_CACHE_KEY, tgMsgId, qqMsgId, TTL)
-            cache.put(QQ_MSG_CACHE_KEY, qqMsgId, messageChain.serializeToJsonString(), TTL)
+            bot.cache.put(QQ_TG_MSG_ID_CACHE_KEY, qqMsgId, tgMsgId, TTL)
+            bot.cache.put(TG_QQ_MSG_ID_CACHE_KEY, tgMsgId, qqMsgId, TTL)
+            bot.cache.put(QQ_MSG_CACHE_KEY, qqMsgId, messageChain.serializeToJsonString(), TTL)
             cache(message)
         } catch (e: Exception) {
             log.warn("缓存信息失败", e)
         }
     }
 
-    fun cache(receipt: MessageReceipt<*>, message: Message) {
+    suspend fun cache(receipt: MessageReceipt<*>, message: Message) {
         cache(receipt.sourceMessage.plus(receipt.source), message)
     }
 
-    fun cache(message: Message) {
-        cache.put(TG_MSG_CACHE_KEY, message.cacheId(), message, TTL)
+    suspend fun cache(message: Message) {
+        getBotOrThrow().cache.put(TG_MSG_CACHE_KEY, message.cacheId(), message, TTL)
     }
 
-    fun cachePrivateChat(friendId: Long, messageId: Int) {
-        cache.put(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId, friendId)
-        cache.put(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId, messageId)
+    suspend fun cachePrivateChat(friendId: Long, messageId: Int) {
+        val bot = getBotOrThrow()
+        bot.cache.put(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId, friendId)
+        bot.cache.put(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId, messageId)
     }
 
-    fun cacheFile(qqFileId: String, fileCache: FileCache) {
-        cache.put(TG_FILE_CACHE_KEY, qqFileId, fileCache, TTL)
+    suspend fun cacheFile(qqFileId: String, fileCache: FileCache) {
+        getBotOrThrow().cache.put(TG_FILE_CACHE_KEY, qqFileId, fileCache, TTL)
     }
 
-    fun cacheFile(file: File) {
-        val ttlSet = redisson.getScoredSortedSet<String>(TG_FILE_CACHE_TTL_KEY)
+    suspend fun cacheFile(file: File) {
+        val ttlSet = getBotOrThrow().redisson.getScoredSortedSet<String>(TG_FILE_CACHE_TTL_KEY)
         ttlSet.addScore(file.path, LocalDateTime.now().plusHours(1).durationSeconds())
     }
 
-    fun cacheImg(image: File) {
+    suspend fun cacheImg(image: File) {
         cacheFile(image)
     }
 
-    fun getNotExistFiles(): MutableCollection<ScoredEntry<String>>? {
-        val ttlSet = redisson.getScoredSortedSet<String>(TG_FILE_CACHE_TTL_KEY)
+    suspend fun getNotExistFiles(): MutableCollection<ScoredEntry<String>>? {
+        val ttlSet = getBotOrThrow().redisson.getScoredSortedSet<String>(TG_FILE_CACHE_TTL_KEY)
         val now = getNowSeconds().toDouble()
         //TODO atomic by script
         val entries = ttlSet.entryRange(0.0, true, now, false)
@@ -90,39 +91,39 @@ object CacheService {
         return entries
     }
 
-    fun getFile(qqFileId: String): FileCache? {
-        return cache.get<String?, FileCache?>(TG_FILE_CACHE_KEY, qqFileId).also {
-            val t = total.incrementAndGet()
+    suspend fun getFile(qqFileId: String): FileCache? {
+        return getBotOrThrow().cache.get<String?, FileCache?>(TG_FILE_CACHE_KEY, qqFileId).also {
+            val t = total().incrementAndGet()
             if (it != null) {
-                val h = hit.incrementAndGet()
+                val h = hit().incrementAndGet()
                 val formatter = NumberFormat.getPercentInstance()
                 formatter.maximumFractionDigits = 2
 
                 log.info { "Cache hit: $h / $t (${formatter.format(h / t.toFloat())})" }
             } else {
-                hit.get()
+                hit().get()
             }
         }
     }
 
-    fun getQQIdByTg(message: Message): Pair<Long, Int>? {
+    suspend fun getQQIdByTg(message: Message): Pair<Long, Int>? {
         return getQQIdByTg(message.chat.id, message.messageId!!)
     }
 
-    fun getQQIdByTg(chatId: Long, messageId: Int): Pair<Long, Int>? {
-        return cache.get<String, String?>(TG_QQ_MSG_ID_CACHE_KEY, getTgCacheId(chatId, messageId))?.splitCacheId()
+    suspend fun getQQIdByTg(chatId: Long, messageId: Int): Pair<Long, Int>? {
+        return getBotOrThrow().cache.get<String, String?>(TG_QQ_MSG_ID_CACHE_KEY, getTgCacheId(chatId, messageId))?.splitCacheId()
     }
 
-    fun getTgIdByQQ(group: Long, id: Int): Pair<Long, Int>? {
-        return cache.get<String, String?>(QQ_TG_MSG_ID_CACHE_KEY, getQQCacheId(group, id))?.splitCacheId()
+    suspend fun getTgIdByQQ(group: Long, id: Int): Pair<Long, Int>? {
+        return getBotOrThrow().cache.get<String, String?>(QQ_TG_MSG_ID_CACHE_KEY, getQQCacheId(group, id))?.splitCacheId()
     }
 
-    fun getQQ(group: Long, id: Int): MessageChain? {
+    suspend fun getQQ(group: Long, id: Int): MessageChain? {
         return getOfflineQQ(group, id)
     }
 
-    fun getOfflineQQ(group: Long, id: Int): MessageChain? {
-        val json: String? = cache.get(QQ_MSG_CACHE_KEY, getQQCacheId(group, id))
+    suspend fun getOfflineQQ(group: Long, id: Int): MessageChain? {
+        val json: String? = getBotOrThrow().cache.get(QQ_MSG_CACHE_KEY, getQQCacheId(group, id))
         return if (json == null) {
             log.debug { "QQ source not found by $group:$id" }
             null
@@ -136,7 +137,7 @@ object CacheService {
         }
     }
 
-    fun getQQByTg(message: Message): MessageChain? {
+    suspend fun getQQByTg(message: Message): MessageChain? {
         val msgId = getQQIdByTg(message.chat.id, message.messageId!!)
         return if (msgId == null) {
             log.debug { "QQ msg id not found by ${message.cacheId()}" }
@@ -146,7 +147,7 @@ object CacheService {
         }
     }
 
-    fun getQQByTg(chatId: Long, messageId: Int): MessageChain? {
+    suspend fun getQQByTg(chatId: Long, messageId: Int): MessageChain? {
         val msgId = getQQIdByTg(chatId, messageId)
         return if (msgId == null) {
             log.debug { "QQ msg id not found by $msgId" }
@@ -161,7 +162,7 @@ object CacheService {
     }
 
     suspend fun getTg(chatId: Long, messageId: Int): Message? {
-        return cache.get(TG_MSG_CACHE_KEY, getTgCacheId(chatId, messageId)) ?: getOnlineTg(chatId.toString(), messageId)
+        return getBotOrThrow().cache.get(TG_MSG_CACHE_KEY, getTgCacheId(chatId, messageId)) ?: getOnlineTg(chatId.toString(), messageId)
     }
 
     suspend fun getOnlineTg(chatId: String?, messageId: Int): Message? {
@@ -177,12 +178,12 @@ object CacheService {
         }
     }
 
-    fun getPrivateChannelMessageId(friendId: Long): Int? {
-        return cache.get(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId)
+    suspend fun getPrivateChannelMessageId(friendId: Long): Int? {
+        return getBotOrThrow().cache.get(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId)
     }
 
-    fun getFriendId(messageId: Int): Long? {
-        return cache.get(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId)
+    suspend fun getFriendId(messageId: Int): Long? {
+        return getBotOrThrow().cache.get(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId)
     }
 
     private fun getTgCacheId(chatId: Long, messageId: Int): String {

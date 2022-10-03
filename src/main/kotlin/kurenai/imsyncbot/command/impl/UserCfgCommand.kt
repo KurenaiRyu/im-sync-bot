@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
 import moe.kurenai.tdlight.model.media.InputFile
@@ -17,15 +17,16 @@ class UserCfgCommand : AbstractTelegramCommand() {
     override val onlyUserMessage = true
 
     override suspend fun execute(update: Update, message: Message): String? {
+        val bot = getBotOrThrow()
         return if (message.isReply()) {
             message.replyToMessage?.document?.let { doc ->
                 val file = BotUtil.downloadTgFile(doc.fileId, doc.fileUniqueId)
-                UserConfig.load(file)
+                bot.userConfig.load(file)
                 "配置已更新"
             } ?: "无效引用"
         } else {
-            UserConfig.save()
-            SendDocument(message.chatId, InputFile(UserConfig.file)).send()
+            bot.userConfig.save()
+            SendDocument(message.chatId, InputFile(bot.userConfig.file)).send()
             null
         }
     }

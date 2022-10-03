@@ -7,43 +7,24 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import io.github.kurenairyu.cache.Cache
-import io.github.kurenairyu.cache.redis.lettuce.LettuceCache
-import io.github.kurenairyu.cache.redis.lettuce.jackson.JacksonCodec
 import io.github.kurenairyu.cache.redis.lettuce.jackson.RecordNamingStrategyPatchModule
-import io.lettuce.core.RedisURI
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kurenai.imsyncbot.Main.Companion.log
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.command.AbstractQQCommand
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.command.InlineCommandHandler
 import kurenai.imsyncbot.config.AbstractConfig
-import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.handler.qq.QQHandler
 import kurenai.imsyncbot.handler.qq.QQMessageHandler
 import kurenai.imsyncbot.handler.tg.TelegramHandler
 import kurenai.imsyncbot.handler.tg.TgMessageHandler
-import kurenai.imsyncbot.qq.QQBotClient
-import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.TelegramBot
-import kurenai.imsyncbot.utils.HttpUtil
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.filefilter.AgeFileFilter
 import org.apache.commons.io.filefilter.SizeFileFilter
 import org.apache.commons.lang3.time.DateUtils
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
-import org.redisson.Redisson
-import org.redisson.api.RedissonClient
-import org.redisson.codec.JsonJacksonCodec
-import org.redisson.config.Config
 import org.reflections.Reflections
 import java.io.File
-import java.net.InetSocketAddress
-import java.net.Proxy
 import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -54,13 +35,8 @@ import kotlin.concurrent.timerTask
  * @since 7/1/2022 09:31:04
  */
 
-class Main {
-    companion object {
-        val log: Logger = LogManager.getLogger()
-    }
-}
-
-val mapper = jacksonObjectMapper()
+internal val log: Logger = LogManager.getLogger()
+internal val mapper: ObjectMapper = jacksonObjectMapper()
     .registerModules(Jdk8Module(), JavaTimeModule(), RecordNamingStrategyPatchModule())
     .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
     .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
@@ -72,68 +48,60 @@ val mapper = jacksonObjectMapper()
         ObjectMapper.DefaultTyping.EVERYTHING
     )
 
-val reflections = Reflections("kurenai.imsyncbot")
-val dfs = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+internal val reflections = Reflections("kurenai.imsyncbot")
+internal val dfs: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
-val configs = ArrayList<AbstractConfig<*>>()
-val callbacks = reflections.getSubTypesOf(Callback::class.java).map { it.getConstructor().newInstance() }
-val tgCommands = ArrayList<AbstractTelegramCommand>()
-val qqCommands = ArrayList<AbstractQQCommand>()
-val inlineCommands = HashMap<String, InlineCommandHandler>()
-val qqHandlers = ArrayList<QQHandler>()
-val tgHandlers = ArrayList<TelegramHandler>()
+internal val configs = ArrayList<AbstractConfig<*>>()
+internal val callbacks = reflections.getSubTypesOf(Callback::class.java).map { it.getConstructor().newInstance() }
+internal val tgCommands = ArrayList<AbstractTelegramCommand>()
+internal val qqCommands = ArrayList<AbstractQQCommand>()
+internal val inlineCommands = HashMap<String, InlineCommandHandler>()
+internal val qqHandlers = ArrayList<QQHandler>()
+internal val tgHandlers = ArrayList<TelegramHandler>()
 
-lateinit var tgMessageHandler: TgMessageHandler
-lateinit var qqMessageHandler: QQMessageHandler
-lateinit var configProperties: ConfigProperties
-lateinit var redisson: RedissonClient
-lateinit var cache: Cache
+internal lateinit var instants: MutableList<ImSyncBot>
 
 suspend fun main() {
     loadProperties()
-    init()
-    setUpTimer()
-    CoroutineScope(Dispatchers.Default).launch { TelegramBot.start() }
-    CoroutineScope(Dispatchers.Default).launch { QQBotClient.start() }
+    commonInit()
+    instants.forEach { it.start() }
 }
 
 fun loadProperties() {
     val mapper = ObjectMapper(YAMLFactory()).disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
         .setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
-    configProperties = mapper.readValue(File("./config/config.yaml"), ConfigProperties::class.java)
+    instants = File("./config").walk().mapNotNull { file ->
+        if (file.name == "config.yaml" || file.name == "config.yml") {
+            file.parentFile.path to mapper.readValue(file, ConfigProperties::class.java)
+        } else null
+    }.map { (path, props) -> ImSyncBot(path, props) }.toMutableList()
+        .takeIf { it.isNotEmpty() } ?: throw IllegalStateException("找不到配置文件，请确认配置文件路径是否在 ./config/config.yaml")
 }
 
-fun init() {
-    redisson = redissonClient()
-    cache = cache()
-
-    checkRedisCodec()
-    configProxy()
-    initUserConfig()
-
+fun commonInit() {
     registerTgCommand()
     registerQQCommand()
     registerTgHandler()
     registerQQHandler()
-
+    setUpTimer()
 }
 
 fun registerTgHandler() {
     reflections.getSubTypesOf(TelegramHandler::class.java)
+        .filter { it != TgMessageHandler::class.java }
         .map { it.getDeclaredConstructor().newInstance() }
         .forEach {
             tgHandlers.add(it)
-            if (!::tgMessageHandler.isInitialized && it is TgMessageHandler) tgMessageHandler = it
             log.info("Registered telegram handler:  ${it.handleName()}(${it::class.java.simpleName})")
         }
 }
 
 fun registerQQHandler() {
     reflections.getSubTypesOf(QQHandler::class.java)
+        .filter { it != QQMessageHandler::class.java }
         .map { it.getDeclaredConstructor().newInstance() }
         .forEach {
             qqHandlers.add(it)
-            if (!::qqMessageHandler.isInitialized && it is QQMessageHandler) qqMessageHandler = it
             log.info("Registered qq handler:  ${it.handleName()}(${it::class.java.simpleName})")
         }
 }
@@ -157,37 +125,6 @@ private fun registerQQCommand() {
         }
 }
 
-private fun redissonClient(): RedissonClient {
-    val redissonConfig = Config()
-    redissonConfig.codec = JsonJacksonCodec(mapper)
-    redissonConfig.useSingleServer()
-        .setAddress("redis://${configProperties.redis.host}:${configProperties.redis.port}")
-        .setDatabase(configProperties.redis.database)
-    return Redisson.create(redissonConfig)
-}
-
-private fun cache(): Cache {
-    val redisURI = RedisURI.builder()
-        .withHost(configProperties.redis.host)
-        .withPort(configProperties.redis.port)
-        .withDatabase(configProperties.redis.database)
-        .build()
-    return LettuceCache(
-        redisURI, JacksonCodec<Any>(mapper)
-    )
-}
-
-private fun initUserConfig() {
-    UserConfig.setMaster(configProperties.handler)
-}
-
-private fun configProxy() {
-    val proxy = configProperties.bot.telegram.proxy
-    if (proxy.type != Proxy.Type.DIRECT) {
-        HttpUtil.PROXY = Proxy(proxy.type, InetSocketAddress(proxy.host, proxy.port))
-    }
-}
-
 private val largeFileSize = 200 * 1024L
 private val largeDirSize = 100 * 1024 * 1024L
 
@@ -206,10 +143,8 @@ private fun setUpTimer() {
                 val sizeOfDir = FileUtils.sizeOfDirectory(dirFile)
                 log.info("Cache folder [${dirFile.name}] size: ${sizeOfDir.humanReadableByteCountBin()}")
                 val filesToDelete = ArrayList<File>()
-                val files = CacheService.getNotExistFiles()?.map { File(it.value) }
-                if (files?.isNotEmpty() == true) filesToDelete.addAll(filesToDelete)
 
-                val oldestAllowedFileDate = DateUtils.addMinutes(Date(), -10)
+                val oldestAllowedFileDate = DateUtils.addMinutes(Date(), -60)
                 if (sizeOfDir > largeDirSize) {
                     filesToDelete.addAll(
                         FileUtils.listFiles(
@@ -243,14 +178,5 @@ private fun doDeleteCacheFile(filesToDelete: List<File>) {
             it.delete()
         } //I don't want an exception if a file is not deleted. Otherwise use filesToDelete.next().delete() in a try/catch
         log.info("Clear ${filesToDelete.size} cache files.")
-    }
-}
-
-private fun checkRedisCodec() {
-    val tgProperties = configProperties.bot.telegram
-    val serializeType: String? = cache.get("SERIALIZE_TYPE", tgProperties.token.substringBefore(":"))
-    if ("json" != serializeType?.lowercase()) {
-        cache.clearAll()
-        cache.put("SERIALIZE_TYPE", tgProperties.token.substringBefore(":"), "json")
     }
 }

@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.getBotOrThrow
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import mu.KotlinLogging
@@ -19,7 +19,7 @@ class SuperAdminCommand : AbstractTelegramCommand() {
             val user = message.replyToMessage!!.from!!
             if (user.isBot) "机器人无法成为管理员"
             else {
-                UserConfig.admin(user.id, isSuper = true, username = user.username)
+                getBotOrThrow().userConfig.admin(user.id, isSuper = true, username = user.username)
                 "添加超级管理员成功"
             }
         } else {

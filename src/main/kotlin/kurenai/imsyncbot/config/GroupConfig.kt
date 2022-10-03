@@ -4,7 +4,9 @@ import com.fasterxml.jackson.core.type.TypeReference
 import moe.kurenai.tdlight.model.message.Message
 import java.io.File
 
-object GroupConfig : AbstractConfig<Group>() {
+class GroupConfig(
+    configPath: String
+) : AbstractConfig<Group>() {
 
     var defaultQQGroup: Long = 0
     var defaultTgGroup: Long = 0
@@ -15,7 +17,7 @@ object GroupConfig : AbstractConfig<Group>() {
     var picBannedGroups = emptyList<Long>()
     var filterGroups = emptyList<Long>()
     override val items = ArrayList<Group>()
-    override val file = File("./config/group.json")
+    override val file = File(configPath, "group.json")
     override val typeRef = object : TypeReference<ArrayList<Group>>() {}
 
     init {
@@ -124,8 +126,8 @@ object GroupConfig : AbstractConfig<Group>() {
 
     override fun addAll0(configs: Collection<Group>) {
         val tgs = configs.map { it.tg }
-        GroupConfig.items.removeIf { tgs.contains(it.tg) }
-        GroupConfig.items.addAll(configs)
+        items.removeIf { tgs.contains(it.tg) }
+        items.addAll(configs)
     }
 
     override fun getConfigName(): String {

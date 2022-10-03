@@ -1,14 +1,9 @@
 package kurenai.imsyncbot.command
 
 import com.google.common.base.CaseFormat
-import kurenai.imsyncbot.config.GroupConfig
-import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.*
 import kurenai.imsyncbot.exception.BotException
-import kurenai.imsyncbot.inlineCommands
-import kurenai.imsyncbot.qqCommands
-import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
-import kurenai.imsyncbot.tgCommands
 import kurenai.imsyncbot.utils.reflections
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.inline.InlineQuery
@@ -18,7 +13,7 @@ import moe.kurenai.tdlight.request.message.SendMessage
 import mu.KotlinLogging
 import net.mamoe.mirai.event.events.MessageEvent
 
-object DelegatingCommand {
+object CommandDispatcher {
 
     private val log = KotlinLogging.logger {}
 
@@ -27,11 +22,12 @@ object DelegatingCommand {
     }
 
     suspend fun execute(update: Update, message: Message) {
+        val bot = getBotOrThrow()
         val command = message.entities!!
             .first { it.type == MessageEntityType.BOT_COMMAND }
             .text!!
             .replace("/", "")
-            .replace("@${TelegramBot.username}", "")
+            .replace("@${bot.tg.username}", "")
         if (command == "help") {
             handleHelp(message)
             return
@@ -42,23 +38,23 @@ object DelegatingCommand {
         for (handler in tgCommands) {
             if (handler.command.lowercase() == command.lowercase()) {
                 log.debug { "Match ${handler.name}" }
-                val isSupperAdmin = UserConfig.superAdmins.contains(message.from?.id)
+                val isSupperAdmin = bot.userConfig.superAdmins.contains(message.from?.id)
                 val param = message.text?.replace("/${handler.command}", "")?.trim()
                 msg = if (isSupperAdmin && param == "ban") {
-                    handleBan(message.chat.id, handler)
+                    handleBan(bot, message.chat.id, handler)
                     "Banned command: ${handler.command}"
                 } else if (isSupperAdmin && param == "unban") {
-                    handleUnban(message.chat.id, handler)
+                    handleUnban(bot, message.chat.id, handler)
                     "Unbanned command: ${handler.command}"
-                } else if (GroupConfig.statusContain(message.chat.id, handler.getCommandBannedStatus())) {
+                } else if (bot.groupConfig.statusContain(message.chat.id, handler.getCommandBannedStatus())) {
                     log.debug("Command was banned for group[${message.chat.title}(${message.chat.id})].")
                     return
                 } else {
-                    if (handler.onlyMaster && UserConfig.masterTg != message.from?.id) {
+                    if (handler.onlyMaster && bot.userConfig.masterTg != message.from?.id) {
                         "该命令只允许主人执行"
                     } else if (handler.onlySupperAdmin && !isSupperAdmin) {
                         "该命令只允许超级管理员执行"
-                    } else if (handler.onlyAdmin && !UserConfig.admins.contains(message.from?.id)) {
+                    } else if (handler.onlyAdmin && !bot.userConfig.admins.contains(message.from?.id)) {
                         "该命令只允许管理员执行"
                     } else if (handler.onlyUserMessage && !message.isUserMessage()) {
                         "该命令只允许私聊执行"
@@ -88,13 +84,13 @@ object DelegatingCommand {
         }
     }
 
-    private fun handleUnban(groupId: Long, handler: AbstractTelegramCommand) {
-        GroupConfig.removeStatus(groupId, handler.getCommandBannedStatus())
+    private fun handleUnban(bot: ImSyncBot, groupId: Long, handler: AbstractTelegramCommand) {
+        bot.groupConfig.removeStatus(groupId, handler.getCommandBannedStatus())
         log.info("Unbanned command: ${handler.command}")
     }
 
-    private fun handleBan(groupId: Long, handler: AbstractTelegramCommand) {
-        GroupConfig.addStatus(groupId, handler.getCommandBannedStatus())
+    private fun handleBan(bot: ImSyncBot, groupId: Long, handler: AbstractTelegramCommand) {
+        bot.groupConfig.addStatus(groupId, handler.getCommandBannedStatus())
         log.info("Banned command: ${handler.command}")
     }
 
@@ -142,9 +138,10 @@ object DelegatingCommand {
     }
 
     suspend fun execute(event: MessageEvent): Int {
+        val bot = getBotOrThrow()
         var matched = false
         for (handler in qqCommands) {
-            if (GroupConfig.items.any { it.qq == event.subject.id && it.status.contains(handler.getCommandBannedStatus()) })
+            if (bot.groupConfig.items.any { it.qq == event.subject.id && it.status.contains(handler.getCommandBannedStatus()) })
                 if (handler.execute(event) == 1) {
                     matched = true
                     break

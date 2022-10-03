@@ -5,7 +5,9 @@ import kurenai.imsyncbot.HandlerProperties
 import moe.kurenai.tdlight.model.message.Message
 import java.io.File
 
-object UserConfig : AbstractConfig<User>() {
+class UserConfig(
+    configPath: String
+) : AbstractConfig<User>() {
 
     var masterTg: Long = 0
     var masterQQ: Long = 0
@@ -21,7 +23,7 @@ object UserConfig : AbstractConfig<User>() {
     var admins = emptyList<Long>()
     var superAdmins = emptyList<Long>()
     override val items = ArrayList<User>()
-    override val file = File("./config/user.json")
+    override val file = File(configPath, "user.json")
     override val typeRef = object : TypeReference<ArrayList<User>>() {}
 
     init {

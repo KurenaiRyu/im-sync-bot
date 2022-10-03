@@ -4,8 +4,8 @@ import io.ktor.http.*
 import io.ktor.util.network.*
 import kotlinx.coroutines.future.await
 import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
+import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.humanReadableByteCountBin
-import kurenai.imsyncbot.telegram.TelegramBot
 import mu.KotlinLogging
 import org.apache.logging.log4j.LogManager
 import java.io.File
@@ -42,7 +42,7 @@ object HttpUtil {
         })
 
     suspend fun download(tgFile: moe.kurenai.tdlight.model.media.File, file: File): File {
-        return download(file, tgFile.getFileUrl(TelegramBot.token), true)
+        return download(file, tgFile.getFileUrl(getBotOrThrow().tg.token), true)
     }
 
     suspend fun download(file: File, url: String, enableProxy: Boolean = false): File {

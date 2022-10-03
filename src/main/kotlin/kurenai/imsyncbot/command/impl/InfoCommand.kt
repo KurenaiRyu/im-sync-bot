@@ -1,15 +1,11 @@
 package kurenai.imsyncbot.command.impl
 
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.config.GroupConfig
-import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.dfs
-import kurenai.imsyncbot.qq.QQBotClient.bot
+import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
@@ -31,18 +27,20 @@ class InfoCommand : AbstractTelegramCommand() {
     override val parseMode = ParseMode.MARKDOWN_V2
 
     override suspend fun execute(update: Update, message: Message): String? {
+        val bot = getBotOrThrow()
+        val qqBot = bot.qq.qqBot
         return if (message.isReply()) {
             val replyMessage = message.replyToMessage!!
             val user = replyMessage.from!!
-            if (user.isBot && user.username == TelegramBot.username) {
+            if (user.isBot && user.username == bot.tg.username) {
                 val qqMsg = CacheService.getQQByTg(replyMessage)
                 if (qqMsg != null) {
                     val userId = qqMsg.source.fromId
-                    val qqGroup = GroupConfig.tgQQ[message.chat.id]?.let { bot.getGroup(it) }
+                    val qqGroup = bot.groupConfig.tgQQ[message.chat.id]?.let { qqBot.getGroup(it) }
                     if (qqGroup == null) {
                         return "找不到绑定的qq群"
                     } else {
-                        val config = UserConfig.items.firstOrNull { it.qq == userId }
+                        val config = bot.userConfig.items.firstOrNull { it.qq == userId }
                         val member = qqGroup[userId]
                         if (member != null) {
 
@@ -75,7 +73,7 @@ class InfoCommand : AbstractTelegramCommand() {
                             if (config?.status?.isNotEmpty() == true)
                                 list.add("状态: ${config.status.toString().fm2md()}")
 
-                            CoroutineScope(Dispatchers.IO).launch {
+                            withContext(Dispatchers.IO) {
                                 val file = BotUtil.downloadImg("avatar-${member.id}.png", member.avatarUrl)
                                 SendPhoto(message.chatId, InputFile(file)).apply {
                                     caption = list.joinToString("\n")
@@ -98,25 +96,23 @@ class InfoCommand : AbstractTelegramCommand() {
                 list.joinToString("\n")
             }
         } else {
-            val group = GroupConfig.tgQQ[message.chat.id]?.let { bot.getGroup(it) }
+            val group = bot.groupConfig.tgQQ[message.chat.id]?.let { qqBot.getGroup(it) }
             if (group == null) {
                 return "找不到绑定的qq群"
             } else {
                 val list = ArrayList<String>()
-                val config = GroupConfig.items.firstOrNull { it.tg == message.chat.id }
+                val config = bot.groupConfig.items.firstOrNull { it.tg == message.chat.id }
                 list.add("绑定群id: `${group.id}`")
                 list.add("绑定群名称: `${group.name.format2Markdown()}`")
                 list.add("绑定群群主: `${group.owner.nick.format2Markdown()}`\\(`${group.owner.id}`\\)")
                 if (config?.status?.isNotEmpty() == true)
                     list.add("状态: ${config.status.toString().format2Markdown()}")
 
-                CoroutineScope(Dispatchers.IO).launch {
-                    val file = BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl)
-                    SendPhoto(message.chatId, InputFile(file)).apply {
-                        caption = list.joinToString("\n")
-                        parseMode = ParseMode.MARKDOWN_V2
-                    }.send()
-                }
+                val file = BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl)
+                SendPhoto(message.chatId, InputFile(file)).apply {
+                    caption = list.joinToString("\n")
+                    parseMode = ParseMode.MARKDOWN_V2
+                }.send()
                 null
             }
         }

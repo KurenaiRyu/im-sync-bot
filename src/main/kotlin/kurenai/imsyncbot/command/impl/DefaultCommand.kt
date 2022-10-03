@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.config.GroupConfig
+import kurenai.imsyncbot.getBotOrThrow
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 
@@ -12,7 +12,7 @@ class DefaultCommand : AbstractTelegramCommand() {
     override val onlyGroupMessage = true
 
     override suspend fun execute(update: Update, message: Message): String {
-        GroupConfig.default(message)
+        getBotOrThrow().groupConfig.default(message)
         return "设置默认群成功"
     }
 

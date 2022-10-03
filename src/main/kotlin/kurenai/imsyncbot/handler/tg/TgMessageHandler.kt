@@ -1,14 +1,10 @@
 package kurenai.imsyncbot.handler.tg
 
 import jodd.util.StringPool
-import kurenai.imsyncbot.config.GroupConfig
-import kurenai.imsyncbot.config.GroupConfig.bannedGroups
-import kurenai.imsyncbot.config.GroupConfig.tgQQ
-import kurenai.imsyncbot.config.UserConfig
-import kurenai.imsyncbot.configProperties
+import kurenai.imsyncbot.ConfigProperties
+import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
-import kurenai.imsyncbot.qq.QQBotClient.bot
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
@@ -28,7 +24,10 @@ import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import java.io.File
 import java.io.IOException
 
-class TgMessageHandler : TelegramHandler {
+class TgMessageHandler(
+    configProperties: ConfigProperties,
+    internal val bot: ImSyncBot
+) : TelegramHandler {
 
     private val log = KotlinLogging.logger {}
 
@@ -41,7 +40,7 @@ class TgMessageHandler : TelegramHandler {
     }
 
     override suspend fun onEditMessage(message: Message): Int {
-        if (!tgQQ.containsKey(message.chat.id)) {
+        if (!bot.groupConfig.tgQQ.containsKey(message.chat.id)) {
             return CONTINUE
         }
         CacheService.getQQByTg(message)?.recall()
@@ -54,15 +53,15 @@ class TgMessageHandler : TelegramHandler {
             log.info { "ignore command" }
             return CONTINUE
         }
-        if (!tgQQ.containsKey(message.chat.id)) {
+        if (!bot.groupConfig.tgQQ.containsKey(message.chat.id)) {
             log.info { "ignore no configProperties group" }
             return CONTINUE
         }
-        if (bannedGroups.contains(message.chat.id)) {
+        if (bot.groupConfig.bannedGroups.contains(message.chat.id)) {
             log.info { "ignore banned group" }
             return CONTINUE
         }
-        if (UserConfig.bannedIds.contains(message.from?.id)) {
+        if (bot.userConfig.bannedIds.contains(message.from?.id)) {
             log.info { "ignore banned id" }
             return CONTINUE
         }
@@ -71,15 +70,15 @@ class TgMessageHandler : TelegramHandler {
             message.replyToMessage?.let {
                 CacheService.getQQByTg(it)
             }
-        val groupId = quoteMsgChain?.source?.targetId ?: tgQQ.getOrDefault(message.chat.id, GroupConfig.defaultQQGroup)
+        val groupId = quoteMsgChain?.source?.targetId ?: bot.groupConfig.tgQQ.getOrDefault(message.chat.id, bot.groupConfig.defaultQQGroup)
         if (groupId == 0L) return CONTINUE
-        val group = bot.getGroup(groupId)
+        val group = bot.qq.qqBot.getGroup(groupId)
         if (null == group) {
             log.error { "QQ group[$groupId] not found." }
             return CONTINUE
         }
         val senderId = message.from!!.id
-        val isMaster = UserConfig.masterTg == senderId
+        val isMaster = bot.userConfig.masterTg == senderId
         val senderName = getSenderName(message)
         val caption = message.caption ?: ""
 
@@ -194,7 +193,7 @@ class TgMessageHandler : TelegramHandler {
         }
     }
 
-    private fun formatMsgAndQuote(
+    private suspend fun formatMsgAndQuote(
         quoteMsgChain: MessageChain?,
         isMaster: Boolean,
         id: Long,
@@ -207,9 +206,9 @@ class TgMessageHandler : TelegramHandler {
         entities?.forEach { entity ->
             val user = entity.user
             if (user != null) {
-                UserConfig.items.find { it.tg == user.id }?.qq
+                bot.userConfig.items.find { it.tg == user.id }?.qq
             } else if (entity.type == MessageEntityType.MENTION) {
-                UserConfig.items.find { it.username == username }?.qq
+                bot.userConfig.items.find { it.username == username }?.qq
             } else {
                 null
             }?.let {
@@ -281,15 +280,15 @@ class TgMessageHandler : TelegramHandler {
         return moe.kurenai.tdlight.model.media.File(fileId, fileUniqueId)
     }
 
-    private fun getSenderName(message: Message): String {
+    private suspend fun getSenderName(message: Message): String {
         val from = message.from!!
         if (from.username.equals("GroupAnonymousBot", true)) {
             return message.authorSignature ?: ""    // 匿名用头衔作为前缀，空头衔将会不添加前缀
         } else if (message.isChannelMessage() || from.id == 136817688L) { //tg 频道以及tg官方id不加前缀
             return ""
         } else {
-            return UserConfig.idBindings[from.id]
-                ?: UserConfig.usernameBindings[from.username]
+            return bot.userConfig.idBindings[from.id]
+                ?: bot.userConfig.usernameBindings[from.username]
                 ?: let {
                     val username = "${from.firstName} ${from.lastName ?: ""}"
                     return username.ifBlank { from.username ?: "none" }

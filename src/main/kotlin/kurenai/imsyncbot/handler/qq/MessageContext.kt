@@ -4,12 +4,10 @@ import com.fasterxml.jackson.core.exc.StreamReadException
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import kurenai.imsyncbot.config.GroupConfig
-import kurenai.imsyncbot.config.UserConfig
-import kurenai.imsyncbot.configProperties
+import kotlinx.coroutines.runBlocking
+import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.domain.QQAppMessage
 import kurenai.imsyncbot.domain.QQRichMessage
-import kurenai.imsyncbot.qq.QQBotClient
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.BotUtil.formatUsername
@@ -33,25 +31,33 @@ import org.jsoup.parser.Parser
 sealed interface MessageContext
 
 data class GroupMessageContext(
+    val bot: ImSyncBot,
     val group: Group,
     val messageChain: MessageChain,
     val senderId: Long = messageChain.source.fromId,
     val sender: NormalMember? = group[senderId],
     val senderName: String? =
         senderId
-            .let { UserConfig.idBindings[it] ?: QQBotClient.bot.getFriend(it)?.remarkOrNick } ?: sender?.remarkOrNameCardOrNick
+            .let { bot.userConfig.idBindings[it] ?: bot.qq.qqBot.getFriend(it)?.remarkOrNick } ?: sender?.remarkOrNameCardOrNick
             ?.formatUsername()
 ) : MessageContext {
 
-    private var tgMsgFormat = if (configProperties.handler.tgMsgFormat.contains("\$msg")) configProperties.handler.tgMsgFormat else "\$name: \$msg"
-    private var qqMsgFormat = if (configProperties.handler.qqMsgFormat.contains("\$msg")) configProperties.handler.qqMsgFormat else "\$name: \$msg"
+    private var tgMsgFormat = if (bot.configProperties.handler.tgMsgFormat.contains("\$msg")) bot.configProperties.handler.tgMsgFormat else "\$name: \$msg"
     private var type: MessageType? = null
 
     val simpleContent: String = messageChain.contentToString()
-    val chatId: String = (GroupConfig.qqTg[group.id] ?: GroupConfig.defaultTgGroup).toString()
-    val replyId: Int? by lazy { messageChain[QuoteReply.Key]?.let { CacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }?.second }
-    val hasReply = replyId != null
-    val rejectPic: Boolean = GroupConfig.picBannedGroups.contains(group.id)
+    val chatId: String = (bot.groupConfig.qqTg[group.id] ?: bot.groupConfig.defaultTgGroup).toString()
+    val replyId: Int? by lazy {
+        messageChain[QuoteReply.Key]?.let {
+            runBlocking(bot.tg.coroutineContext) {
+                CacheService.getTgIdByQQ(
+                    it.source.targetId,
+                    it.source.ids[0]
+                )
+            }
+        }?.second
+    }
+    val hasReply: Boolean by lazy { replyId != null }
     val normalType: Normal = Normal()
 
     suspend fun getType() = type ?: handleType(messageChain).also { type = it }
@@ -112,13 +118,13 @@ data class GroupMessageContext(
                 else lastAt = target
                 val id: Long?
                 content += if (target == group.bot.id && !hasReply) {
-                    id = UserConfig.masterTg
-                    UserConfig.masterUsername.ifBlank { id.toString() }.let {
+                    id = bot.userConfig.masterTg
+                    bot.userConfig.masterUsername.ifBlank { id.toString() }.let {
                         "[${it.formatUsername().fm2md()}](tg://user?id=$id)"
                     }
                 } else {
-                    id = UserConfig.links.find { it.qq == target }?.tg
-                    val bindName = (UserConfig.qqUsernames[target] ?: UserConfig.idBindings[target]).let {
+                    id = bot.userConfig.links.find { it.qq == target }?.tg
+                    val bindName = (bot.userConfig.qqUsernames[target] ?: bot.userConfig.idBindings[target]).let {
                         if (it.isNullOrBlank())
                             messageChain.bot.getFriend(target)?.remarkOrNick?.takeIf { it.isNotBlank() }
                                 ?: group.getMember(target)?.remarkOrNameCardOrNick?.takeIf { it.isNotBlank() }
@@ -296,7 +302,7 @@ data class GroupMessageContext(
     }
 
     inner class Forward(val msg: ForwardMessage) : MessageType {
-        val contextList = msg.nodeList.map { GroupMessageContext(group, it.messageChain, senderId, senderName = "$senderName forward from ${it.senderName}") }
+        val contextList = msg.nodeList.map { GroupMessageContext(bot, group, it.messageChain, senderId, senderName = "$senderName forward from ${it.senderName}") }
     }
 
     inner class Normal : MessageType {

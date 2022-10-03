@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.getBotOrThrow
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import mu.KotlinLogging
@@ -17,7 +17,7 @@ class AdminCommand : AbstractTelegramCommand() {
     override suspend fun execute(update: Update, message: Message): String {
         return if (message.isReply()) {
             val user = message.replyToMessage!!.from!!
-            UserConfig.admin(user.id, username = user.username)
+            getBotOrThrow().userConfig.admin(user.id, username = user.username)
             "添加管理员成功"
         } else {
             "需要引用一条消息来找到该用户"

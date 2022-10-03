@@ -3,11 +3,8 @@ package kurenai.imsyncbot.utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
-import kurenai.imsyncbot.config.GroupConfig
-import kurenai.imsyncbot.config.GroupConfig.qqTg
-import kurenai.imsyncbot.config.GroupConfig.tgQQ
+import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.exception.TelegramApiException
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
@@ -69,7 +66,7 @@ object BotUtil {
         return if (cacheFile?.exists() == true) {
             cacheFile
         } else {
-            val url = tgFile.getFileUrl(TelegramBot.token)
+            val url = tgFile.getFileUrl(getBotOrThrow().tg.token)
             downloadDoc(tgFile.filePath?.substringAfterLast("/") ?: UUID.randomUUID().toString(), url)
         }
     }
@@ -159,14 +156,6 @@ object BotUtil {
             throw e
         }
         return null
-    }
-
-    fun getQQGroupByTg(id: Long): Long {
-        return tgQQ[id] ?: GroupConfig.defaultQQGroup
-    }
-
-    fun getTgChatByQQ(id: Long): Long {
-        return qqTg[id] ?: GroupConfig.defaultTgGroup
     }
 
 }

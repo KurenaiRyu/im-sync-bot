@@ -2,10 +2,8 @@ package kurenai.imsyncbot.handler.qq
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import kurenai.imsyncbot.config.GroupConfig
-import kurenai.imsyncbot.config.GroupConfig.qqTg
-import kurenai.imsyncbot.config.UserConfig
-import kurenai.imsyncbot.configProperties
+import kurenai.imsyncbot.ConfigProperties
+import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
@@ -23,7 +21,10 @@ import net.mamoe.mirai.contact.remarkOrNameCardOrNick
 import net.mamoe.mirai.event.events.*
 import org.apache.logging.log4j.LogManager
 
-class QQMessageHandler : QQHandler {
+class QQMessageHandler(
+    configProperties: ConfigProperties,
+    internal val bot: ImSyncBot
+) : QQHandler {
 
     private val log = LogManager.getLogger()
 
@@ -47,16 +48,16 @@ class QQMessageHandler : QQHandler {
             val t = c.getType()
             kotlin.runCatching {
                 when (t) {
-                    is GroupMessageContext.App -> t.telegramMessage.send()
-                    is GroupMessageContext.GifImage -> t.getTelegramMessage().send()
-                    is GroupMessageContext.MultiImage -> t.getTelegramMessage().send()
-                    is GroupMessageContext.Rich -> t.telegramMessage.send()
-                    is GroupMessageContext.SingleImage -> if (t.shouldBeFile) t.getFileMessage().send() else t.getImageMessage().send()
-                    is GroupMessageContext.Normal -> t.telegramMessage.send()
+                    is GroupMessageContext.App -> t.telegramMessage.send(bot.tg)
+                    is GroupMessageContext.GifImage -> t.getTelegramMessage().send(bot.tg)
+                    is GroupMessageContext.MultiImage -> t.getTelegramMessage().send(bot.tg)
+                    is GroupMessageContext.Rich -> t.telegramMessage.send(bot.tg)
+                    is GroupMessageContext.SingleImage -> if (t.shouldBeFile) t.getFileMessage().send(bot.tg) else t.getImageMessage().send(bot.tg)
+                    is GroupMessageContext.Normal -> t.telegramMessage.send(bot.tg)
                     else -> null
                 }
             }.recoverCatching {
-                c.normalType.telegramMessage.send()
+                c.normalType.telegramMessage.send(bot.tg)
             }.getOrThrow()?.also { message ->
                 log.debug("Sent ${mapper.writeValueAsString(message)}")
                 if (message is Message) {
@@ -74,7 +75,7 @@ class QQMessageHandler : QQHandler {
     override suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {
         CacheService.getTgByQQ(event.group.id, event.messageIds[0])?.let { message ->
             if (enableRecall) {
-                DeleteMessage(message.chatId, message.messageId!!).send()
+                DeleteMessage(message.chatId, message.messageId!!).send(bot.tg)
             } else {
                 val text = message.text
                 if (text.isNullOrBlank()) {
@@ -87,7 +88,7 @@ class QQMessageHandler : QQHandler {
                                 message.captionEntities?.let { list.addAll(it) }
                             }
                         }
-                    }.send()
+                    }.send(bot.tg)
                 } else {
                     EditMessageText(text).apply {
                         chatId = message.chatId
@@ -95,7 +96,7 @@ class QQMessageHandler : QQHandler {
                         entities = mutableListOf(MessageEntity(MessageEntityType.STRIKETHROUGH, 0, text.length)).also { list ->
                             message.entities?.let { list.addAll(it) }
                         }
-                    }.send()
+                    }.send(bot.tg)
                 }
             }
         }
@@ -108,11 +109,11 @@ class QQMessageHandler : QQHandler {
                 val tag = "\\#入群 \\#id${event.member.id} \\#group${event.group.id}\n"
                 when (event) {
                     is MemberJoinEvent.Active -> {
-                        "$tag`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`入群`${event.group.name}`"
+                        "$tag`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`入群`${event.group.name}`"
                     }
 
                     is MemberJoinEvent.Invite -> {
-                        "$tag`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`通过`${(UserConfig.idBindings[event.invitor.id] ?: event.invitor.remarkOrNameCardOrNick).format2Markdown()}` \\#id${event.invitor.id}\\ 的邀请入群`${event.group.name}`"
+                        "$tag`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`通过`${(bot.userConfig.idBindings[event.invitor.id] ?: event.invitor.remarkOrNameCardOrNick).format2Markdown()}` \\#id${event.invitor.id}\\ 的邀请入群`${event.group.name}`"
                     }
 
                     else -> return
@@ -123,11 +124,11 @@ class QQMessageHandler : QQHandler {
                 val tag = "\\#退群 \\#id${event.member.id} \\#group${event.group.id}\n"
                 when (event) {
                     is MemberLeaveEvent.Kick -> {
-                        "$tag`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`被踢出群`${event.group.name}`"
+                        "$tag`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`被踢出群`${event.group.name}`"
                     }
 
                     is MemberLeaveEvent.Quit -> {
-                        "$tag`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`退出群`${event.group.name}`"
+                        "$tag`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`退出群`${event.group.name}`"
                     }
 
                     else -> return
@@ -135,27 +136,27 @@ class QQMessageHandler : QQHandler {
             }
 
             is MemberMuteEvent -> {
-                "\\#禁言\n\\#id${event.member.id}\n`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`被禁言${event.durationSeconds / 60}分钟"
+                "\\#禁言\n\\#id${event.member.id}\n`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`被禁言${event.durationSeconds / 60}分钟"
             }
 
             is GroupMuteAllEvent -> {
-                "\\#禁言\n`${(UserConfig.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.format2Markdown() ?: "?"}` \\#id${event.operator?.id ?: "?"} 禁言了所有人"
+                "\\#禁言\n`${(bot.userConfig.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.format2Markdown() ?: "?"}` \\#id${event.operator?.id ?: "?"} 禁言了所有人"
             }
 
             is MemberUnmuteEvent -> {
-                "\\#禁言\n`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}` \\#id${event.member.id} 被`${(UserConfig.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.format2Markdown() ?: "?"})` \\#id${event.operator?.id ?: "?"} 解除禁言"
+                "\\#禁言\n`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}` \\#id${event.member.id} 被`${(bot.userConfig.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.format2Markdown() ?: "?"})` \\#id${event.operator?.id ?: "?"} 解除禁言"
             }
 
             is MemberCardChangeEvent -> {
                 if (event.new.isNotEmpty()) {
-                    "\\#名称 \\#id${event.member.id}\n`${(UserConfig.idBindings[event.member.id] ?: event.origin).format2Markdown()}`名称改为`${event.new.format2Markdown()}`"
+                    "\\#名称 \\#id${event.member.id}\n`${(bot.userConfig.idBindings[event.member.id] ?: event.origin).format2Markdown()}`名称改为`${event.new.format2Markdown()}`"
                 } else {
                     return
                 }
             }
 
             is MemberSpecialTitleChangeEvent -> {
-                "\\#头衔 \\#id${event.member.id}\n`${(UserConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`获得头衔`${event.new.format2Markdown()}`"
+                "\\#头衔 \\#id${event.member.id}\n`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).format2Markdown()}`获得头衔`${event.new.format2Markdown()}`"
             }
 
             else -> {
@@ -163,8 +164,8 @@ class QQMessageHandler : QQHandler {
                 return
             }
         }
-        val chatId = qqTg[event.group.id] ?: GroupConfig.defaultTgGroup
-        SendMessage(chatId.toString(), msg).apply { parseMode = ParseMode.MARKDOWN_V2 }.send()
+        val chatId = bot.groupConfig.qqTg[event.group.id] ?: bot.groupConfig.defaultTgGroup
+        SendMessage(chatId.toString(), msg).apply { parseMode = ParseMode.MARKDOWN_V2 }.send(bot.tg)
     }
 
     override fun order(): Int {

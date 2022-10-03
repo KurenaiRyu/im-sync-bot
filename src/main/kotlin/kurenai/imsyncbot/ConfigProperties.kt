@@ -16,6 +16,7 @@ data class ConfigProperties(
 )
 
 data class RedisProperties(
+    val url: String? = null,
     val host: String = "redis",
     val port: Int = 6379,
     val database: Int = 0

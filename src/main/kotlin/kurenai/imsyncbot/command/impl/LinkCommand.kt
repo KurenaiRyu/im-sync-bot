@@ -4,11 +4,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.config.UserStatus
-import kurenai.imsyncbot.qq.QQBotClient.bot
+import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.message.Message
@@ -38,21 +36,23 @@ class LinkCommand : AbstractTelegramCommand() {
     private val timer = Timer("clearLink", false)
 
     override suspend fun execute(update: Update, message: Message): String? {
+        val bot = getBotOrThrow()
+        val qqBot = bot.qq.qqBot
         val replyMsg = message.replyToMessage!!
-        if (replyMsg.from?.username != TelegramBot.username) return "请引用转发的qq消息"
+        if (replyMsg.from?.username != bot.tg.username) return "请引用转发的qq消息"
         val qqMsg = CacheService.getQQByTg(replyMsg) ?: return "找不到该qq信息"
         val user = message.from!!
-        return if (UserConfig.superAdmins.contains(user.id)) {
-            val u = UserConfig.links.firstOrNull { it.tg == user.id && it.qq != null }
+        return if (bot.userConfig.superAdmins.contains(user.id)) {
+            val u = bot.userConfig.links.firstOrNull { it.tg == user.id && it.qq != null }
             if (u != null) {
                 return if (u.status.contains(UserStatus.MASTER)) "master账号无法改变绑定qq"
                 else "qq[${qqMsg.source.fromId}]已绑定@${user.username}"
             }
 
-            UserConfig.link(user.id, qqMsg.source.fromId, user.username!!)
+            bot.userConfig.link(user.id, qqMsg.source.fromId, user.username!!)
             "绑定qq[${qqMsg.source.fromId}]成功"
         } else {
-            val qqGroup = bot.getGroup(qqMsg.source.targetId) ?: return "找不到QQ群信息"
+            val qqGroup = qqBot.getGroup(qqMsg.source.targetId) ?: return "找不到QQ群信息"
             CoroutineScope(Dispatchers.Default).launch {
                 qqGroup.sendMessage(At(qqMsg.source.fromId).plus("【${message.from?.firstName ?: "First name not found"}】准备绑定，回复此条消息 accept 完成绑定。不是请无视该信息。"))
                     .also { receipt ->

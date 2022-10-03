@@ -1,13 +1,11 @@
 package kurenai.imsyncbot.handler
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kurenai.imsyncbot.config.UserConfig
-import kurenai.imsyncbot.configProperties
+import kurenai.imsyncbot.ConfigProperties
+import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.handler.Handler.Companion.END
-import kurenai.imsyncbot.qq.QQBotClient.bot
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
@@ -33,7 +31,9 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-object PrivateChatHandler {
+class PrivateChatHandler(
+    configProperties: ConfigProperties
+) {
 
     //TODO: 其他qq事件
     private val log = LogManager.getLogger()
@@ -57,7 +57,7 @@ object PrivateChatHandler {
 //                client.execute(EditMessageMedia())
             }
             is FriendMessageSyncEvent -> {
-                if (event.friend.id != UserConfig.masterQQ) {
+                if (event.friend.id != getBotOrThrow().userConfig.masterQQ) {
                     onFriendMessage(event.friend, event.message, true)
                 }
             }
@@ -148,19 +148,20 @@ object PrivateChatHandler {
     }
 
     suspend fun onPrivateChat(update: Update) {
+        val bot = getBotOrThrow()
         val message = update.message!!
         if (message.from?.id == 777000L && message.forwardFromChat?.id == privateChatChannel) {
             onChannelForward(update)
         } else if (message.isReply()) {
             val rootReplyMessageId = message.getRootReplyMessageId()
-            val quoteMsgSource = message.replyToMessage?.let(CacheService::getQQByTg)
+            val quoteMsgSource = message.replyToMessage?.let { CacheService.getQQByTg(it) }
             val friendId = CacheService.getFriendId(rootReplyMessageId) ?: run {
                 SendMessage(privateChat.toString(), "无法通过引用消息找到qq好友: $rootReplyMessageId").apply {
                     replyToMessageId = message.messageId
                 }.send()
                 return
             }
-            val friend = bot.getFriend(friendId) ?: run {
+            val friend = bot.qq.qqBot.getFriend(friendId) ?: run {
                 SendMessage(privateChat.toString(), "找不到qq好友: $friendId").apply {
                     replyToMessageId = message.messageId
                 }.send()
@@ -219,6 +220,7 @@ object PrivateChatHandler {
     }
 
     suspend fun getStartMsg(friend: Friend): Int? {
+        val qqBot = getBotOrThrow().qq.qqBot
         var messageId = CacheService.getPrivateChannelMessageId(friend.id)
         var count = 0
 
@@ -232,10 +234,10 @@ object PrivateChatHandler {
             }
         } else if (newChannelLock.isHeldByCurrentThread) {
             kotlin.runCatching {
-                bot.getFriend(friend.id)?.let {
+                qqBot.getFriend(friend.id)?.let {
                     SendPhoto(
                         privateChatChannel.toString(),
-                        InputFile(bot.getFriend(friend.id)?.avatarUrl!!)
+                        InputFile(qqBot.getFriend(friend.id)?.avatarUrl!!)
                     ).apply {
                         caption = "昵称：#${friend.nick}\n备注：#${friend.remark}\n#id${friend.id}\n"
                     }.send()
@@ -256,13 +258,15 @@ object PrivateChatHandler {
     }
 
     suspend fun onChannelForward(update: Update) {
-        CoroutineScope(Dispatchers.Default).launch {
-            log.debug("${this::class.java}#onChannelForward")
-            currentMessage = update.message!!
-            newChannelLock.withLock {
-                newChannelCondition.signalAll()
+        coroutineScope {
+            launch {
+                log.debug("${this::class.java}#onChannelForward")
+                currentMessage = update.message!!
+                newChannelLock.withLock {
+                    newChannelCondition.signalAll()
+                }
+                log.debug("Signal with message id: ${update.message?.messageId}")
             }
-            log.debug("Signal with message id: ${update.message?.messageId}")
         }
     }
 

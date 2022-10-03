@@ -122,7 +122,7 @@ tasks.jar {
     manifest {
         attributes["Manifest-Version"] = "1.0"
         attributes["Multi-Release"] = "true"
-        attributes["Main-Class"] = "kurenai.imsyncbot.MainKt"
+        attributes["Main-Class"] = "kurenai.imsyncbot.BotKt"
         attributes["Class-Path"] =
             configurations.runtimeClasspath.get().files.joinToString(" ") { "lib/${it.name}" }
     }

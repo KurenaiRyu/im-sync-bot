@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.getBotOrThrow
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import mu.KotlinLogging
@@ -18,7 +18,7 @@ class RemoveAdminCommand : AbstractTelegramCommand() {
     override suspend fun execute(update: Update, message: Message): String {
         val reply = message.replyToMessage!!
         val user = reply.from!!
-        UserConfig.removeAdmin(user.id)
+        getBotOrThrow().userConfig.removeAdmin(user.id)
         return "移除管理员成功"
     }
 

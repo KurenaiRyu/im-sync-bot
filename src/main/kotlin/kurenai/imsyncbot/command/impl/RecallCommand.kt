@@ -4,7 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.qq.QQBotClient.bot
+import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
@@ -32,7 +32,7 @@ class RecallCommand : AbstractTelegramCommand() {
                 if (qqMsg == null)
                     SendMessage(message.chatId, "未能找到对应的qq消息").send()
                 else {
-                    bot.getGroup(qqMsg.source.targetId)?.recallMessage(qqMsg)
+                    getBotOrThrow().qq.qqBot.getGroup(qqMsg.source.targetId)?.recallMessage(qqMsg)
                     if (!DeleteMessage(message.chatId, replyMsg.messageId!!).send()) {
                         SendMessage("已删除", message.chatId).send()
                     } else {

@@ -22,8 +22,8 @@ class StatusCommand : AbstractTelegramCommand() {
         )
             .map { it / 1024 / 1024 }
             .map { "${it}m" }
-        val total = CacheService.total.get()
-        val hit = CacheService.hit.get()
+        val total = CacheService.total().get()
+        val hit = CacheService.hit().get()
         val formatter = NumberFormat.getPercentInstance()
         return """
             总可用内存: ${arr[0]}/${arr[1]}

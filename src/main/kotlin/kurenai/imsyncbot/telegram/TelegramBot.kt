@@ -4,18 +4,14 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kurenai.imsyncbot.*
 import kurenai.imsyncbot.callback.Callback
-import kurenai.imsyncbot.callbacks
-import kurenai.imsyncbot.command.DelegatingCommand
-import kurenai.imsyncbot.configProperties
+import kurenai.imsyncbot.command.CommandDispatcher
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.Handler.Companion.END
-import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.qq.QQBotClient
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.TelegramBot.client
-import kurenai.imsyncbot.telegram.TelegramBot.token
-import kurenai.imsyncbot.tgHandlers
+import kurenai.imsyncbot.utils.childScopeContext
 import moe.kurenai.tdlight.AbstractUpdateSubscriber
 import moe.kurenai.tdlight.LongPollingCoroutineTelegramBot
 import moe.kurenai.tdlight.client.TDLightCoroutineClient
@@ -26,38 +22,38 @@ import moe.kurenai.tdlight.model.keyboard.InlineKeyboardMarkup
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.Request
 import moe.kurenai.tdlight.request.message.SendMessage
-import moe.kurenai.tdlight.util.CoroutineUtil.childScopeContext
 import moe.kurenai.tdlight.util.DefaultMapper.MAPPER
 import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.Logger
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * 机器人实例
  * @author Kurenai
  * @since 2021-06-30 14:05
  */
-object TelegramBot : AbstractUpdateSubscriber(), CoroutineScope {
+class TelegramBot(
+    parentCoroutineContext: CoroutineContext,
+    private val telegramProperties: TelegramProperties,
+    private val bot: ImSyncBot,
+) : AbstractUpdateSubscriber(), CoroutineScope {
 
-    private val telegramProperties = configProperties.bot.telegram
+    companion object {
+        internal val log = LogManager.getLogger()
+    }
 
+    internal val clientLock = Mutex()
+    private val messageReceiveLock = Mutex()
     var statusChannel = Channel<TelegramBotStatus>(Channel.BUFFERED)
     val username: String = telegramProperties.username
     val token: String = telegramProperties.token
     lateinit var client: TDLightCoroutineClient
 
-    private val log = LogManager.getLogger()
-    private lateinit var bot: LongPollingCoroutineTelegramBot
-    override val coroutineContext: CoroutineContext = CoroutineName("TelegramBot").plus(
+    internal lateinit var tgBot: LongPollingCoroutineTelegramBot
+    override val coroutineContext: CoroutineContext = CoroutineName("TelegramBot.$").plus(
         CoroutineExceptionHandler { context, e ->
             log.error(context[CoroutineName]?.let { "Exception in coroutine '${it.name}'." }
                 ?: "Exception in unnamed coroutine.", e)
-        })
-        .childScopeContext(EmptyCoroutineContext)
+        }).childScopeContext(parentCoroutineContext)
         .apply {
             job.invokeOnCompletion {
                 kotlin.runCatching {
@@ -68,42 +64,27 @@ object TelegramBot : AbstractUpdateSubscriber(), CoroutineScope {
             }
         }
 
-    private val pool = ThreadPoolExecutor(
-        1, 1, 1L, TimeUnit.MILLISECONDS,
-        LinkedBlockingQueue(300)
-    ) { r ->
-        val t = Thread(
-            Thread.currentThread().threadGroup, r,
-            "telegram-bot",
-            0
-        )
-        if (t.isDaemon) t.isDaemon = false
-        if (t.priority != Thread.NORM_PRIORITY) t.priority = Thread.NORM_PRIORITY
-        t
-    }
-    private val scope = pool.asCoroutineDispatcher()
-
     suspend fun start() {
-//        GetChatMember(GroupConfig.tgQQ[0])
-
-        log.debug("Telegram base url: ${telegramProperties.baseUrl}")
-        client = TDLightCoroutineClient(
-            telegramProperties.baseUrl,
-            telegramProperties.token,
-            isUserMode = false,
-            isDebugEnabled = true,
-            updateBaseUrl = telegramProperties.baseUrl
-        )
-        statusChannel.send(Initialized)
-        var qqBotStatus = QQBotClient.statusChannel.receive()
-        while (qqBotStatus !is QQBotClient.Initialized) {
-            log.debug("QQ bot status: ${qqBotStatus.javaClass.simpleName}")
-            qqBotStatus = QQBotClient.statusChannel.receive()
+        CoroutineScope(coroutineContext).launch {
+            log.debug("Telegram base url: ${telegramProperties.baseUrl}")
+            client = TDLightCoroutineClient(
+                telegramProperties.baseUrl,
+                telegramProperties.token,
+                isUserMode = false,
+                isDebugEnabled = true,
+                updateBaseUrl = telegramProperties.baseUrl
+            )
+            statusChannel.send(Initialized)
+            var qqBotStatus = bot.qq.statusChannel.receive()
+            while (qqBotStatus !is QQBotClient.Initialized) {
+                log.debug("QQ bot status: ${qqBotStatus.javaClass.simpleName}")
+                qqBotStatus = bot.qq.statusChannel.receive()
+            }
+            tgBot = LongPollingCoroutineTelegramBot(listOf(this@TelegramBot), client).apply {
+                coroutineContext = coroutineContext.childScopeContext(this@TelegramBot.coroutineContext)
+            }
+            tgBot.start()
         }
-        bot = LongPollingCoroutineTelegramBot(listOf(this), client).apply {
-            coroutineContext = coroutineContext.childScopeContext(this@TelegramBot.coroutineContext)
-        }
-        bot.start()
     }
 
     override fun onComplete0() {
@@ -113,14 +94,16 @@ object TelegramBot : AbstractUpdateSubscriber(), CoroutineScope {
     }
 
     override fun onNext0(update: Update) {
-        CoroutineScope(scope).launch {
-            try {
-                onUpdateReceivedSuspend(update)
-            } catch (e: Exception) {
-                reportError(
-                    update,
-                    BotException("Error on update received: ${e.message ?: e::class.java.simpleName}", e)
-                )
+        CoroutineScope(coroutineContext).launch {
+            messageReceiveLock.withLock {
+                try {
+                    onUpdateReceivedSuspend(update)
+                } catch (e: Exception) {
+                    reportError(
+                        update,
+                        BotException("Error on update received: ${e.message ?: e::class.java.simpleName}", e)
+                    )
+                }
             }
         }
     }
@@ -144,30 +127,47 @@ object TelegramBot : AbstractUpdateSubscriber(), CoroutineScope {
                     }
                 }
             } catch (e: Exception) {
-                reportError(update, e, "执行回调失败", false)
+                reportError(update, e, "执行回调失败")
             }
         }
 
         if (message.isCommand()) {
-            DelegatingCommand.execute(update, message)
+            coroutineScope {
+                launch(this@TelegramBot.coroutineContext) {
+                    CommandDispatcher.execute(update, message)
+                }
+            }
         } else if (update.hasInlineQuery()) {
-            DelegatingCommand.handleInlineQuery(update, update.inlineQuery!!)
-        } else if (message.chat.id == PrivateChatHandler.privateChat) {
-            PrivateChatHandler.onPrivateChat(update)
+            coroutineScope {
+                launch(this@TelegramBot.coroutineContext) {
+                    CommandDispatcher.handleInlineQuery(update, update.inlineQuery!!)
+                }
+            }
+        } else if (message.chat.id == bot.privateHandle.privateChat) {
+            bot.privateHandle.onPrivateChat(update)
         } else if ((message.isGroupMessage() || message.isSuperGroupMessage())) {
+            var handled = false
             if (update.hasMessage()) {
                 for (handler in tgHandlers) {
-                    if (handler.onMessage(message) == END) break
+                    if (handler.onMessage(message) == END) {
+                        handled = true
+                        break
+                    }
                 }
+                if (!handled) bot.tgMessageHandler.onMessage(message)
             } else if (update.hasEditedMessage()) {
                 for (handler in tgHandlers) {
-                    if (handler.onEditMessage(update.editedMessage!!) == END) break
+                    if (handler.onEditMessage(update.editedMessage!!) == END) {
+                        handled = true
+                        break
+                    }
                 }
+                if (!handled) bot.tgMessageHandler.onEditMessage(update.editedMessage!!)
             }
         }
     }
 
-    suspend fun reportError(update: Update, throwable: Throwable, topic: String = "转发失败", canRetry: Boolean = true) {
+    suspend fun reportError(update: Update, throwable: Throwable, topic: String = "转发失败") {
         log.error(throwable.message ?: throwable::class.java.simpleName, throwable)
         try {
             val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message ?: return
@@ -185,14 +185,14 @@ object TelegramBot : AbstractUpdateSubscriber(), CoroutineScope {
 //                send(EditMessageText.builder().chatId(it).messageId(recMsgId).text("$simpleMsg\n\n${mapper.writeValueAsString(update)}").build())
 //            }
 
-            val errorMsg = "#$topic\n${throwable::class.simpleName}: ${throwable.message?.replace(configProperties.bot.telegram.token, "{token}")}"
+            val errorMsg = "#$topic\n${throwable::class.simpleName}: ${throwable.message?.replace(telegramProperties.token, "{token}")}"
             SendMessage(message.chatId, errorMsg).apply {
                 this.replyToMessageId = message.messageId
                 this.replyMarkup =
                     InlineKeyboardMarkup(listOf(listOf(InlineKeyboardButton("重试").apply {
                         this.callbackData = "retry"
                     })))
-            }.send()
+            }.send(this)
             CacheService.cache(message)
         } catch (e: Exception) {
             log.error("Report error task fail: ${e.message}", e)
@@ -200,21 +200,18 @@ object TelegramBot : AbstractUpdateSubscriber(), CoroutineScope {
     }
 
     sealed interface TelegramBotStatus
-
     object Initializing : TelegramBotStatus
     object Initialized : TelegramBotStatus
 }
 
-val log: Logger = LogManager.getLogger()
-val clientLock = Mutex()
-
-suspend fun <T> Request<ResponseWrapper<T>>.send(): T {
+suspend fun <T> Request<ResponseWrapper<T>>.send(param: TelegramBot? = null): T {
+    val bot = param ?: getBotOrThrow().tg
     var lastEx: Throwable? = null
-    clientLock.withLock {
+    bot.clientLock.withLock {
         var count = 0
         while (count <= 0) {
             try {
-                return client.send(this@send)
+                return bot.client.send(this@send)
             } catch (e: Exception) {
                 lastEx = e
                 when (e) {
@@ -236,6 +233,6 @@ suspend fun <T> Request<ResponseWrapper<T>>.send(): T {
         }
     }
     throw lastEx?.let {
-        BotException(it.message?.replace(token, "{mask}") ?: "信息发送失败")
+        BotException(it.message?.replace(bot.token, "{mask}") ?: "信息发送失败")
     } ?: BotException("信息发送失败")
 }

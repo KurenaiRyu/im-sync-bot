@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
 import kurenai.imsyncbot.command.AbstractQQCommand
-import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.request.message.EditMessageText
 import net.mamoe.mirai.contact.Group
@@ -21,7 +21,7 @@ class AcceptLinkCommand : AbstractQQCommand() {
                 return 1
             }
             if (event.message.filterIsInstance(PlainText::class.java).joinToString("") { it.content }.contains("accept")) {
-                UserConfig.link(pair.second[0].from!!.id, pair.first, pair.second[0].from!!.username!!)
+                getBotOrThrow().userConfig.link(pair.second[0].from!!.id, pair.first, pair.second[0].from!!.username!!)
                 LinkCommand.holdLinks.remove(reply.source.ids[0])
                 event.subject.sendMessage(event.message.quote().plus("绑定成功"))
                 EditMessageText("绑定成功").apply {
