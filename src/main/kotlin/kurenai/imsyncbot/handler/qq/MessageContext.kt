@@ -208,12 +208,11 @@ data class GroupMessageContext(
 
         suspend fun getImageMessage(): SendPhoto {
             return SendPhoto(chatId, InputFile(image.queryUrl())).apply {
-                if (!onlyImage) {
-                    caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
-                    parseMode = ParseMode.MARKDOWN_V2
+                parseMode = ParseMode.MARKDOWN_V2
+                caption = if (onlyImage) {
+                    "".formatMsg(senderId, senderName)
                 } else {
-                    caption = "".formatMsg(senderId, senderName)
-                    parseMode = ParseMode.MARKDOWN_V2
+                    getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
                 }
                 replyId?.let { replyToMessageId = replyId }
             }
@@ -221,12 +220,11 @@ data class GroupMessageContext(
 
         suspend fun getFileMessage(): SendDocument {
             return SendDocument(chatId, InputFile(image.queryUrl())).apply {
-                if (!onlyImage) {
-                    caption = "".formatMsg(senderId, senderName)
-                    parseMode = ParseMode.MARKDOWN_V2
+                parseMode = ParseMode.MARKDOWN_V2
+                caption = if (onlyImage) {
+                    "".formatMsg(senderId, senderName)
                 } else {
-                    caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
-                    parseMode = ParseMode.MARKDOWN_V2
+                    getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
                 }
                 replyId?.let { replyToMessageId = replyId }
             }
