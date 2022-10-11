@@ -93,8 +93,8 @@ data class GroupMessageContext(
                 MultiImage(images)
         } else if (messageChain.contains(FileMessage.Key)) {
             val fileMessage = messageChain[FileMessage.Key]!!
-            val extention = fileMessage.name.substringAfterLast(".").lowercase()
-            if (extention == "mkv" || extention == "mp4") {
+            val extension = fileMessage.name.substringAfterLast(".").lowercase()
+            if (extension == "mkv" || extension == "mp4") {
                 Video(fileMessage)
             } else {
                 File(fileMessage)
@@ -288,14 +288,27 @@ data class GroupMessageContext(
     inner class File(
         val file: FileMessage,
     ) : MessageType {
-        suspend fun getTelegramMessage(): SendDocument {
-            val url = file.toAbsoluteFile(group)?.getUrl()
-            require(url != null) { "获取文件地址失败" }
-            return SendDocument(chatId, InputFile(url)).apply {
+        val shouldBeFile = file.size < 20 * 1024 * 1024
+
+        suspend fun getFileMessage(): SendDocument {
+            return SendDocument(chatId, InputFile(getUrl())).apply {
                 caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
                 parseMode = ParseMode.MARKDOWN_V2
                 replyId?.let { replyToMessageId = replyId }
             }
+        }
+
+        suspend fun getTextMessage(): SendMessage {
+            return SendMessage(chatId, getContentWithAtAndWithoutImage().formatMsg(senderId, senderName) + "\n\n[${file.name}](${getUrl()})").apply {
+                parseMode = ParseMode.MARKDOWN_V2
+                replyId?.let { replyToMessageId = replyId }
+            }
+        }
+
+        private suspend fun getUrl(): String {
+            val url = file.toAbsoluteFile(group)?.getUrl()
+            require(url != null) { "获取文件地址失败" }
+            return url
         }
     }
 

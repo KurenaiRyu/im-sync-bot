@@ -46,18 +46,20 @@ class QQMessageHandler(
         val list = if (messageType is GroupMessageContext.Forward) messageType.contextList else listOf(context)
         for (c in list) {
             val t = c.getType()
+            val tg = bot.tg
             kotlin.runCatching {
                 when (t) {
-                    is GroupMessageContext.App -> t.telegramMessage.send(bot.tg)
-                    is GroupMessageContext.GifImage -> t.getTelegramMessage().send(bot.tg)
-                    is GroupMessageContext.MultiImage -> t.getTelegramMessage().send(bot.tg)
-                    is GroupMessageContext.Rich -> t.telegramMessage.send(bot.tg)
-                    is GroupMessageContext.SingleImage -> if (t.shouldBeFile) t.getFileMessage().send(bot.tg) else t.getImageMessage().send(bot.tg)
-                    is GroupMessageContext.Normal -> t.telegramMessage.send(bot.tg)
+                    is GroupMessageContext.App -> t.telegramMessage.send(tg)
+                    is GroupMessageContext.GifImage -> t.getTelegramMessage().send(tg)
+                    is GroupMessageContext.MultiImage -> t.getTelegramMessage().send(tg)
+                    is GroupMessageContext.Rich -> t.telegramMessage.send(tg)
+                    is GroupMessageContext.SingleImage -> if (t.shouldBeFile) t.getFileMessage().send(tg) else t.getImageMessage().send(tg)
+                    is GroupMessageContext.File -> if (t.shouldBeFile) t.getFileMessage().send(tg) else t.getTextMessage().send(tg)
+                    is GroupMessageContext.Normal -> t.telegramMessage.send(tg)
                     else -> null
                 }
             }.recoverCatching {
-                c.normalType.telegramMessage.send(bot.tg)
+                c.normalType.telegramMessage.send(tg)
             }.getOrThrow()?.also { message ->
                 log.debug("Sent ${mapper.writeValueAsString(message)}")
                 if (message is Message) {
