@@ -1,8 +1,5 @@
 package kurenai.imsyncbot.command.impl
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.service.CacheService
@@ -27,17 +24,15 @@ class RecallCommand : AbstractTelegramCommand() {
     override suspend fun execute(update: Update, message: Message): String? {
         val replyMsg = message.replyToMessage!!
         return try {
-            CoroutineScope(Dispatchers.Default).launch {
-                val qqMsg = CacheService.getQQByTg(replyMsg)
-                if (qqMsg == null)
-                    SendMessage(message.chatId, "未能找到对应的qq消息").send()
-                else {
-                    getBotOrThrow().qq.qqBot.getGroup(qqMsg.source.targetId)?.recallMessage(qqMsg)
-                    if (!DeleteMessage(message.chatId, replyMsg.messageId!!).send()) {
-                        SendMessage("已删除", message.chatId).send()
-                    } else {
-                        DeleteMessage(message.chatId, message.messageId!!).send()
-                    }
+            val qqMsg = CacheService.getQQByTg(replyMsg)
+            if (qqMsg == null)
+                SendMessage(message.chatId, "未能找到对应的qq消息").send()
+            else {
+                getBotOrThrow().qq.qqBot.getGroup(qqMsg.source.targetId)?.recallMessage(qqMsg)
+                if (!DeleteMessage(message.chatId, replyMsg.messageId!!).send()) {
+                    SendMessage("已删除", message.chatId).send()
+                } else {
+                    DeleteMessage(message.chatId, message.messageId!!).send()
                 }
             }
             null

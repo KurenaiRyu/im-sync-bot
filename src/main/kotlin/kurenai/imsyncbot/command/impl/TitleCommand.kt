@@ -39,20 +39,18 @@ class TitleCommand : AbstractTelegramCommand(), Bannable {
                 val from = replyMsg.from!!
                 bot.userConfig.superAdmins.firstOrNull { message.from?.id == it }?.also {
                     if (!handleLinkCase(bot, from, message, param)) {
-                        CoroutineScope(Dispatchers.Default).launch {
-                            val qqMsg = CacheService.getQQByTg(replyMsg)
-                            if (qqMsg == null) {
-                                SendMessage(message.chatId, "未能找到对应的qq消息").apply {
+                        val qqMsg = CacheService.getQQByTg(replyMsg)
+                        if (qqMsg == null) {
+                            SendMessage(message.chatId, "未能找到对应的qq消息").apply {
+                                replyToMessageId = message.messageId
+                            }.send()
+                        } else {
+                            bot.qq.qqBot.getGroup(qqMsg.source.targetId)?.getMember(qqMsg.source.fromId)?.also {
+                                modifyTitle(it, message, param)
+                            } ?: kotlin.run {
+                                SendMessage(message.chatId, "未能找到对应的qq用户或群组").apply {
                                     replyToMessageId = message.messageId
                                 }.send()
-                            } else {
-                                bot.qq.qqBot.getGroup(qqMsg.source.targetId)?.getMember(qqMsg.source.fromId)?.also {
-                                    modifyTitle(it, message, param)
-                                } ?: kotlin.run {
-                                    SendMessage(message.chatId, "未能找到对应的qq用户或群组").apply {
-                                        replyToMessageId = message.messageId
-                                    }.send()
-                                }
                             }
                         }
                     }
