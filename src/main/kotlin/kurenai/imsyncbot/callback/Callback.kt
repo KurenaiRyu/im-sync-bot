@@ -1,7 +1,9 @@
 package kurenai.imsyncbot.callback
 
+import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
+import moe.kurenai.tdlight.request.message.AnswerCallbackQuery
 import mu.KotlinLogging
 
 abstract class Callback {
@@ -22,19 +24,15 @@ abstract class Callback {
     open val method: String = ""
 
     open suspend fun handle(update: Update, message: Message): Int {
-        var result = END
-        try {
-            result = handle0(update, message)
-            return result % 10
-        } finally {
-            try {
-                if (result % 100 / 10 != WITHOUT_ANSWER) {
-//                    ContextHolder.telegramBotClient.send(AnswerCallbackQuery(update.callbackQuery.id))
-                }
-            } catch (e: Exception) {
-                log.warn { e.message }
-            }
-        }
+        return kotlin.runCatching {
+            handle0(update, message)
+        }.recover {
+            AnswerCallbackQuery(update.callbackQuery!!.id).apply {
+                text = "执行回调异常"
+                showAlert = true
+            }.send()
+            null
+        }.getOrThrow()?.let { it % 10 } ?: END
     }
 
     abstract suspend fun handle0(update: Update, message: Message): Int
@@ -48,11 +46,15 @@ abstract class Callback {
     }
 
     open fun match(text: String): Boolean {
-        return text.substringBefore(" ") == method
+        return text.substringBefore(' ') == method
     }
 
-    fun getBody(update: Update): String {
-        return update.callbackQuery?.data?.substringAfter(" ") ?: ""
+    fun Update.getBody(): String {
+        return callbackQuery?.data?.substringAfter(' ') ?: ""
+    }
+
+    fun Update.getParams(): List<String> {
+        return callbackQuery?.data?.substringAfter(' ')?.trim()?.split(' ') ?: emptyList()
     }
 
 }
