@@ -6,12 +6,15 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import kotlinx.coroutines.runBlocking
 import kurenai.imsyncbot.ImSyncBot
+import kurenai.imsyncbot.callback.impl.GetFileUrlCallback.Companion.METHOD
 import kurenai.imsyncbot.domain.QQAppMessage
 import kurenai.imsyncbot.domain.QQRichMessage
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.BotUtil.formatUsername
 import moe.kurenai.tdlight.model.ParseMode
+import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
+import moe.kurenai.tdlight.model.keyboard.InlineKeyboardMarkup
 import moe.kurenai.tdlight.model.media.InputFile
 import moe.kurenai.tdlight.request.message.*
 import moe.kurenai.tdlight.util.MarkdownUtil.fm2md
@@ -49,7 +52,7 @@ data class GroupMessageContext(
     val chatId: String = (bot.groupConfig.qqTg[group.id] ?: bot.groupConfig.defaultTgGroup).toString()
     val replyId: Int? by lazy {
         messageChain[QuoteReply.Key]?.let {
-            runBlocking(bot.tg.coroutineContext) {
+            runBlocking(bot.coroutineContext) {
                 CacheService.getTgIdByQQ(
                     it.source.targetId,
                     it.source.ids[0]
@@ -288,7 +291,7 @@ data class GroupMessageContext(
     inner class File(
         val file: FileMessage,
     ) : MessageType {
-        val shouldBeFile = file.size < 20 * 1024 * 1024
+        val shouldBeFile = file.size < 50 * 1024 * 1024
 
         suspend fun getFileMessage(): SendDocument {
             return SendDocument(chatId, InputFile(getUrl())).apply {
@@ -299,9 +302,12 @@ data class GroupMessageContext(
         }
 
         suspend fun getTextMessage(): SendMessage {
-            return SendMessage(chatId, getContentWithAtAndWithoutImage().formatMsg(senderId, senderName) + "\n\n[${file.name}](${getUrl()})").apply {
+            return SendMessage(chatId, getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)).apply {
                 parseMode = ParseMode.MARKDOWN_V2
                 replyId?.let { replyToMessageId = replyId }
+                replyMarkup = InlineKeyboardMarkup(listOf(listOf(InlineKeyboardButton("获取/刷新下载链接").apply {
+                    callbackData = "$METHOD ${group.id} ${file.toAbsoluteFile(group)?.absolutePath ?: ""}"
+                })))
             }
         }
 
