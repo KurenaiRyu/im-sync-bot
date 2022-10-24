@@ -28,6 +28,7 @@ object BotUtil {
     const val MSG_PATTERN = "\$msg"
     const val ID_PATTERN = "\$id"
     const val NEWLINE_PATTERN = "\$newline"
+    const val LOG_FILE_PATH = "./logs/im-sync-bot.log"
 
     private val log = KotlinLogging.logger {}
 

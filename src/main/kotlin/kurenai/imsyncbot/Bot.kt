@@ -71,7 +71,7 @@ fun loadProperties() {
     val mapper = ObjectMapper(YAMLFactory()).disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
         .setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
     instants = File("./config").walk().mapNotNull { file ->
-        if (file.name == "config.yaml" || file.name == "config.yml") {
+        if ((file.name == "config.yaml" || file.name == "config.yml") && !file.parentFile.name.startsWith('.')) {
             file.parentFile.path to mapper.readValue(file, ConfigProperties::class.java)
         } else null
     }.map { (path, props) -> ImSyncBot(path, props) }.toMutableList()
