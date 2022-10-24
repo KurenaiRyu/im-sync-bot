@@ -7,7 +7,7 @@ import moe.kurenai.tdlight.model.media.InputFile
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.SendDocument
-import mu.KotlinLogging
+import org.apache.logging.log4j.LogManager
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -16,7 +16,7 @@ import java.util.zip.ZipOutputStream
 
 class LogCommand : AbstractTelegramCommand() {
 
-    private val log = KotlinLogging.logger {}
+    private val log = LogManager.getLogger()
     override val help: String = "获取日志文件"
     override val command: String = "log"
 
@@ -31,6 +31,7 @@ class LogCommand : AbstractTelegramCommand() {
                 out.write(file.readBytes())
             }
             SendDocument(msg.chatId, InputFile(zipFile)).send()
+            zipFile.delete()
             null
         } catch (e: Exception) {
             log.error(e.message, e)
