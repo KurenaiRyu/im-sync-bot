@@ -1,7 +1,10 @@
 package kurenai.imsyncbot.telegram
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
@@ -35,7 +38,7 @@ class TelegramBot(
     parentCoroutineContext: CoroutineContext,
     private val telegramProperties: TelegramProperties,
     private val bot: ImSyncBot,
-) : AbstractUpdateSubscriber(), CoroutineScope {
+) : AbstractUpdateSubscriber() {
 
     companion object {
         internal val log = LogManager.getLogger()
@@ -49,23 +52,9 @@ class TelegramBot(
     lateinit var client: TDLightCoroutineClient
 
     internal lateinit var tgBot: LongPollingCoroutineTelegramBot
-    override val coroutineContext: CoroutineContext = CoroutineName("TelegramBot.$").plus(
-        CoroutineExceptionHandler { context, e ->
-            log.error(context[CoroutineName]?.let { "Exception in coroutine '${it.name}'." }
-                ?: "Exception in unnamed coroutine.", e)
-        }).childScopeContext(parentCoroutineContext)
-        .apply {
-            job.invokeOnCompletion {
-                kotlin.runCatching {
-                    client.close()
-                }.onFailure {
-                    if (it !is CancellationException) log.error(it)
-                }
-            }
-        }
 
     suspend fun start() {
-        CoroutineScope(coroutineContext).launch {
+        CoroutineScope(bot.coroutineContext).launch {
             log.debug("Telegram base url: ${telegramProperties.baseUrl}")
             client = TDLightCoroutineClient(
                 telegramProperties.baseUrl,
@@ -81,7 +70,7 @@ class TelegramBot(
                 qqBotStatus = bot.qq.statusChannel.receive()
             }
             tgBot = LongPollingCoroutineTelegramBot(listOf(this@TelegramBot), client).apply {
-                coroutineContext = coroutineContext.childScopeContext(this@TelegramBot.coroutineContext)
+                coroutineContext = coroutineContext.childScopeContext(bot.coroutineContext)
             }
             tgBot.start()
         }
@@ -94,7 +83,7 @@ class TelegramBot(
     }
 
     override fun onNext0(update: Update) {
-        CoroutineScope(coroutineContext).launch {
+        CoroutineScope(bot.coroutineContext).launch {
             messageReceiveLock.withLock {
                 try {
                     onUpdateReceivedSuspend(update)
@@ -133,13 +122,13 @@ class TelegramBot(
 
         if (message.isCommand()) {
             coroutineScope {
-                launch(this@TelegramBot.coroutineContext) {
+                launch(bot.coroutineContext) {
                     CommandDispatcher.execute(update, message)
                 }
             }
         } else if (update.hasInlineQuery()) {
             coroutineScope {
-                launch(this@TelegramBot.coroutineContext) {
+                launch(bot.coroutineContext) {
                     CommandDispatcher.handleInlineQuery(update, update.inlineQuery!!)
                 }
             }

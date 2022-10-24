@@ -11,7 +11,6 @@ import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import kurenai.imsyncbot.handler.qq.GroupMessageContext
 import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
-import kurenai.imsyncbot.utils.childScopeContext
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.message.MessageEntity
 import moe.kurenai.tdlight.model.message.User
@@ -37,26 +36,9 @@ class QQBotClient(
     parentCoroutineContext: CoroutineContext,
     private val qqProperties: QQProperties,
     private val bot: ImSyncBot,
-) : CoroutineScope {
+) {
 
     private val log = LogManager.getLogger()
-    override val coroutineContext: CoroutineContext = CoroutineName("QQBot.${qqProperties.account}").plus(
-        CoroutineExceptionHandler { context, e ->
-            log.error(context[CoroutineName]?.let { "Exception in coroutine '${it.name}'." }
-                ?: "Exception in unnamed coroutine.", e)
-        }).childScopeContext(parentCoroutineContext)
-        .apply {
-            job.invokeOnCompletion {
-                kotlin.runCatching {
-                    qqBot.close()
-                    statusChannel.close()
-                    scopeMap.clear()
-                    destroy()
-                }.onFailure {
-                    if (it !is CancellationException) log.error(it)
-                }
-            }
-        }
     val statusChannel = Channel<QQBotStatus>(Channel.BUFFERED)
     private val scopeMap = HashMap<Long, CoroutineScope>()
     val qqBot: Bot = BotFactory.newBot(qqProperties.account, qqProperties.password) {
@@ -64,7 +46,6 @@ class QQBotClient(
         fileBasedDeviceInfo("${bot.configPath}/device.json") // 使用 device.json 存储设备信息
         protocol = qqProperties.protocol // 切换协议
         highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
-        this.parentCoroutineContext = parentCoroutineContext
 //        val file = File(BotConstant.LOG_FILE_PATH)
 //        redirectBotLogToFile(file)
 //        redirectNetworkLogToFile(file)
@@ -76,12 +57,12 @@ class QQBotClient(
     suspend fun start() {
         log.info("Login qq ${qqProperties.account}...")
         qqBot.login()
-        CoroutineScope(this@QQBotClient.coroutineContext).launch {
+        CoroutineScope(bot.coroutineContext).launch {
             statusChannel.send(Initialized)
-            var telegramBotStatus = this@QQBotClient.bot.tg.statusChannel.receive()
+            var telegramBotStatus = bot.tg.statusChannel.receive()
             while (telegramBotStatus !is TelegramBot.Initialized) {
                 log.debug("Telegram bot status: ${telegramBotStatus.javaClass.simpleName}")
-                telegramBotStatus = this@QQBotClient.bot.tg.statusChannel.receive()
+                telegramBotStatus = bot.tg.statusChannel.receive()
             }
             qqBot.eventChannel.filter { event ->
                 return@filter kotlin.runCatching {
@@ -92,10 +73,10 @@ class QQBotClient(
                             if (bot.groupConfig.filterGroups.isNotEmpty() && !bot.groupConfig.filterGroups.contains(groupId)) {
                                 false
                             } else {
-                                !bot.groupConfig.bannedGroups.contains(groupId) && !this@QQBotClient.bot.userConfig.bannedIds.contains(event.sender.id)
+                                !bot.groupConfig.bannedGroups.contains(groupId) && !bot.userConfig.bannedIds.contains(event.sender.id)
                             }.also { result ->
                                 if (!result) {
-                                    event.message.filterIsInstance<At>().firstOrNull { it.target == this@QQBotClient.bot.userConfig.masterQQ }
+                                    event.message.filterIsInstance<At>().firstOrNull { it.target == bot.userConfig.masterQQ }
                                         ?.let { sendRemindMsg(event) }
                                 }
                             }
@@ -144,7 +125,7 @@ class QQBotClient(
                                                                 .toCompletableFuture()
                                                                 .await()
                                                         if (message != null) {
-                                                            withContext(this@QQBotClient.coroutineContext) {
+                                                            withContext(bot.coroutineContext) {
                                                                 bot.privateHandle.onFriendMessage(
                                                                     friend,
                                                                     message.deserializeJsonToMessageChain()
@@ -182,7 +163,7 @@ class QQBotClient(
                                                         val message =
                                                             queue.pollAsync(30, TimeUnit.SECONDS).toCompletableFuture()
                                                                 .await() ?: continue
-                                                        withContext(this@QQBotClient.coroutineContext) {
+                                                        withContext(bot.coroutineContext) {
                                                             messageChain = message.deserializeJsonToMessageChain()
                                                             var count = 0
                                                             while (count < 3) {
@@ -265,7 +246,7 @@ class QQBotClient(
             ).apply {
                 entities =
                     listOf(MessageEntity(MessageEntityType.TEXT_MENTION, 1, 3).apply {
-                        user = User(this@QQBotClient.bot.userConfig.masterTg)
+                        user = User(bot.userConfig.masterTg)
                     })
             }.send()
         }.onFailure {
