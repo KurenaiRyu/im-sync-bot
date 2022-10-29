@@ -182,6 +182,10 @@ object CacheService {
         return getBotOrThrow().cache.get(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId)
     }
 
+    suspend fun removePrivateChannelMessageId(friendId: Long): Boolean {
+        return getBotOrThrow().cache.remove(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId)
+    }
+
     suspend fun getFriendId(messageId: Int): Long? {
         return getBotOrThrow().cache.get(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId)
     }

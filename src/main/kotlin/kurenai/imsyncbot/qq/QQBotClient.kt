@@ -40,7 +40,7 @@ class QQBotClient(
 
     private val log = LogManager.getLogger()
     val statusChannel = Channel<QQBotStatus>(Channel.BUFFERED)
-    private val scopeMap = HashMap<Long, CoroutineScope>()
+    private val scopeMap = HashMap<String, CoroutineScope>()
     val qqBot: Bot = BotFactory.newBot(qqProperties.account, qqProperties.password) {
         cacheDir = File("./mirai/${qqProperties.account}")
         fileBasedDeviceInfo("${bot.configPath}/device.json") // 使用 device.json 存储设备信息
@@ -110,15 +110,12 @@ class QQBotClient(
                                     val id = friend.id
                                     val queueName = "QUEUE:FRIEND:$id"
                                     val queue = bot.redisson.getBlockingQueue<String?>(queueName)
-                                    var scope = scopeMap[id]
+                                    val scope = scopeMap[queueName]
                                     if (scope == null) {
                                         mapLock.withLock {
-                                            scope = scopeMap[id]
-                                            if (scope == null) {
-                                                scopeMap[id] = CoroutineScope(newSingleThreadContext("${friend.nameCardOrNick}(${friend.id})"))
-                                            }
-                                            scope = scopeMap[id]
-                                            scope!!.launch {
+                                            scopeMap.getOrPut(queueName) {
+                                                CoroutineScope(newSingleThreadContext("${friend.nameCardOrNick}(${friend.id})"))
+                                            }.launch {
                                                 while (isActive) {
                                                     try {
                                                         val message =
@@ -129,7 +126,8 @@ class QQBotClient(
                                                             withContext(bot.coroutineContext) {
                                                                 bot.privateHandle.onFriendMessage(
                                                                     friend,
-                                                                    message.deserializeJsonToMessageChain()
+                                                                    message.deserializeJsonToMessageChain(),
+                                                                    friend.id == qqBot.id
                                                                 )
                                                             }
                                                         }
@@ -147,16 +145,12 @@ class QQBotClient(
                                     val id = event.group.id
                                     val queueName = "QUEUE:GROUP:$id"
                                     val queue = bot.redisson.getBlockingQueue<String?>(queueName)
-                                    var scope = scopeMap[id]
+                                    val scope = scopeMap[queueName]
                                     if (scope == null) {
                                         mapLock.withLock {
-                                            scope = scopeMap[id]
-                                            if (scope == null) {
-                                                scopeMap[id] =
-                                                    CoroutineScope(newSingleThreadContext("${event.group.name}(${event.group.id})"))
-                                            }
-                                            scope = scopeMap[id]
-                                            scope!!.launch {
+                                            scopeMap.getOrPut(queueName) {
+                                                CoroutineScope(newSingleThreadContext("${event.group.name}(${event.group.id})"))
+                                            }.launch {
                                                 val group = event.group
                                                 while (isActive) {
                                                     var messageChain: MessageChain? = null
@@ -164,8 +158,8 @@ class QQBotClient(
                                                         val message =
                                                             queue.pollAsync(30, TimeUnit.SECONDS).toCompletableFuture()
                                                                 .await() ?: continue
+                                                        messageChain = message.deserializeJsonToMessageChain()
                                                         withContext(bot.coroutineContext) {
-                                                            messageChain = message.deserializeJsonToMessageChain()
                                                             var count = 0
                                                             while (count < 3) {
                                                                 try {

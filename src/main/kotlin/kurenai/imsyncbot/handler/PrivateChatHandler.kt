@@ -1,9 +1,10 @@
 package kurenai.imsyncbot.handler
 
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kurenai.imsyncbot.ConfigProperties
+import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.service.CacheService
@@ -14,10 +15,7 @@ import moe.kurenai.tdlight.model.media.InputFile
 import moe.kurenai.tdlight.model.media.PhotoSize
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
-import moe.kurenai.tdlight.request.message.SendDocument
-import moe.kurenai.tdlight.request.message.SendMessage
-import moe.kurenai.tdlight.request.message.SendPhoto
-import moe.kurenai.tdlight.request.message.SendVoice
+import moe.kurenai.tdlight.request.message.*
 import net.mamoe.mirai.contact.Friend
 import net.mamoe.mirai.event.events.FriendAvatarChangedEvent
 import net.mamoe.mirai.event.events.FriendEvent
@@ -27,6 +25,7 @@ import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.message.sourceMessage
 import org.apache.logging.log4j.LogManager
+import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -44,13 +43,16 @@ class PrivateChatHandler(
     val newChannelCondition = newChannelLock.newCondition()
     private val picToFileSize = configProperties.handler.picToFileSize * 1024 * 1024
 
-    private var currentMessage: Message? = null
+    private var messageMap = mutableMapOf<String, Message>()
+
+    private val privateChannelMessageIdCache = WeakHashMap<Long, Int>()
 
     suspend fun onFriendEvent(event: FriendEvent): Int {
         when (event) {
             is FriendMessageEvent -> {
                 onFriendMessage(event.friend, event.message)
             }
+
             is FriendAvatarChangedEvent -> {
 //                val messageId = CacheService.getPrivateChannelMessageId(event.friend.id)
 //                InputMediaPhoto()
@@ -68,81 +70,95 @@ class PrivateChatHandler(
 
     suspend fun onFriendMessage(friend: Friend, chain: MessageChain, isSync: Boolean = false) {
         var replyMsgId =
-            chain[QuoteReply.Key]?.let { CacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }?.second
-        if (replyMsgId == null) {
-            replyMsgId = getStartMsg(friend)
-        }
-        for (msg in chain) {
-            when (msg) {
-                is Image -> {
-                    try {
-                        val aspectRatio = msg.width.toFloat() / msg.height.toFloat()
-                        var sendByFile = aspectRatio > 10 || aspectRatio < 0.1 || msg.width > 1920 || msg.height > 1920
-                        val inputFile = CacheService.getFile(msg.imageId).let {
-                            if (it == null) {
-                                val file = BotUtil.downloadImg(msg.imageId, msg.queryUrl())
-                                if (!sendByFile && file.length() > picToFileSize) {
-                                    sendByFile = true
+            (chain[QuoteReply.Key]?.let { CacheService.getTgIdByQQ(it.source.targetId, it.source.ids[0]) }?.second) ?: kotlin.run {
+                // 没有引用消息则需要找到最开始的第一条消息
+                getStartMsg(friend) ?: throw BotException("找不到引用的消息或是第一条消息")
+            }
+        kotlin.runCatching {
+            GetMessageInfo(privateChat.toString(), replyMsgId).send()
+        }.recover {
+            log.warn(it.message, it)
+            if (it is BotException && it.message?.endsWith("message not found") == true) {
+                log.warn("Remove error private channel message id")
+                CacheService.removePrivateChannelMessageId(friend.id)
+            }
+            replyMsgId = getStartMsg(friend) ?: throw BotException("找不到引用的消息或是第一条消息")
+        }.onSuccess {
+            for (msg in chain) {
+                when (msg) {
+                    is Image -> {
+                        try {
+                            val aspectRatio = msg.width.toFloat() / msg.height.toFloat()
+                            var sendByFile = aspectRatio > 10 || aspectRatio < 0.1 || msg.width > 1920 || msg.height > 1920
+                            val inputFile = CacheService.getFile(msg.imageId).let {
+                                if (it == null) {
+                                    val file = BotUtil.downloadImg(msg.imageId, msg.queryUrl())
+                                    if (!sendByFile && file.length() > picToFileSize) {
+                                        sendByFile = true
+                                    }
+                                    InputFile(file)
+                                } else {
+                                    if (!sendByFile && it.fileSize > picToFileSize) {
+                                        sendByFile = true
+                                    }
+                                    InputFile(it.fileId)
                                 }
-                                InputFile(file)
-                            } else {
-                                if (!sendByFile && it.fileSize > picToFileSize) {
-                                    sendByFile = true
-                                }
-                                InputFile(it.fileId)
                             }
-                        }
-                        if (sendByFile) {
-                            SendDocument(privateChat.toString(), inputFile).apply {
+                            if (sendByFile) {
+                                SendDocument(privateChat.toString(), inputFile).apply {
+                                    replyToMessageId = replyMsgId
+                                    if (isSync) {
+                                        caption = "同步消息"
+                                    }
+                                }.send()
+                            } else {
+                                SendPhoto(privateChat.toString(), inputFile).apply {
+                                    replyToMessageId = replyMsgId
+                                    if (isSync) {
+                                        caption = "同步消息"
+                                    }
+                                }.send()
+                            }
+                        } catch (e: Exception) {
+                            log.debug("fallback to send text")
+                            var content = "[图片](${msg.queryUrl()})"
+                            if (isSync) content = "同步消息\n\n$content"
+                            SendMessage(privateChat.toString(), content).apply {
                                 replyToMessageId = replyMsgId
-                                if (isSync) {
-                                    caption = "同步消息"
-                                }
-                            }.send()
-                        } else {
-                            SendPhoto(privateChat.toString(), inputFile).apply {
-                                replyToMessageId = replyMsgId
-                                if (isSync) {
-                                    caption = "同步消息"
-                                }
+                                parseMode = ParseMode.MARKDOWN_V2
                             }.send()
                         }
-                    } catch (e: Exception) {
-                        log.debug("fallback to send text")
-                        var content = "[图片](${msg.queryUrl()})"
+                    }
+
+                    is FileMessage -> {
+                        var content = "文件 ${msg.name}\n\n暂不支持私聊文件上传下载"
                         if (isSync) content = "同步消息\n\n$content"
                         SendMessage(privateChat.toString(), content).apply {
                             replyToMessageId = replyMsgId
-                            parseMode = ParseMode.MARKDOWN_V2
                         }.send()
                     }
-                }
-                is FileMessage -> {
-                    var content = "文件 ${msg.name}\n\n暂不支持私聊文件上传下载"
-                    if (isSync) content = "同步消息\n\n$content"
-                    SendMessage(privateChat.toString(), content).apply {
-                        replyToMessageId = replyMsgId
-                    }.send()
-                }
-                is OnlineAudio -> {
-                    val file = BotUtil.downloadDoc(msg.filename, msg.urlForDownload)
-                    SendVoice(privateChat.toString(), InputFile(file)).apply {
-                        replyToMessageId = replyMsgId
-                        if (isSync) {
-                            caption = "同步消息"
-                        }
-                    }.send()
-                }
-                else -> {
-                    msg.contentToString().takeIf { it.isNotEmpty() }?.let {
-                        val content = if (isSync) "同步消息\n\n$it" else it
-                        SendMessage(privateChat.toString(), content).apply {
+
+                    is OnlineAudio -> {
+                        val file = BotUtil.downloadDoc(msg.filename, msg.urlForDownload)
+                        SendVoice(privateChat.toString(), InputFile(file)).apply {
                             replyToMessageId = replyMsgId
+                            if (isSync) {
+                                caption = "同步消息"
+                            }
                         }.send()
                     }
+
+                    else -> {
+                        msg.contentToString().takeIf { it.isNotEmpty() }?.let {
+                            val content = if (isSync) "同步消息\n\n$it" else it
+                            SendMessage(privateChat.toString(), content).apply {
+                                replyToMessageId = replyMsgId
+                            }.send()
+                        }
+                    }
+                }?.also { rec ->
+                    CacheService.cache(chain, rec)
                 }
-            }?.also { rec ->
-                CacheService.cache(chain, rec)
             }
         }
     }
@@ -220,39 +236,38 @@ class PrivateChatHandler(
     }
 
     suspend fun getStartMsg(friend: Friend): Int? {
-        val qqBot = getBotOrThrow().qq.qqBot
-        var messageId = CacheService.getPrivateChannelMessageId(friend.id)
-        var count = 0
+        val bot = getBotOrThrow()
+        val qqBot = bot.qq.qqBot
+        var messageId = getPrivateChannelMessageIdCache(friend.id)
 
-        while (!newChannelLock.tryLock() && count < 3) {
-            count++
-            delay(5000)
-        }
-        if (count >= 3) {
-            if (newChannelLock.isLocked) {
-                newChannelLock.unlock()
-            }
-        } else if (newChannelLock.isHeldByCurrentThread) {
-            kotlin.runCatching {
-                qqBot.getFriend(friend.id)?.let {
-                    SendPhoto(
-                        privateChatChannel.toString(),
-                        InputFile(qqBot.getFriend(friend.id)?.avatarUrl!!)
-                    ).apply {
-                        caption = "昵称：#${friend.nick}\n备注：#${friend.remark}\n#id${friend.id}\n"
-                    }.send()
+        if (messageId == null) {
+            newChannelLock.withLock {
+                runBlocking(bot.coroutineContext) {
+                    messageId = getPrivateChannelMessageIdCache(friend.id)
+                    if (messageId == null) {
+                        kotlin.runCatching {
+                            qqBot.getFriend(friend.id)?.let {
+                                SendPhoto(
+                                    privateChatChannel.toString(),
+                                    InputFile(qqBot.getFriend(friend.id)?.avatarUrl!!)
+                                ).apply {
+                                    caption = "昵称：#${friend.nick}\n备注：#${friend.remark}\n#id${friend.id}"
+                                }.send()
+                            }
+                            log.debug("Wait for new channel message")
+                            newChannelCondition.await(20, TimeUnit.SECONDS)
+                            val message = messageMap.remove(friend.id.toString()) ?: throw BotException("获取不到好友开头信息")
+                            log.debug("New channel message received: ${message.messageId}")
+                            message.messageId!!.let {
+                                messageId = it
+                                CacheService.cachePrivateChat(friend.id, it)
+                            }
+                        }.onFailure {
+                            log.debug("getStartMsg error", it)
+                        }.getOrThrow()
+                    }
                 }
-                log.debug("Wait for new channel message")
-                newChannelCondition.await(1, TimeUnit.MINUTES)
-                log.debug("New channel message received: ${currentMessage?.messageId}")
-                currentMessage?.messageId?.let {
-                    messageId = it
-                    CacheService.cachePrivateChat(friend.id, it)
-                }
-            }.onFailure {
-                log.debug("getStartMsg error", it)
             }
-            newChannelLock.unlock()
         }
         return messageId
     }
@@ -261,7 +276,9 @@ class PrivateChatHandler(
         coroutineScope {
             launch {
                 log.debug("${this::class.java}#onChannelForward")
-                currentMessage = update.message!!
+                val message = update.message!!
+                val caption = message.caption ?: return@launch
+                messageMap[caption.substringAfterLast("#id")] = update.message!!
                 newChannelLock.withLock {
                     newChannelCondition.signalAll()
                 }
@@ -277,6 +294,10 @@ class PrivateChatHandler(
         } else {
             this.messageId!!
         }
+    }
+
+    private suspend fun getPrivateChannelMessageIdCache(friendId: Long): Int? {
+        return privateChannelMessageIdCache[friendId] ?: CacheService.getPrivateChannelMessageId(friendId)
     }
 
 }
