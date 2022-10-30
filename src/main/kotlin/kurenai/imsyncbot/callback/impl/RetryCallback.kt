@@ -30,7 +30,7 @@ class RetryCallback : Callback() {
         }
 
         val messageId = message.messageId!!
-        val chatId = message.chatId.toString()
+        val chatId = message.chatId
         val retryMsg = "${message.text}\n\n正在重试..."
         EditMessageText(retryMsg).apply {
             this.chatId = chatId

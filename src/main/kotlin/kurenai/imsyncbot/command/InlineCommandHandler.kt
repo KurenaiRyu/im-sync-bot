@@ -5,6 +5,6 @@ import moe.kurenai.tdlight.model.message.Update
 
 abstract class InlineCommandHandler {
 
-    abstract fun execute(update: Update, inlineQuery: InlineQuery, arg: String)
+    abstract suspend fun execute(update: Update, inlineQuery: InlineQuery, args: List<String>)
 
 }

@@ -107,7 +107,7 @@ object CommandDispatcher {
         }_BANNED"
     }
 
-    fun handleInlineQuery(update: Update, inlineQuery: InlineQuery) {
+    suspend fun handleInlineQuery(update: Update, inlineQuery: InlineQuery) {
         if (inlineCommands.isEmpty()) return
 
         if (inlineQuery.query.isBlank()) return
@@ -115,19 +115,19 @@ object CommandDispatcher {
         val offset = inlineQuery.offset.takeIf { it.isNotBlank() }?.toInt() ?: 0
         if (offset < 0) return
         try {
-            val args = query.split(" ", limit = 2)
+            val args = query.split(' ', limit = 2)
+            log.info("Match command ${javaClass.name}")
             when (args.size) {
                 0 -> return
                 1 -> {
                     inlineCommands[query]?.run {
-                        log.info("Match command ${javaClass.name}")
-                        execute(update, inlineQuery, "")
+                        execute(update, inlineQuery, emptyList())
                     }
                 }
+
                 2 -> {
                     inlineCommands[args[0]]?.run {
-                        log.info("Match command ${javaClass.name}")
-                        execute(update, inlineQuery, args[1])
+                        execute(update, inlineQuery, args[1].split(' '))
                     }
                 }
             }
