@@ -7,6 +7,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import org.reflections.Reflections
+import java.io.File
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -50,4 +51,21 @@ inline fun CoroutineScope.launchWithPermit(
     return launch(coroutineContext) {
         semaphore.withPermit { block() }
     }
+}
+
+/**
+ * 创建空文件（包括目录）
+ */
+fun File.createEmpty(): File {
+    this.parentFile.mkdirs()
+    if (!this.exists()) this.createNewFile()
+    return this
+}
+
+/**
+ * 创建父类目录
+ */
+fun File.parentMkdirs(): File {
+    this.parentFile.mkdirs()
+    return this
 }

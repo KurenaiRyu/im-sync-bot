@@ -193,35 +193,39 @@ class TelegramBot(
     object Initialized : TelegramBotStatus
 }
 
+suspend fun <T> Request<ResponseWrapper<T>>.sendCatching(param: TelegramBot? = null): Result<T> {
+    return kotlin.runCatching {
+        send(param)
+    }
+}
+
 suspend fun <T> Request<ResponseWrapper<T>>.send(param: TelegramBot? = null): T {
     val bot = param ?: getBotOrThrow().tg
-    var lastEx: Throwable? = null
+    var ex: Throwable? = null
     bot.clientLock.withLock {
         var count = 0
         while (count <= 0) {
             try {
                 return bot.client.send(this@send)
             } catch (e: Exception) {
-                lastEx = e
+                ex?.also { it.addSuppressed(e) } ?: kotlin.run { ex = e }
                 when (e) {
                     is TelegramApiRequestException -> {
                         e.response?.parameters?.retryAfter?.also { retryAfter ->
                             log.info("Wait for ${retryAfter}s")
                             delay(retryAfter * 1000L)
                         } ?: run {
+                            count++
                             log.warn("消息发送失败", e)
                         }
                     }
-
                     else -> {
+                        count++
                         log.warn("消息发送失败", e)
                     }
                 }
-                count++
             }
         }
+        throw BotException(ex!!.message?.replace(bot.token, "{mask}") ?: "信息发送失败", ex)
     }
-    throw lastEx?.let {
-        BotException(it.message?.replace(bot.token, "{mask}") ?: "信息发送失败")
-    } ?: BotException("信息发送失败")
 }

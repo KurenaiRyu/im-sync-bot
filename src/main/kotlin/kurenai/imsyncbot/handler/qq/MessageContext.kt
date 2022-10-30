@@ -23,6 +23,7 @@ import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.ForwardMessage
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.utils.MiraiExperimentalApi
+import org.apache.logging.log4j.LogManager
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 
@@ -32,6 +33,8 @@ import org.jsoup.parser.Parser
  * @since 9/2/2022 15:12:44
  */
 sealed interface MessageContext
+
+private val log = LogManager.getLogger()
 
 data class GroupMessageContext(
     val bot: ImSyncBot,
@@ -291,10 +294,15 @@ data class GroupMessageContext(
     inner class File(
         val file: FileMessage,
     ) : MessageType {
-        val shouldBeFile = file.size < 50 * 1024 * 1024
+        // 获取到的url telegram不接受, 貌似是文件名称问题
+        // http://183.47.111.39/ftn_handler/B5C4BFA68F2C8362F222D540E5DE5CD40592321149BC8EE21CED5E4A516F2BED00DBA98D5E659DBCEBBC6662CAC8368F728482811326AF3BF8F9170BE2EE9C7C/?fname=31633433666234612D353338312D313165642D393662322D353235343030643663323236
+        // Client request error: [400]Bad Request: wrong file identifier/HTTP URL specified
+        val shouldBeFile = false
 
         suspend fun getFileMessage(): SendDocument {
-            return SendDocument(chatId, InputFile(getUrl())).apply {
+            return SendDocument(chatId, InputFile(getUrl()).apply {
+                fileName = this@File.file.name
+            }).apply {
                 caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
                 parseMode = ParseMode.MARKDOWN_V2
                 replyId?.let { replyToMessageId = replyId }
@@ -313,6 +321,7 @@ data class GroupMessageContext(
 
         private suspend fun getUrl(): String {
             val url = file.toAbsoluteFile(group)?.getUrl()
+            log.debug("File message fetched url: $url")
             require(url != null) { "获取文件地址失败" }
             return url
         }
