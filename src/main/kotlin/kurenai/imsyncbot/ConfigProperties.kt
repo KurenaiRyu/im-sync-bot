@@ -10,6 +10,7 @@ import java.net.Proxy
  */
 
 data class ConfigProperties(
+    val enable: Boolean = true,
     val redis: RedisProperties = RedisProperties(),
     val bot: BotProperties = BotProperties(),
     val handler: HandlerProperties = HandlerProperties()
