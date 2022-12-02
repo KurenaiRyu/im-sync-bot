@@ -5,7 +5,7 @@ import moe.kurenai.tdlight.model.message.Message
 import java.io.File
 
 class GroupConfig(
-    configPath: String
+    configPath: String,
 ) : AbstractConfig<Group>() {
 
     var defaultQQGroup: Long = 0

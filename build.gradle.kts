@@ -1,8 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.7.20"
-    kotlin("kapt") version "1.7.20"
+    kotlin("jvm") version "1.7.21"
     application
 }
 
@@ -11,10 +10,8 @@ version = "0.0.1-SNAPSHOT"
 
 repositories {
     mavenLocal()
-    maven { url = uri("https://repo.spring.io/milestone") }
     maven { url = uri("https://maven.aliyun.com/repository/public/") }
     maven { url = uri("https://maven.aliyun.com/repository/spring/") }
-    maven { url = uri("https://repo.spring.io/release") }
     maven { url = uri("https://jitpack.io") }
     maven(gpr("https://maven.pkg.github.com/KurenaiRyu/tdlight-sdk"))
     maven(gpr("https://maven.pkg.github.com/KurenaiRyu/simple-cache"))
@@ -33,30 +30,25 @@ fun gpr(url: String): (MavenArtifactRepository).() -> Unit {
 
 dependencies {
 
-    val miraiVersion = "2.13.0-M1"
+    val miraiVersion = "2.13.2"
 
     //mirai
-    implementation("net.mamoe", "mirai-core-jvm", miraiVersion) {
-        exclude("net.mamoe", "mirai-core-api")
-        exclude("net.mamoe", "mirai-core-utils")
-    }
-    implementation("net.mamoe", "mirai-core-api-jvm", miraiVersion) {
-        exclude("net.mamoe", "mirai-core-utils")
-    }
-    implementation("net.mamoe", "mirai-core-utils-jvm", miraiVersion)
+    implementation("net.mamoe", "mirai-core", miraiVersion)
+    implementation("net.mamoe", "mirai-core-api", miraiVersion)
+    implementation("net.mamoe", "mirai-core-utils", miraiVersion)
 
     //td-light-sdk
     implementation("moe.kurenai.tdlight", "td-light-sdk", "0.1.0-SNAPSHOT")
 
-    val ktor = "2.1.0"
+    val ktor = "2.1.3"
     implementation("io.ktor:ktor-client-core:${ktor}")
     implementation("io.ktor:ktor-client-okhttp:${ktor}")
-    implementation("io.ktor:ktor-client-encoding:${ktor}")
 
-    val log4j = "2.17.2"
+    val log4j = "2.19.0"
     //logging
     implementation("org.apache.logging.log4j:log4j-core:$log4j")
     implementation("org.apache.logging.log4j:log4j-api:$log4j")
+    implementation("org.apache.logging.log4j:log4j-slf4j-impl:${log4j}")
     implementation("com.lmax:disruptor:3.4.4")
 
     //kotlin

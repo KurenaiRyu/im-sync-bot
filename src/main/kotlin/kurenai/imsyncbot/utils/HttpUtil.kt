@@ -5,7 +5,6 @@ import io.ktor.util.network.*
 import kotlinx.coroutines.future.await
 import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import kurenai.imsyncbot.getBotOrThrow
-import kurenai.imsyncbot.humanReadableByteCountBin
 import mu.KotlinLogging
 import org.apache.logging.log4j.LogManager
 import java.io.File

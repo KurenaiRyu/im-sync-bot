@@ -56,9 +56,7 @@ class ImSyncBot(
     internal val redisson: RedissonClient = configRedisson()
     internal val cache: Cache = configCache()
     internal val proxy: Proxy? = configProxy()
-    internal val userConfig: UserConfig = UserConfig(configPath).apply {
-        setMaster(configProperties.handler)
-    }
+    internal val userConfig: UserConfig = UserConfig(configPath, configProperties)
     internal val groupConfig: GroupConfig = GroupConfig(configPath)
     val tgMessageHandler: TgMessageHandler = TgMessageHandler(configProperties, this)
     var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)

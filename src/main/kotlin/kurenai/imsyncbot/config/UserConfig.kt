@@ -1,16 +1,23 @@
 package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
-import kurenai.imsyncbot.HandlerProperties
+import kurenai.imsyncbot.ConfigProperties
 import moe.kurenai.tdlight.model.message.Message
 import java.io.File
 
+/**
+ * 用户配置类
+ *
+ * @param configPath 用户配置路径
+ * @param configProperties 配置文件
+ */
 class UserConfig(
-    configPath: String
+    configPath: String,
+    configProperties: ConfigProperties
 ) : AbstractConfig<User>() {
 
-    var masterTg: Long = 0
-    var masterQQ: Long = 0
+    var masterTg: Long = configProperties.handler.masterOfTg
+    var masterQQ: Long = configProperties.handler.masterOfQq
     var masterChatId: Long = 0
     var masterUsername: String = ""
 
@@ -152,38 +159,19 @@ class UserConfig(
     }
 
     fun setMaster(message: Message) {
-        setMaster(User(message.from?.id, masterQQ, message.from?.firstName, chatId = message.chat.id))
-    }
-
-    fun setMaster(properties: HandlerProperties) {
-        setMaster(User(properties.masterOfTg, properties.masterOfQq))
-    }
-
-    fun setMaster(user: User) {
-        if (!user.status.contains(UserStatus.MASTER)) user.status.add(UserStatus.MASTER)
-        val master = items.firstOrNull { it.status.contains(UserStatus.MASTER) }
+        val master = items.firstOrNull { it.status.contains(UserStatus.ADMIN) }
         if (master == null) {
-            if (!user.status.contains(UserStatus.MASTER)) user.status.add(UserStatus.MASTER)
-            items.add(user)
+            items.add(User(masterTg, masterQQ, message.from?.firstName, chatId = message.chat.id, status = hashSetOf(UserStatus.MASTER)))
         } else {
-            items.remove(master)
-
-            for (s in master.status) {
-                if (!user.status.contains(s)) user.status.add(s)
+            message.from?.firstName?.let {
+                if (master.username == null) {
+                    master.username = it
+                    masterUsername = it
+                }
             }
-
-            items.add(
-                User(
-                    user.tg ?: master.tg,
-                    user.qq ?: master.qq,
-                    user.username ?: master.username,
-                    user.bindingName ?: master.bindingName,
-                    user.chatId ?: master.chatId,
-                    user.status
-                )
-            )
+            masterChatId = message.chat.id
+            master.chatId = message.chat.id
         }
-        afterUpdate()
     }
 
     override fun refresh() {
@@ -212,14 +200,17 @@ class UserConfig(
                         config.tg?.let(bannedIds::add)
                         config.qq?.let(bannedIds::add)
                     }
+
                     UserStatus.PIC_BANNED -> {
                         config.tg?.let(picBannedIds::add)
                         config.qq?.let(picBannedIds::add)
                     }
+
                     UserStatus.ADMIN -> {
                         config.tg?.let(admins::add)
                         config.qq?.let(admins::add)
                     }
+
                     UserStatus.SUPER_ADMIN -> {
                         config.tg?.let {
                             admins.add(it)
@@ -230,23 +221,19 @@ class UserConfig(
                             superAdmins.add(it)
                         }
                     }
+
                     UserStatus.MASTER -> {
-                        config.tg?.let {
-                            admins.add(it)
-                            superAdmins.add(it)
-                            masterTg = it
-                        }
-                        config.qq?.let {
-                            admins.add(it)
-                            superAdmins.add(it)
-                            masterQQ = it
-                        }
                         config.username?.let { masterUsername = it }
                         config.chatId?.let { masterChatId = it }
                     }
                 }
             }
         }
+
+        admins.add(masterTg)
+        superAdmins.add(masterTg)
+        admins.add(masterQQ)
+        superAdmins.add(masterQQ)
 
         idBindings = ids.toMap()
         usernameBindings = usernames.toMap()

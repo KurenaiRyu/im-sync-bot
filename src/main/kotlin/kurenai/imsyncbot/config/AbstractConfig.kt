@@ -55,7 +55,6 @@ abstract class AbstractConfig<T> {
 
     protected open fun afterUpdate() {
         save()
-        refresh()
     }
 
     protected abstract fun add0(config: T)
