@@ -23,7 +23,6 @@ import net.mamoe.mirai.event.events.FriendMessageEvent
 import net.mamoe.mirai.event.events.FriendMessageSyncEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
-import net.mamoe.mirai.message.sourceMessage
 import org.apache.logging.log4j.LogManager
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -231,7 +230,7 @@ class PrivateChatHandler(
                     builder.add(message.text!!)
                 }
             }
-            CacheService.cache(friend.sendMessage(builder.build()).sourceMessage, message)
+            CacheService.cache(friend.sendMessage(builder.build()), message)
         }
     }
 

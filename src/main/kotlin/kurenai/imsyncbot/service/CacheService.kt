@@ -40,6 +40,13 @@ object CacheService {
 
     private val log = KotlinLogging.logger {}
 
+    /**
+     * 缓存信息，不适用从Receipt中拿到的chain
+     *
+     *
+     * @param messageChain
+     * @param message
+     */
     suspend fun cache(messageChain: MessageChain, message: Message) {
         val bot = getBotOrThrow()
         try {
@@ -55,6 +62,13 @@ object CacheService {
         }
     }
 
+    /**
+     * 缓存信息，用于receipt
+     *
+     *
+     * @param receipt
+     * @param message
+     */
     suspend fun cache(receipt: MessageReceipt<*>, message: Message) {
         cache(receipt.sourceMessage.plus(receipt.source), message)
     }
