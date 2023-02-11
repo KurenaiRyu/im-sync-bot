@@ -9,13 +9,17 @@ group = "moe.kurenai.bot"
 version = "0.0.1-SNAPSHOT"
 
 repositories {
-    mavenLocal()
     maven { url = uri("https://maven.aliyun.com/repository/public/") }
     maven { url = uri("https://maven.aliyun.com/repository/spring/") }
     maven { url = uri("https://jitpack.io") }
     maven(gpr("https://maven.pkg.github.com/KurenaiRyu/tdlight-sdk"))
     maven(gpr("https://maven.pkg.github.com/KurenaiRyu/simple-cache"))
     mavenCentral()
+    mavenLocal {
+        content {
+            includeGroupByRegex(".*\\.kurenai.*")
+        }
+    }
 }
 
 fun gpr(url: String): (MavenArtifactRepository).() -> Unit {
@@ -30,7 +34,7 @@ fun gpr(url: String): (MavenArtifactRepository).() -> Unit {
 
 dependencies {
 
-    val miraiVersion = "2.13.2"
+    val miraiVersion = "2.13.4"
 
     //mirai
     implementation("net.mamoe", "mirai-core", miraiVersion)
@@ -69,7 +73,7 @@ dependencies {
     implementation("org.jsoup:jsoup:1.15.3")
     implementation("io.github.kurenairyu", "simple-cache", "1.2.0-SNAPSHOT")
 
-    implementation("org.redisson:redisson:3.17.6")
+    implementation("org.redisson:redisson:3.19.1")
 
     implementation("org.reflections", "reflections", "0.10.2")
 

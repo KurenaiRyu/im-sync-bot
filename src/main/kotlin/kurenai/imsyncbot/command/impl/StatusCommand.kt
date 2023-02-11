@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
 import kurenai.imsyncbot.command.AbstractTelegramCommand
+import kurenai.imsyncbot.getBot
 import kurenai.imsyncbot.service.CacheService
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
@@ -25,7 +26,10 @@ class StatusCommand : AbstractTelegramCommand() {
         val total = CacheService.total().get()
         val hit = CacheService.hit().get()
         val formatter = NumberFormat.getPercentInstance()
+        val isOnline = getBot()?.qq?.qqBot?.isOnline ?: false
         return """
+            QQ: ${if (isOnline) "在线" else "离线"}
+            
             总可用内存: ${arr[0]}/${arr[1]}
             剩余可用分配内存: ${arr[2]}/${arr[3]}
             

@@ -25,3 +25,21 @@ class AdminCommand : AbstractTelegramCommand() {
     }
 
 }
+
+class RemoveAdminCommand : AbstractTelegramCommand() {
+
+    override val command = "removeAdmin"
+    override val help: String = "移除管理员"
+    override val onlyGroupMessage = true
+    override val onlyReply = true
+
+    private val log = KotlinLogging.logger {}
+
+    override suspend fun execute(update: Update, message: Message): String {
+        val reply = message.replyToMessage!!
+        val user = reply.from!!
+        getBotOrThrow().userConfig.removeAdmin(user.id)
+        return "移除管理员成功"
+    }
+
+}

@@ -9,6 +9,7 @@ services:
       driver: "json-file"
       options:
         max-size: "50m"
+    user: root
     volumes:
       #      - ./api-data/:/var/lib/telegram-bot-api/ #本地api配置
       - ./mirai/:/deployments/mirai/

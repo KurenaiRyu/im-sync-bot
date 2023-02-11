@@ -163,7 +163,7 @@ class QQBotClient(
                                                             var count = 0
                                                             while (count < 3) {
                                                                 try {
-                                                                    bot.qqMessageHandler.onGroupMessage(GroupMessageContext(bot, group, messageChain!!))
+                                                                    bot.qqMessageHandler.onGroupMessage(GroupMessageContext(bot, group, messageChain))
                                                                     break
                                                                 } catch (e: ConnectException) {
                                                                     log.warn(e.message)

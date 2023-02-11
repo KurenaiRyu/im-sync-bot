@@ -4,7 +4,7 @@ im同步机器人，现主要同步（转发）tg跟qq群。
 
 ## Upgrade
 
-若是从旧版本迁移上来，请注意本版本不向下兼容，需要重新按照下面修改配置文件，并且删除config/device.json。
+若是从旧版本迁移上来，请注意本版本不向下兼容，需要重新按照下面修改配置文件。
 
 ## Quickstart
 
@@ -32,9 +32,9 @@ im同步机器人，现主要同步（转发）tg跟qq群。
         qqMsgFormat: "$name: $msg" # qq消息格式化
     ```
 2. 如果你有之前qq机器人生成过得 `device.json`，则只需要把他放入项目根目录下然后进行下面的第3步即可。没有则如下操作：  
-   启动redis `docker-compose up -d redis`, 如果用的是本地api则`docker-compose up -d redis api`。
-   启动bot `docker-compose run -T bot` 等待运行。注意有些ssh工具比如idea是可能展示不全转行的文字，所以可能导致复制的链接刷不出二维码来（可以尝试直接点击链接而不是复制，idea貌似能够识别完全整个链接）
-   如果碰到登录验证问题按照提示输入， 登录成功，即可`ctrl + C`中断运行。  
+   启动redis `docker compose up -d redis`, 如果用的是本地api则`docker compose up -d redis api`。
+   启动bot `docker compose run -T --rm bot` 等待运行。注意有些ssh工具比如idea是可能展示不全转行的文字，所以可能导致复制的链接刷不出二维码来（可以尝试直接点击链接而不是复制，idea貌似能够识别完全整个链接）
+   如果碰到登录验证问题按照提示输入，具体看mirai官方文档， 登录成功后即可`ctrl + C`中断运行（也许需要多次或者关不掉，只能关闭当前ssh，手动停止镜像了）。  
    想要跳过则需要把 [Mirai](https://github.com/mamoe/mirai) 生成的device.json文件放入根目录下。
 3. 输入命令 `docker-compose up -d` 后台运行程序
 
