@@ -1,10 +1,7 @@
 package kurenai.imsyncbot.telegram
 
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
@@ -14,6 +11,7 @@ import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.qq.QQBotClient
 import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.utils.chatInfoString
 import kurenai.imsyncbot.utils.childScopeContext
 import moe.kurenai.tdlight.AbstractUpdateSubscriber
 import moe.kurenai.tdlight.LongPollingCoroutineTelegramBot
@@ -34,6 +32,7 @@ import kotlin.coroutines.CoroutineContext
  * @author Kurenai
  * @since 2021-06-30 14:05
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class TelegramBot(
     parentCoroutineContext: CoroutineContext,
     private val telegramProperties: TelegramProperties,
@@ -46,6 +45,10 @@ class TelegramBot(
 
     internal val clientLock = Mutex()
     private val messageReceiveLock = Mutex()
+
+    @OptIn(DelicateCoroutinesApi::class)
+    private val workerContext = newFixedThreadPoolContext(10, "${telegramProperties.username}-worker")
+    private val handlerContext = bot.coroutineContext + workerContext.limitedParallelism(9)
     var statusChannel = Channel<TelegramBotStatus>(Channel.BUFFERED)
     val username: String = telegramProperties.username
     val token: String = telegramProperties.token
@@ -54,7 +57,7 @@ class TelegramBot(
     internal lateinit var tgBot: LongPollingCoroutineTelegramBot
 
     suspend fun start() {
-        CoroutineScope(bot.coroutineContext).launch {
+        CoroutineScope(bot.coroutineContext + workerContext.limitedParallelism(1)).launch {
             log.debug("Telegram base url: ${telegramProperties.baseUrl}")
             client = TDLightCoroutineClient(
                 telegramProperties.baseUrl,
@@ -83,7 +86,7 @@ class TelegramBot(
     }
 
     override fun onNext0(update: Update) {
-        CoroutineScope(bot.coroutineContext).launch {
+        CoroutineScope(handlerContext).launch {
             messageReceiveLock.withLock {
                 try {
                     onUpdateReceivedSuspend(update)
@@ -101,7 +104,7 @@ class TelegramBot(
     }
 
     suspend fun onUpdateReceivedSuspend(update: Update) {
-        log.info("onUpdateReceived: {}", MAPPER.writeValueAsString(update))
+        log.info("${update.chatInfoString()}: {}", MAPPER.writeValueAsString(update))
         val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message
         if (message == null) {
             log.debug("No message")
@@ -122,13 +125,13 @@ class TelegramBot(
 
         if (message.isCommand()) {
             coroutineScope {
-                launch(bot.coroutineContext) {
+                launch(handlerContext) {
                     CommandDispatcher.execute(update, message)
                 }
             }
         } else if (update.hasInlineQuery()) {
             coroutineScope {
-                launch(bot.coroutineContext) {
+                launch(handlerContext) {
                     CommandDispatcher.handleInlineQuery(update, update.inlineQuery!!)
                 }
             }
@@ -184,7 +187,7 @@ class TelegramBot(
             }.send(this)
             CacheService.cache(message)
         } catch (e: Exception) {
-            log.error("Report error task fail: ${e.message}", e)
+            log.error("${update.chatInfoString()} Report error task fail: ${e.message}", e)
         }
     }
 

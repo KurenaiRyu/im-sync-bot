@@ -8,6 +8,7 @@ import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
+import kurenai.imsyncbot.utils.groupInfoString
 import moe.kurenai.tdlight.exception.TelegramApiException
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.ParseMode
@@ -42,6 +43,8 @@ class QQMessageHandler(
     @Throws(Exception::class)
     @Suppress("UNCHECKED_CAST")
     override suspend fun onGroupMessage(context: GroupMessageContext): Int {
+        if (context.bot.groupConfig.bannedGroups.contains(context.group.id)) return CONTINUE
+
         val messageType = context.getType()
         val list = if (messageType is GroupMessageContext.Forward) messageType.contextList else listOf(context)
         for (c in list) {
@@ -61,7 +64,7 @@ class QQMessageHandler(
             }.recoverCatching {
                 c.normalType.telegramMessage.send(tg)
             }.getOrThrow()?.also { message ->
-                log.debug("Sent ${mapper.writeValueAsString(message)}")
+                log.debug("${context.groupInfoString()} Sent ${mapper.writeValueAsString(message)}")
                 if (message is Message) {
                     CacheService.cache(context.messageChain, message)
                 } else {

@@ -1,2 +1,2 @@
 #!/bin/bash
-chmod +rwx config/* && java -jar /deployments/im-sync-bot.jar
+chmod +rwx config/* && java -jar /deployments/im-sync-bot.jar -Dkotlinx.coroutines.debug

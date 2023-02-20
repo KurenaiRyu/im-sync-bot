@@ -21,7 +21,7 @@ abstract class AbstractTelegramCommand {
     abstract suspend fun execute(update: Update, message: Message): String?
 
     fun String.param(): String {
-        return this.replace("/$command", "").trim()
+        return this.substring(command.length + 1).trim()
     }
 
 

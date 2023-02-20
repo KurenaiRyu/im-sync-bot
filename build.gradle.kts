@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.7.21"
+    kotlin("jvm") version "1.8.10"
     application
 }
 
@@ -9,11 +9,7 @@ group = "moe.kurenai.bot"
 version = "0.0.1-SNAPSHOT"
 
 repositories {
-    maven { url = uri("https://maven.aliyun.com/repository/public/") }
-    maven { url = uri("https://maven.aliyun.com/repository/spring/") }
     maven { url = uri("https://jitpack.io") }
-    maven(gpr("https://maven.pkg.github.com/KurenaiRyu/tdlight-sdk"))
-    maven(gpr("https://maven.pkg.github.com/KurenaiRyu/simple-cache"))
     mavenCentral()
     mavenLocal {
         content {
@@ -22,19 +18,9 @@ repositories {
     }
 }
 
-fun gpr(url: String): (MavenArtifactRepository).() -> Unit {
-    return {
-        this.url = uri(url)
-        credentials {
-            username = project.findProperty("gpr.user") as String? ?: System.getenv("USERNAME")
-            password = project.findProperty("gpr.key") as String? ?: System.getenv("TOKEN")
-        }
-    }
-}
-
 dependencies {
 
-    val miraiVersion = "2.13.4"
+    val miraiVersion = "2.14.0"
 
     //mirai
     implementation("net.mamoe", "mirai-core", miraiVersion)
@@ -59,6 +45,9 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
+    //cache
+    implementation("com.sksamuel.aedile:aedile-core:1.2.0")
+
     //tool kit
     implementation("com.google.guava:guava:31.1-jre")
     implementation("org.sejda.imageio:webp-imageio:0.1.6")
@@ -81,7 +70,7 @@ dependencies {
 }
 
 application {
-    applicationDefaultJvmArgs = listOf("-Dspring.config.location=./config/config.yaml", "-Duser.timezone=GMT+08")
+    applicationDefaultJvmArgs = listOf("-Dkotlinx.coroutines.debug", "-Duser.timezone=GMT+08")
 }
 
 java {

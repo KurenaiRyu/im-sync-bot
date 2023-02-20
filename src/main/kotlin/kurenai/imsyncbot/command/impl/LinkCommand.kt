@@ -1,8 +1,10 @@
 package kurenai.imsyncbot.command.impl
 
+import com.sksamuel.aedile.core.caffeineBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kurenai.imsyncbot.command.AbstractQQCommand
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.UserStatus
 import kurenai.imsyncbot.getBotOrThrow
@@ -11,17 +13,24 @@ import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
+import moe.kurenai.tdlight.request.message.EditMessageText
 import moe.kurenai.tdlight.request.message.SendMessage
+import net.mamoe.mirai.contact.Group
+import net.mamoe.mirai.event.events.MessageEvent
 import net.mamoe.mirai.message.data.At
+import net.mamoe.mirai.message.data.MessageSource.Key.quote
+import net.mamoe.mirai.message.data.PlainText
+import net.mamoe.mirai.message.data.QuoteReply
 import net.mamoe.mirai.message.data.source
-import java.util.*
-import java.util.concurrent.TimeUnit
-import kotlin.concurrent.timerTask
+import kotlin.time.Duration.Companion.minutes
 
 class LinkCommand : AbstractTelegramCommand() {
 
     companion object {
-        val holdLinks = HashMap<Int, Pair<Long, List<Message>>>()
+        // <msgId, <qq, [tgMsg, tgTipsMsg]>>
+        val linkCache = caffeineBuilder<Int, Pair<Long, List<Message>>> {
+            expireAfterWrite = 10.minutes
+        }.build()
     }
 
     override val command = "link"
@@ -33,13 +42,11 @@ class LinkCommand : AbstractTelegramCommand() {
 
     override val reply = true
 
-    private val timer = Timer("clearLink", false)
-
     override suspend fun execute(update: Update, message: Message): String? {
         val bot = getBotOrThrow()
         val qqBot = bot.qq.qqBot
         val replyMsg = message.replyToMessage!!
-        if (replyMsg.from?.username != bot.tg.username) return "请引用转发的qq消息"
+        if (replyMsg.from?.id != bot.tg.tgBot.me.id) return "请引用转发的qq消息"
         val qqMsg = CacheService.getQQByTg(replyMsg) ?: return "找不到该qq信息"
         val user = message.from!!
         return if (bot.userConfig.superAdmins.contains(user.id)) {
@@ -61,18 +68,7 @@ class LinkCommand : AbstractTelegramCommand() {
                             parseMode = ParseMode.MARKDOWN_V2
                         }.send()
                         val msgId = receipt.source.ids[0]
-                        holdLinks[msgId] = qqMsg.source.fromId to listOf(message, tips)
-
-                        timer.schedule(timerTask {
-                            CoroutineScope(Dispatchers.Default).launch {
-                                holdLinks.remove(msgId)?.let {
-                                    SendMessage(message.chatId, "已超时").apply {
-                                        replyToMessageId = message.messageId
-                                    }.send()
-                                    qqGroup.sendMessage(receipt.quote().plus("已超时"))
-                                }
-                            }
-                        }, TimeUnit.MINUTES.toMillis(3))
+                        linkCache[msgId] = qqMsg.source.fromId to listOf(message, tips)
                     }
             }
             null
@@ -109,4 +105,31 @@ class UnlinkCommand : AbstractTelegramCommand() {
         }
         return "已取消qq[${user.qq}]和@${user.username}的链接关系"
     }
+}
+
+class AcceptLinkCommand : AbstractQQCommand() {
+
+    override suspend fun execute(event: MessageEvent): Int {
+        if (event.subject is Group) {
+            val cache = LinkCommand.linkCache
+            val reply = event.message[QuoteReply.Key] ?: return 0
+            val (qq, msgList) = reply.let { cache.getIfPresent(it.source.ids[0]) } ?: return 0
+            if (qq != event.sender.id) {
+                event.subject.sendMessage(event.message.quote().plus("非绑定目标QQ"))
+                return 1
+            }
+            if (event.message.filterIsInstance(PlainText::class.java).any { it.content.contains("accept") }) {
+                getBotOrThrow().userConfig.link(msgList[0].from!!.id, qq, msgList[0].from!!.username!!)
+                cache.invalidate(reply.source.ids[0])
+                event.subject.sendMessage(event.message.quote().plus("绑定成功"))
+                EditMessageText("绑定成功").apply {
+                    chatId = msgList[1].chatId
+                    messageId = msgList[1].messageId
+                }.send()
+                return 1
+            }
+        }
+        return 0
+    }
+
 }

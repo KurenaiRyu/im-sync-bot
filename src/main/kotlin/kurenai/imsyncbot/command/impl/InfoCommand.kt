@@ -93,6 +93,11 @@ class InfoCommand : AbstractTelegramCommand() {
                 list.add("firstName: `${user.firstName.format2Markdown()}`")
                 list.add("lastName: `${user.lastName?.format2Markdown()}`")
                 list.add("isBot: ${user.isBot}")
+                bot.userConfig.items.firstOrNull {
+                    it.tg == user.id
+                }?.let {
+                    list.add("status: ${it.status.toString().fm2md()}")
+                }
                 list.joinToString("\n")
             }
         } else {

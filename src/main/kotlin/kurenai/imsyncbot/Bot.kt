@@ -11,9 +11,9 @@ import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.github.kurenairyu.cache.redis.lettuce.jackson.RecordNamingStrategyPatchModule
 import kurenai.imsyncbot.callback.Callback
+import kurenai.imsyncbot.command.AbstractInlineCommand
 import kurenai.imsyncbot.command.AbstractQQCommand
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.command.InlineCommandHandler
 import kurenai.imsyncbot.config.AbstractConfig
 import kurenai.imsyncbot.handler.qq.QQHandler
 import kurenai.imsyncbot.handler.qq.QQMessageHandler
@@ -58,7 +58,7 @@ internal val configs = ArrayList<AbstractConfig<*>>()
 internal val callbacks = reflections.getSubTypesOf(Callback::class.java).map { it.getConstructor().newInstance() }
 internal val tgCommands = ArrayList<AbstractTelegramCommand>()
 internal val qqCommands = ArrayList<AbstractQQCommand>()
-internal val inlineCommands = HashMap<String, InlineCommandHandler>()
+internal val inlineCommands = HashMap<String, AbstractInlineCommand>()
 internal val qqHandlers = ArrayList<QQHandler>()
 internal val tgHandlers = ArrayList<TelegramHandler>()
 
@@ -95,6 +95,8 @@ fun loadProperties() {
 fun commonInit() {
     registerTgCommand()
     registerQQCommand()
+    //TODO: 设置 inline 命令
+//    registerInlineCommand()
     registerTgHandler()
     registerQQHandler()
     setUpTimer()
@@ -136,6 +138,17 @@ private fun registerQQCommand() {
         .forEach { command ->
             qqCommands.add(command)
             log.info("Registered qq command:  ${command.name}(${command::class.java.simpleName})")
+        }
+}
+
+private fun registerInlineCommand() {
+    reflections.getSubTypesOf(AbstractInlineCommand::class.java)
+        .map { it.getDeclaredConstructor().newInstance() }
+        .forEach { command ->
+            if (command.command.isNotBlank()) {
+                inlineCommands[command.command] = command
+            }
+            log.info("Registered inline command:  ${command.name}(${command::class.java.simpleName})")
         }
 }
 

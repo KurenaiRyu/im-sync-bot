@@ -7,12 +7,19 @@ import io.lettuce.core.RedisURI
 import kotlinx.coroutines.*
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.handler.qq.QQMessageHandler
 import kurenai.imsyncbot.handler.tg.TgMessageHandler
 import kurenai.imsyncbot.qq.QQBotClient
+import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.utils.childScopeContext
+import moe.kurenai.tdlight.model.message.Message
+import net.mamoe.mirai.contact.Group
+import net.mamoe.mirai.contact.NormalMember
+import net.mamoe.mirai.contact.getMember
+import net.mamoe.mirai.message.data.source
 import org.redisson.Redisson
 import org.redisson.api.RedissonClient
 import org.redisson.codec.JsonJacksonCodec
@@ -77,6 +84,24 @@ class ImSyncBot(
             qq.start()
             tg.start()
         }
+    }
+
+    suspend fun getMemberFromMessage(message: Message): NormalMember {
+        val tgId = message.replyToMessage?.from?.id ?: throw BotException("未找到该消息发送用户id")
+        val group = getGroupFromMessage(message)
+        val qq = if (tgId == tg.tgBot.me.id) { //bot id
+            CacheService.getQQByTg(message)?.source?.fromId ?: throw BotException("未找到该用户qq")
+        } else {
+            userConfig.links.firstOrNull { it.tg == tgId }?.qq ?: throw BotException("该用户未绑定qq")
+        }
+        return group.getMember(qq) ?: throw BotException("未找到该成员")
+    }
+
+    suspend fun getMemberFromMessageReply(message: Message) = getMemberFromMessage(message.replyToMessage ?: throw BotException("未找到该消息的引用"))
+
+    fun getGroupFromMessage(message: Message): Group {
+        val groupId = groupConfig.tgQQ[message.chat.id] ?: throw BotException("未找到该qq群id")
+        return qq.qqBot.getGroup(groupId) ?: throw BotException("未找到该qq群")
     }
 
     private fun configRedisson(): RedissonClient {

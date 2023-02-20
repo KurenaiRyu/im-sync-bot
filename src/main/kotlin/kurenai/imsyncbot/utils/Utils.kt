@@ -6,6 +6,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kurenai.imsyncbot.handler.qq.GroupMessageContext
+import moe.kurenai.tdlight.model.message.Update
 import org.reflections.Reflections
 import java.io.File
 import java.text.CharacterIterator
@@ -108,3 +110,7 @@ fun Long.humanReadableByteCountBin(): String {
     value *= java.lang.Long.signum(this).toLong()
     return String.format("%.1f %ciB", value / 1024.0, ci.current())
 }
+
+fun Update.chatInfoString() = this.message?.chat?.let { "[${it.title ?: it.username}(${it.id})]" } ?: ""
+
+fun GroupMessageContext.groupInfoString() = "[${this.group.name}(${this.group.id})]"

@@ -55,6 +55,10 @@ class QQBotClient(
     var messageCount = 0
     val mapLock: Mutex = Mutex()
 
+    @OptIn(DelicateCoroutinesApi::class)
+    val workerContext = newFixedThreadPoolContext(10, "${qqProperties.account}-worker")
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun start() {
         log.info("Login qq ${qqProperties.account}...")
         qqBot.login()
@@ -114,7 +118,11 @@ class QQBotClient(
                                     if (scope == null) {
                                         mapLock.withLock {
                                             scopeMap.getOrPut(queueName) {
-                                                CoroutineScope(newSingleThreadContext("${friend.nameCardOrNick}(${friend.id})"))
+                                                CoroutineScope(
+                                                    bot.coroutineContext +
+                                                            workerContext.limitedParallelism(1) +
+                                                            CoroutineName("${friend.nameCardOrNick}(${friend.id})")
+                                                )
                                             }.launch {
                                                 while (isActive) {
                                                     try {
@@ -123,13 +131,11 @@ class QQBotClient(
                                                                 .toCompletableFuture()
                                                                 .await()
                                                         if (message != null) {
-                                                            withContext(bot.coroutineContext) {
-                                                                bot.privateHandle.onFriendMessage(
-                                                                    friend,
-                                                                    message.deserializeJsonToMessageChain(),
-                                                                    friend.id == qqBot.id
-                                                                )
-                                                            }
+                                                            bot.privateHandle.onFriendMessage(
+                                                                friend,
+                                                                message.deserializeJsonToMessageChain(),
+                                                                friend.id == qqBot.id
+                                                            )
                                                         }
                                                     } catch (e: Exception) {
                                                         log.error("Handle friend message fail", e)
@@ -149,7 +155,11 @@ class QQBotClient(
                                     if (scope == null) {
                                         mapLock.withLock {
                                             scopeMap.getOrPut(queueName) {
-                                                CoroutineScope(newSingleThreadContext("${event.group.name}(${event.group.id})"))
+                                                CoroutineScope(
+                                                    bot.coroutineContext +
+                                                            workerContext.limitedParallelism(1) +
+                                                            CoroutineName("${event.group.name}(${event.group.id})")
+                                                )
                                             }.launch {
                                                 val group = event.group
                                                 while (isActive) {
@@ -159,17 +169,15 @@ class QQBotClient(
                                                             queue.pollAsync(30, TimeUnit.SECONDS).toCompletableFuture()
                                                                 .await() ?: continue
                                                         messageChain = message.deserializeJsonToMessageChain()
-                                                        withContext(bot.coroutineContext) {
-                                                            var count = 0
-                                                            while (count < 3) {
-                                                                try {
-                                                                    bot.qqMessageHandler.onGroupMessage(GroupMessageContext(bot, group, messageChain))
-                                                                    break
-                                                                } catch (e: ConnectException) {
-                                                                    log.warn(e.message)
-                                                                    count++
-                                                                    delay(count * 2000L)
-                                                                }
+                                                        var count = 0
+                                                        while (count < 3) {
+                                                            try {
+                                                                bot.qqMessageHandler.onGroupMessage(GroupMessageContext(bot, group, messageChain))
+                                                                break
+                                                            } catch (e: ConnectException) {
+                                                                log.warn(e.message)
+                                                                count++
+                                                                delay(count * 2000L)
                                                             }
                                                         }
                                                     } catch (e: ImSyncBotRuntimeException) {

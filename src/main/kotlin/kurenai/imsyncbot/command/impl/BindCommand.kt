@@ -19,7 +19,7 @@ class BindCommand : AbstractTelegramCommand() {
 
 
     override suspend fun execute(update: Update, message: Message): String? {
-        val param = message.text?.param() ?: "参数错误"
+        val param = message.text?.param() ?: return "参数错误"
         val bot = getBotOrThrow()
         val qqBot = bot.qq.qqBot
         return if (message.isGroupMessage() || message.isSuperGroupMessage()) {
