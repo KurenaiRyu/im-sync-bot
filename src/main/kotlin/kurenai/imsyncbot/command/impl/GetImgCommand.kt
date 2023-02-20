@@ -23,7 +23,8 @@ class GetImgCommand : AbstractTelegramCommand() {
     private val log = LogManager.getLogger()
 
     override suspend fun execute(update: Update, message: Message): String? {
-        val messageChain = CacheService.getQQByTg(message)
+        val replyMsg = message.replyToMessage ?: return "必须引用一条消息"
+        val messageChain = CacheService.getQQByTg(replyMsg)
         if (messageChain != null) {
             val imgUrlList = messageChain.filterIsInstance<Image>().map { it.queryUrl() }
             if (imgUrlList.size == 1) {
