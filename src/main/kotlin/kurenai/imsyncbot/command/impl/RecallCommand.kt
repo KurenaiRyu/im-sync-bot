@@ -8,13 +8,13 @@ import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.DeleteMessage
 import moe.kurenai.tdlight.request.message.SendMessage
-import mu.KotlinLogging
+import moe.kurenai.tdlight.util.getLogger
 import net.mamoe.mirai.contact.recallMessage
 import net.mamoe.mirai.message.data.source
 
 class RecallCommand : AbstractTelegramCommand() {
 
-    private val log = KotlinLogging.logger {}
+    private val log = getLogger()
     override val help: String = "撤回消息"
     override val command: String = "recall"
     override val onlySupperAdmin: Boolean = false

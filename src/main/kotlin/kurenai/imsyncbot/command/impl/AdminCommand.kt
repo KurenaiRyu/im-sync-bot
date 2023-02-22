@@ -4,15 +4,12 @@ import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.getBotOrThrow
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
-import mu.KotlinLogging
 
 class AdminCommand : AbstractTelegramCommand() {
 
     override val command = "admin"
     override val help: String = "设置管理员"
     override val onlyGroupMessage = true
-
-    private val log = KotlinLogging.logger {}
 
     override suspend fun execute(update: Update, message: Message): String {
         return if (message.isReply()) {
@@ -32,8 +29,6 @@ class RemoveAdminCommand : AbstractTelegramCommand() {
     override val help: String = "移除管理员"
     override val onlyGroupMessage = true
     override val onlyReply = true
-
-    private val log = KotlinLogging.logger {}
 
     override suspend fun execute(update: Update, message: Message): String {
         val reply = message.replyToMessage!!

@@ -5,7 +5,7 @@ import io.ktor.util.network.*
 import kotlinx.coroutines.future.await
 import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
 import kurenai.imsyncbot.getBotOrThrow
-import mu.KotlinLogging
+import moe.kurenai.tdlight.util.getLogger
 import org.apache.logging.log4j.LogManager
 import java.io.File
 import java.io.InputStream
@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 object HttpUtil {
 
-    private val log = KotlinLogging.logger {}
+    private val log = getLogger()
 
     var PROXY: Proxy? = null
     var IMG_BASE_URL: String? = null
@@ -73,14 +73,14 @@ object HttpUtil {
         }
         val timeOfMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
         val speed = file.length() * 1000 / timeOfMillis
-        log.info {
+        log.info(
             "Downloaded ${file.name} ${file.length().humanReadableByteCountBin()} in ${
                 String.format(
                     "%.2f",
                     timeOfMillis / 1000.0
                 )
             } s (${speed.humanReadableByteCountBin()}/s)"
-        }
+        )
         return file
     }
 
@@ -165,10 +165,10 @@ object HttpUtil {
             HttpResponse.BodyHandlers.ofInputStream()
         ).handle { res, case ->
             if (case != null) {
-                log.debug { "Get remote file size error: ${case.message}" }
+                log.debug("Get remote file size error: ${case.message}")
                 null
             } else if (res.statusCode() != 206) {
-                log.debug { "Get remote file size fail: ${res.infoString()}" }
+                log.debug("Get remote file size fail: ${res.infoString()}")
                 null
             } else if (res.statusCode() == 404) {
                 throw ImSyncBotRuntimeException("File not found: ${res.infoString()}")

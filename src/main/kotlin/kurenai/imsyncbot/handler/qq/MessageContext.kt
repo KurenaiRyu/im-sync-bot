@@ -69,7 +69,7 @@ data class GroupMessageContext(
     suspend fun getType() = type ?: handleType(messageChain).also { type = it }
 
     @OptIn(MiraiExperimentalApi::class)
-    private suspend fun handleType(messageChain: MessageChain): MessageType {
+    private fun handleType(messageChain: MessageChain): MessageType {
         return if (messageChain.contains(RichMessage.Key)) {
             val content = messageChain[RichMessage.Key]!!.content
             try {
@@ -213,7 +213,7 @@ data class GroupMessageContext(
                 (ratio > maxImageRatio || ratio < minImageRatio)
 
         suspend fun getImageMessage(): SendPhoto {
-            return SendPhoto(chatId, InputFile(image.queryUrl())).apply {
+            return SendPhoto(chatId, InputFile(image.queryUrl()).apply { fileName = image.imageId }).apply {
                 parseMode = ParseMode.MARKDOWN_V2
                 caption = if (onlyImage) {
                     "".formatMsg(senderId, senderName)
@@ -225,7 +225,7 @@ data class GroupMessageContext(
         }
 
         suspend fun getFileMessage(): SendDocument {
-            return SendDocument(chatId, InputFile(image.queryUrl())).apply {
+            return SendDocument(chatId, InputFile(image.queryUrl()).apply { fileName = image.imageId }).apply {
                 parseMode = ParseMode.MARKDOWN_V2
                 caption = if (onlyImage) {
                     "".formatMsg(senderId, senderName)
@@ -250,11 +250,11 @@ data class GroupMessageContext(
                 media = images.mapNotNull {
                     if (it.imageType == ImageType.GIF) null
                     else if (shouldBeFile)
-                        InputMediaDocument(InputFile(it.queryUrl())).apply {
+                        InputMediaDocument(InputFile(it.queryUrl()).apply { fileName = it.imageId }).apply {
                             parseMode = ParseMode.MARKDOWN_V2
                         }
                     else
-                        InputMediaPhoto(InputFile(it.queryUrl())).apply {
+                        InputMediaPhoto(InputFile(it.queryUrl()).apply { fileName = it.imageId }).apply {
                             parseMode = ParseMode.MARKDOWN_V2
                         }
                 }.also {
@@ -271,7 +271,7 @@ data class GroupMessageContext(
         val image: Image,
     ) : MessageType {
         suspend fun getTelegramMessage(): SendAnimation {
-            return SendAnimation(chatId, InputFile(image.queryUrl())).apply {
+            return SendAnimation(chatId, InputFile(image.queryUrl()).apply { fileName = image.imageId }).apply {
                 caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
                 parseMode = ParseMode.MARKDOWN_V2
                 replyId?.let { replyToMessageId = replyId }
@@ -279,11 +279,11 @@ data class GroupMessageContext(
         }
     }
 
-    inner class Video(val file: FileMessage) : MessageType {
+    inner class Video(val fileMessage: FileMessage) : MessageType {
         suspend fun getTelegramMessage(): SendVideo {
-            val url = file.toAbsoluteFile(group)?.getUrl()
+            val url = fileMessage.toAbsoluteFile(group)?.getUrl()
             require(url != null) { "获取视频地址失败" }
-            return SendVideo(chatId, InputFile(url)).apply {
+            return SendVideo(chatId, InputFile(url).apply { fileName = fileMessage.name }).apply {
                 caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
                 parseMode = ParseMode.MARKDOWN_V2
                 replyId?.let { replyToMessageId = replyId }
@@ -292,7 +292,7 @@ data class GroupMessageContext(
     }
 
     inner class File(
-        val file: FileMessage,
+        val fileMessage: FileMessage,
     ) : MessageType {
         // 获取到的url telegram不接受, 貌似是文件名称问题
         // http://183.47.111.39/ftn_handler/B5C4BFA68F2C8362F222D540E5DE5CD40592321149BC8EE21CED5E4A516F2BED00DBA98D5E659DBCEBBC6662CAC8368F728482811326AF3BF8F9170BE2EE9C7C/?fname=31633433666234612D353338312D313165642D393662322D353235343030643663323236
@@ -301,7 +301,7 @@ data class GroupMessageContext(
 
         suspend fun getFileMessage(): SendDocument {
             return SendDocument(chatId, InputFile(getUrl()).apply {
-                fileName = this@File.file.name
+                fileName = fileMessage.name
             }).apply {
                 caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
                 parseMode = ParseMode.MARKDOWN_V2
@@ -314,13 +314,13 @@ data class GroupMessageContext(
                 parseMode = ParseMode.MARKDOWN_V2
                 replyId?.let { replyToMessageId = replyId }
                 replyMarkup = InlineKeyboardMarkup(listOf(listOf(InlineKeyboardButton("获取/刷新下载链接").apply {
-                    callbackData = "$METHOD ${group.id} ${file.toAbsoluteFile(group)?.absolutePath ?: ""}"
+                    callbackData = "$METHOD ${group.id} ${fileMessage.toAbsoluteFile(group)?.absolutePath ?: ""}"
                 })))
             }
         }
 
         private suspend fun getUrl(): String {
-            val url = file.toAbsoluteFile(group)?.getUrl()
+            val url = fileMessage.toAbsoluteFile(group)?.getUrl()
             log.debug("File message fetched url: $url")
             require(url != null) { "获取文件地址失败" }
             return url

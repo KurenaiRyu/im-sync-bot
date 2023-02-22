@@ -15,7 +15,7 @@ import moe.kurenai.tdlight.model.media.PhotoSize
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.MessageEntity
 import moe.kurenai.tdlight.request.GetFile
-import mu.KotlinLogging
+import moe.kurenai.tdlight.util.getLogger
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
@@ -29,7 +29,7 @@ class TgMessageHandler(
     internal val bot: ImSyncBot
 ) : TelegramHandler {
 
-    private val log = KotlinLogging.logger {}
+    private val log = getLogger()
 
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
@@ -50,19 +50,19 @@ class TgMessageHandler(
     @Throws(Exception::class)
     override suspend fun onMessage(message: Message): Int {
         if (message.isCommand()) {
-            log.info { "ignore command" }
+            log.info("ignore command")
             return CONTINUE
         }
         if (!bot.groupConfig.tgQQ.containsKey(message.chat.id)) {
-            log.info { "ignore no configProperties group" }
+            log.info("ignore no configProperties group")
             return CONTINUE
         }
         if (bot.groupConfig.bannedGroups.contains(message.chat.id)) {
-            log.info { "ignore banned group" }
+            log.info("ignore banned group")
             return CONTINUE
         }
         if (bot.userConfig.bannedIds.contains(message.from?.id)) {
-            log.info { "ignore banned id" }
+            log.info("ignore banned id")
             return CONTINUE
         }
 
@@ -74,7 +74,7 @@ class TgMessageHandler(
         if (groupId == 0L) return CONTINUE
         val group = bot.qq.qqBot.getGroup(groupId)
         if (null == group) {
-            log.error { "QQ group[$groupId] not found." }
+            log.error("QQ group[$groupId] not found.")
             return CONTINUE
         }
         val senderId = message.from!!.id
@@ -83,7 +83,7 @@ class TgMessageHandler(
         val caption = message.caption ?: ""
 
         if ((message.from?.username == "GroupAnonymousBot" || isMaster) && (caption.contains("#nfwd") || message.text?.contains("#nfwd") == true)) {
-            log.debug { "No forward message." }
+            log.debug("No forward message.")
             return END
         }
 
@@ -266,7 +266,7 @@ class TgMessageHandler(
                 ret = group.uploadImage(it)
             }
         } catch (e: IOException) {
-            log.error(e) { e.message }
+            log.error(e.message, e)
         }
         return ret
     }
@@ -275,7 +275,7 @@ class TgMessageHandler(
         try {
             return GetFile(fileId).send()
         } catch (e: TelegramApiException) {
-            log.error(e) { e.message }
+            log.error(e.message, e)
         }
         return moe.kurenai.tdlight.model.media.File(fileId, fileUniqueId)
     }

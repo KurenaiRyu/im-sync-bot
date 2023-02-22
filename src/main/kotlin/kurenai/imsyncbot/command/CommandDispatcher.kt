@@ -10,12 +10,12 @@ import moe.kurenai.tdlight.model.inline.InlineQuery
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.SendMessage
-import mu.KotlinLogging
+import moe.kurenai.tdlight.util.getLogger
 import net.mamoe.mirai.event.events.MessageEvent
 
 object CommandDispatcher {
 
-    private val log = KotlinLogging.logger {}
+    private val log = getLogger()
 
     init {
         reflections.getSubTypesOf(AbstractQQCommand::class.java)
@@ -37,7 +37,7 @@ object CommandDispatcher {
         var msg: String? = null
         for (handler in tgCommands) {
             if (handler.command.lowercase() == command.lowercase()) {
-                log.debug { "Match ${handler.name}" }
+                log.debug("Match ${handler.name}")
                 val isSupperAdmin = bot.userConfig.superAdmins.contains(message.from?.id)
                 val param = message.text?.replace("/${handler.command}", "")?.trim()
                 msg = if (isSupperAdmin && param == "ban") {

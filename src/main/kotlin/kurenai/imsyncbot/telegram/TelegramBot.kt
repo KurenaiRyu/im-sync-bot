@@ -1,8 +1,6 @@
 package kurenai.imsyncbot.telegram
 
 import com.elbekd.bot.Bot
-import com.elbekd.bot.model.toChatId
-import com.elbekd.bot.util.SendingByteArray
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -16,6 +14,7 @@ import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.qq.QQBotClient
 import kurenai.imsyncbot.service.CacheService
+import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.chatInfoString
 import moe.kurenai.tdlight.AbstractUpdateSubscriber
 import moe.kurenai.tdlight.LongPollingCoroutineTelegramBot
@@ -29,7 +28,10 @@ import moe.kurenai.tdlight.request.Request
 import moe.kurenai.tdlight.request.message.*
 import moe.kurenai.tdlight.util.DefaultMapper.MAPPER
 import moe.kurenai.tdlight.util.getLogger
+import java.nio.file.Files
+import java.util.*
 import kotlin.coroutines.CoroutineContext
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * 机器人实例
@@ -98,17 +100,17 @@ class TelegramBot(
 
     @Suppress("UNCHECKED_CAST")
     private tailrec suspend fun sendMessage() {
+        val message = messageOutChannel.receive() as ChannelMessage<Any>
+        var ex: Throwable? = null
+        var count = 0
+        var response: Any? = null
         try {
-            val message = messageOutChannel.receive() as ChannelMessage<Any>
-
-            var ex: Throwable? = null
-            var count = 0
-            var response: Any? = null
 
             while (count <= 0) {
                 val request = message.request
                 try {
                     response = client.send(request)
+                    count++
                 } catch (e: Exception) {
                     ex?.also { it.addSuppressed(e) } ?: kotlin.run { ex = e }
                     when (e) {
@@ -118,42 +120,28 @@ class TelegramBot(
                                 log.info("Wait for ${retryAfter}s")
                                 delay(retryAfter * 1000L)
                             } else if (e.response?.description?.contains("wrong file identifier/HTTP URL specified") == true) {
-                                (request as? SendDocument)?.let {
-                                    val bytes = httpClient.get(request.document.attachName).body<ByteArray>()
-                                    _bot.sendDocument(
-                                        request.chatId.toChatId(),
-                                        SendingByteArray(bytes, request.document.fileName),
-                                        caption = request.caption,
-                                        replyToMessageId = request.replyToMessageId?.toLong()
-                                    )
+                                val inputFile = (request as? SendDocument)?.let {
+                                    request.document
+                                } ?: (request as? SendPhoto)?.let {
+                                    request.photo
+                                } ?: (request as? SendAnimation)?.let {
+                                    request.animation
+                                } ?: (request as? SendAudio)?.let {
+                                    request.audio
                                 }
-                                (request as? SendPhoto)?.let {
-                                    val bytes = httpClient.get(request.photo.attachName).body<ByteArray>()
-                                    _bot.sendPhoto(
-                                        request.chatId.toChatId(),
-                                        SendingByteArray(bytes, request.photo.fileName),
-                                        caption = request.caption,
-                                        replyToMessageId = request.replyToMessageId?.toLong()
-                                    )
+                                inputFile?.let { file ->
+                                    log.warn(e.response?.description + ": ${inputFile.attachName}")
+                                    val filename = file.fileName ?: UUID.randomUUID().toString()
+                                    BotUtil.downloadImg(file.fileName ?: UUID.randomUUID().toString(), file.attachName).let {
+                                        file.file = it
+                                        file.attachName = "attach://${filename}"
+                                        file.mimeType = Files.probeContentType(it.toPath())
+                                    }
+                                    response = client.send(request)
+                                } ?: kotlin.run {
+                                    log.warn("消息发送失败", e)
                                 }
-                                (request as? SendAnimation)?.let {
-                                    val bytes = httpClient.get(request.animation.attachName).body<ByteArray>()
-                                    _bot.sendAnimation(
-                                        request.chatId.toChatId(),
-                                        SendingByteArray(bytes, request.animation.fileName),
-                                        caption = request.caption,
-                                        replyToMessageId = request.replyToMessageId?.toLong()
-                                    )
-                                }
-                                (request as? SendAudio)?.let {
-                                    val bytes = httpClient.get(request.audio.attachName).body<ByteArray>()
-                                    _bot.sendAudio(
-                                        request.chatId.toChatId(),
-                                        SendingByteArray(bytes, request.audio.fileName),
-                                        caption = request.caption,
-                                        replyToMessageId = request.replyToMessageId?.toLong()
-                                    )
-                                }
+                                count++
                             } else {
                                 count++
                                 log.warn("消息发送失败", e)
@@ -167,11 +155,12 @@ class TelegramBot(
                     }
                 }
             }
+        } catch (e: Exception) {
+            log.error("Send message error", e)
+        } finally {
             message.result.complete(response?.let {
                 Result.success(it)
             } ?: Result.failure(ex ?: BotException("异常不应该为空")))
-        } catch (e: Exception) {
-            log.error("Send message error", e)
         }
         sendMessage()
     }
@@ -361,7 +350,7 @@ suspend fun <T> Request<ResponseWrapper<T>>.sendCatching(bot: TelegramBot? = nul
     val tg = bot ?: getBotOrThrow().tg
     val result = CompletableDeferred<Result<T>>()
     tg.messageOutChannel.send(TelegramBot.ChannelMessage(this, result))
-    return result.await()
+    return withTimeout(30.seconds) { result.await() }
 }
 
 suspend fun <T> Request<ResponseWrapper<T>>.send(bot: TelegramBot? = null): T {

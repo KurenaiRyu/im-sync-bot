@@ -35,11 +35,11 @@ dependencies {
     implementation("io.ktor:ktor-client-core:${ktor}")
     implementation("io.ktor:ktor-client-okhttp:${ktor}")
 
-    val log4j = "2.19.0"
+    val log4j = "2.20.0"
     //logging
     implementation("org.apache.logging.log4j:log4j-core:$log4j")
     implementation("org.apache.logging.log4j:log4j-api:$log4j")
-    implementation("org.apache.logging.log4j:log4j-slf4j-impl:${log4j}")
+    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:$log4j")
     implementation("com.lmax:disruptor:3.4.4")
 
     //kotlin
@@ -59,7 +59,6 @@ dependencies {
     implementation("org.apache.commons", "commons-lang3")
     implementation("org.apache.commons:commons-io:1.3.2")
     implementation("com.esotericsoftware", "kryo", "5.1.1")
-    implementation("io.github.microutils", "kotlin-logging-jvm", "2.0.6")
     implementation("org.jsoup:jsoup:1.15.3")
     implementation("io.github.kurenairyu", "simple-cache", "1.2.0-SNAPSHOT")
 

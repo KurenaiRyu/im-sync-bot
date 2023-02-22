@@ -4,15 +4,12 @@ import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.getBotOrThrow
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
-import mu.KotlinLogging
 
 class SuperAdminCommand : AbstractTelegramCommand() {
 
     override val command = "superAdmin"
     override val help: String = "设置超级管理员"
     override val onlyGroupMessage = true
-
-    private val log = KotlinLogging.logger {}
 
     override suspend fun execute(update: Update, message: Message): String {
         return if (message.isReply()) {

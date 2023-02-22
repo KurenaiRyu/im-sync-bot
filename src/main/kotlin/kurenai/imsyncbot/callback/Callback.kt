@@ -4,11 +4,11 @@ import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.AnswerCallbackQuery
-import mu.KotlinLogging
+import moe.kurenai.tdlight.util.getLogger
 
 abstract class Callback {
 
-    private val log = KotlinLogging.logger {}
+    private val log = getLogger()
 
     companion object {
         const val CONTINUE = 1
@@ -40,7 +40,7 @@ abstract class Callback {
     open fun match(update: Update): Boolean {
         return match(update.callbackQuery?.data ?: "").also {
             if (it) {
-                log.debug { "Match ${this.name} callback" }
+                log.debug("Match ${this.name} callback")
             }
         }
     }

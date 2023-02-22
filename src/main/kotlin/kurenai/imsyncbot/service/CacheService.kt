@@ -5,7 +5,7 @@ import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.request.message.GetMessageInfo
-import mu.KotlinLogging
+import moe.kurenai.tdlight.util.getLogger
 import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
@@ -38,7 +38,7 @@ object CacheService {
     suspend fun hit(): RAtomicLong = getBotOrThrow().redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("HIT"))
     suspend fun total(): RAtomicLong = getBotOrThrow().redisson.getAtomicLong(TG_FILE_CACHE_KEY.appendKey("TOTAL"))
 
-    private val log = KotlinLogging.logger {}
+    private val log = getLogger()
 
     /**
      * 缓存信息，不适用从Receipt中拿到的chain
@@ -113,7 +113,7 @@ object CacheService {
                 val formatter = NumberFormat.getPercentInstance()
                 formatter.maximumFractionDigits = 2
 
-                log.info { "Cache hit: $h / $t (${formatter.format(h / t.toFloat())})" }
+                log.info("Cache hit: $h / $t (${formatter.format(h / t.toFloat())})")
             } else {
                 hit().get()
             }
@@ -139,7 +139,7 @@ object CacheService {
     suspend fun getOfflineQQ(group: Long, id: Int): MessageChain? {
         val json: String? = getBotOrThrow().cache.get(QQ_MSG_CACHE_KEY, getQQCacheId(group, id))
         return if (json == null) {
-            log.debug { "QQ source not found by $group:$id" }
+            log.debug("QQ source not found by $group:$id")
             null
         } else {
             try {
@@ -154,7 +154,7 @@ object CacheService {
     suspend fun getQQByTg(message: Message): MessageChain? {
         val msgId = getQQIdByTg(message.chat.id, message.messageId!!)
         return if (msgId == null) {
-            log.debug { "QQ msg id not found by ${message.cacheId()}" }
+            log.debug("QQ msg id not found by ${message.cacheId()}")
             null
         } else {
             getQQ(msgId.first, msgId.second)
@@ -164,7 +164,7 @@ object CacheService {
     suspend fun getQQByTg(chatId: Long, messageId: Int): MessageChain? {
         val msgId = getQQIdByTg(chatId, messageId)
         return if (msgId == null) {
-            log.debug { "QQ msg id not found by $msgId" }
+            log.debug("QQ msg id not found by $msgId")
             null
         } else {
             getQQ(msgId.first, msgId.second)

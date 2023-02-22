@@ -9,7 +9,7 @@ import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.exception.TelegramApiException
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
 import moe.kurenai.tdlight.request.GetFile
-import mu.KotlinLogging
+import moe.kurenai.tdlight.util.getLogger
 import net.mamoe.mirai.contact.Contact
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
@@ -30,7 +30,7 @@ object BotUtil {
     const val NEWLINE_PATTERN = "\$newline"
     const val LOG_FILE_PATH = "./logs/im-sync-bot.log"
 
-    private val log = KotlinLogging.logger {}
+    private val log = getLogger()
 
     @Throws(TelegramApiException::class, IOException::class)
     suspend fun getImage(friend: Contact, fileId: String, fileUniqueId: String): Image? {
@@ -47,7 +47,7 @@ object BotUtil {
                 ret = friend.uploadImage(it)
             }
         } catch (e: IOException) {
-            log.error(e) { e.message }
+            log.error(e.message, e)
         }
         return ret
     }
@@ -56,7 +56,7 @@ object BotUtil {
         try {
             return GetFile(fileId).send()
         } catch (e: TelegramApiException) {
-            log.error(e) { e.message }
+            log.error(e.message, e)
         }
         return moe.kurenai.tdlight.model.media.File(fileId, fileUniqueId)
     }
@@ -152,7 +152,7 @@ object BotUtil {
             if (process.exitValue() >= 0 || gifFile.exists()) return gifFile
             else gifFile.delete()
         } catch (e: Exception) {
-            log.error(e) { e.message }
+            log.error(e.message, e)
             gifFile.delete()
             throw e
         }

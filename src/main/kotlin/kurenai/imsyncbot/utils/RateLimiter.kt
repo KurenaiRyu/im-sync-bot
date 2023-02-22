@@ -1,6 +1,6 @@
 package kurenai.imsyncbot.utils
 
-import mu.KotlinLogging
+import moe.kurenai.tdlight.util.getLogger
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
 import kotlin.math.min
@@ -14,7 +14,7 @@ class RateLimiter(
     private val rate: Long = (TimeUnit.SECONDS.toMillis(1) / permitsPerSecond).toLong(),
 ) {
 
-    private val log = KotlinLogging.logger {}
+    private val log = getLogger()
 
     fun acquire() {
         return acquire(1)
@@ -37,14 +37,14 @@ class RateLimiter(
     }
 
     private fun acquire(permits: Int, rate: Long) {
-        log.debug { "$name has ${min((now() - time) / this.rate, bucketSize)} tokens, acquire ${permits * rate / this.rate} tokens." }
+        log.debug("$name has ${min((now() - time) / this.rate, bucketSize)} tokens, acquire ${permits * rate / this.rate} tokens.")
         synchronized(lock) {
             val now = now()
             time = max(time, now - bucketSize * this.rate) + permits * rate
             if (time > now) {
                 lock.wait(time - now)
             }
-            log.debug { "Acquire successes, now has ${min((now() - time) / this.rate, bucketSize)} tokens." }
+            log.debug("Acquire successes, now has ${min((now() - time) / this.rate, bucketSize)} tokens.")
         }
     }
 

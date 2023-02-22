@@ -1,12 +1,12 @@
 package kurenai.imsyncbot.utils
 
 import kotlinx.coroutines.delay
-import mu.KotlinLogging
+import moe.kurenai.tdlight.util.getLogger
 
-private val log = KotlinLogging.logger {}
 
 object RetryUtil {
 
+    private val log = getLogger()
     private const val MAX_TIMES = 1
 
     @Throws(Exception::class)
@@ -16,9 +16,7 @@ object RetryUtil {
             consumer.accept(result, null)
         } catch (e: Exception) {
             doRetry(callable, consumer)
-            log.error(e) {
-                e.message
-            }
+            log.error(e.message, e)
         }
     }
 
@@ -35,10 +33,10 @@ object RetryUtil {
                 consumer.accept(result, null)
                 isDone = true
             } catch (e: Exception) {
-                log.error { "Retry fail $count times. ${e.message}" }
+                log.error("Retry fail $count times. ${e.message}")
                 count++
                 if (MAX_TIMES < count) {
-                    log.error { "Retry over $MAX_TIMES times. Discard." }
+                    log.error("Retry over $MAX_TIMES times. Discard.")
                     consumer.accept(null, e)
                     isDone = true
                 }

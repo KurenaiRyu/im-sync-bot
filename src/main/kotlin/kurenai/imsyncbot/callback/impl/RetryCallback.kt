@@ -10,11 +10,11 @@ import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.DeleteMessage
 import moe.kurenai.tdlight.request.message.EditMessageText
-import mu.KotlinLogging
+import moe.kurenai.tdlight.util.getLogger
 
 class RetryCallback : Callback() {
 
-    private val log = KotlinLogging.logger {}
+    private val log = getLogger()
 
     override val method: String = "retry"
 
@@ -41,7 +41,7 @@ class RetryCallback : Callback() {
             getBotOrThrow().tgMessageHandler.onMessage(originMessage)
             DeleteMessage(chatId, messageId).send()
         } catch (e: Exception) {
-            log.error(e) { e.message }
+            log.error(e.message, e)
             EditMessageText("#转发失败\n${e.message}").apply {
                 this.chatId = chatId
                 this.messageId = messageId

@@ -9,7 +9,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import io.github.kurenairyu.cache.redis.lettuce.jackson.RecordNamingStrategyPatchModule
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.command.AbstractInlineCommand
 import kurenai.imsyncbot.command.AbstractQQCommand
@@ -40,7 +39,7 @@ import kotlin.concurrent.timerTask
 
 internal val log: Logger = LogManager.getLogger()
 internal val mapper: ObjectMapper = jacksonObjectMapper()
-    .registerModules(Jdk8Module(), JavaTimeModule(), RecordNamingStrategyPatchModule())
+    .registerModules(Jdk8Module(), JavaTimeModule())
     .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
     .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
     .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
