@@ -27,8 +27,9 @@ dependencies {
     implementation("net.mamoe", "mirai-core-api", miraiVersion)
     implementation("net.mamoe", "mirai-core-utils", miraiVersion)
 
-    //td-light-sdk
+    //telegram
     implementation("moe.kurenai.tdlight", "td-light-sdk", "0.1.0-SNAPSHOT")
+    implementation("com.github.elbekD:kt-telegram-bot:2.2.0")
 
     val ktor = "2.1.3"
     implementation("io.ktor:ktor-client-core:${ktor}")

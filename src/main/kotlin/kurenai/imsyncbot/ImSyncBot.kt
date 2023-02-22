@@ -56,7 +56,7 @@ class ImSyncBot(
                 kotlin.runCatching {
                     instants.remove(this)
                 }.onFailure {
-                    if (it !is CancellationException) TelegramBot.log.error(it)
+                    if (it !is CancellationException) TelegramBot.log.error(it.message, it)
                 }
             }
         }
