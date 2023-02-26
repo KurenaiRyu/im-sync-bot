@@ -1,6 +1,5 @@
 package kurenai.imsyncbot.telegram
 
-import com.elbekd.bot.Bot
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -65,8 +64,6 @@ class TelegramBot(
     val username: String = telegramProperties.username
     val token: String = telegramProperties.token
     lateinit var client: TDLightCoroutineClient
-    private val httpClient = HttpClient()
-    private val _bot = Bot.createPolling(telegramProperties.username, telegramProperties.token)
 
     internal lateinit var tgBot: LongPollingCoroutineTelegramBot
     suspend fun start() {

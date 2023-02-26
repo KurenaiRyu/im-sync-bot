@@ -18,7 +18,7 @@ class ReLoginCommand : AbstractTelegramCommand() {
             "在线中，无需重登录"
         } else {
             kotlin.runCatching {
-                getBotOrThrow().qq.qqBot.login()
+                getBotOrThrow().qq.restart()
                 "重登录成功"
             }.recover {
                 "重登录失败: ${it.message}"

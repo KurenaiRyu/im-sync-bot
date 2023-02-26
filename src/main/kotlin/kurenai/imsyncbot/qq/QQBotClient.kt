@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 
 class QQBotClient(
-    parentCoroutineContext: CoroutineContext,
+    private val parentCoroutineContext: CoroutineContext,
     private val qqProperties: QQProperties,
     private val bot: ImSyncBot,
 ) {
@@ -41,22 +41,26 @@ class QQBotClient(
     private val log = LogManager.getLogger()
     val statusChannel = Channel<QQBotStatus>(Channel.BUFFERED)
     private val scopeMap = HashMap<String, CoroutineScope>()
-    val qqBot: Bot = BotFactory.newBot(qqProperties.account, qqProperties.password) {
-        cacheDir = File("./mirai/${qqProperties.account}")
-        fileBasedDeviceInfo("${bot.configPath}/device.json") // 使用 device.json 存储设备信息
-        protocol = qqProperties.protocol // 切换协议
-        highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
-        this.parentCoroutineContext = parentCoroutineContext
-//        val file = File(BotConstant.LOG_FILE_PATH)
-//        redirectBotLogToFile(file)
-//        redirectNetworkLogToFile(file)
-    }
+    var qqBot: Bot = buildMiraiBot()
 
     var messageCount = 0
     val mapLock: Mutex = Mutex()
 
     @OptIn(DelicateCoroutinesApi::class)
     val workerContext = newFixedThreadPoolContext(10, "${qqProperties.account}-worker")
+
+    private fun buildMiraiBot(): Bot {
+        return BotFactory.newBot(qqProperties.account, qqProperties.password) {
+            cacheDir = File("./mirai/${qqProperties.account}")
+            fileBasedDeviceInfo("${bot.configPath}/device.json") // 使用 device.json 存储设备信息
+            protocol = qqProperties.protocol // 切换协议
+            highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
+            parentCoroutineContext = this@QQBotClient.parentCoroutineContext
+//        val file = File(BotConstant.LOG_FILE_PATH)
+//        redirectBotLogToFile(file)
+//        redirectNetworkLogToFile(file)
+        }
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun start() {
@@ -215,6 +219,16 @@ class QQBotClient(
             }
             log.info("Started qq-bot ${qqBot.nick}(${qqBot.id})")
         }
+    }
+
+    suspend fun restart() {
+        kotlin.runCatching {
+            qqBot.login()
+        }.recoverCatching { ex ->
+            log.error("Re login failed, try to create a new instance...")
+            qqBot = buildMiraiBot()
+            start()
+        }.getOrThrow()
     }
 
     suspend fun reportError(group: Group, messageChain: MessageChain, throwable: Throwable) {
