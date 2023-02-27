@@ -16,12 +16,13 @@ import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import java.io.File
 import java.io.IOException
 import java.util.*
+import moe.kurenai.tdlight.model.media.File as TelegramFile
 
 
 object BotUtil {
 
     const val WEBP_TO_PNG_CMD_PATTERN = "dwebp %s -o %s"
-    const val MP4_TO_GIF_CMD_PATTERN = "ffmpeg -i %s %s"
+    const val MP4_TO_GIF_CMD_PATTERN = "ffmpeg -i %s -vf \"scale=%s:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse\" %s"
     const val IMAGE_PATH = "./cache/img/"
     const val DOCUMENT_PATH = "./cache/doc/"
     const val NAME_PATTERN = "\$name"
@@ -29,6 +30,7 @@ object BotUtil {
     const val ID_PATTERN = "\$id"
     const val NEWLINE_PATTERN = "\$newline"
     const val LOG_FILE_PATH = "./logs/im-sync-bot.log"
+    const val DEFAULT_BASE_URL = "https://api.telegram.org"
 
     private val log = getLogger()
 
@@ -52,13 +54,13 @@ object BotUtil {
         return ret
     }
 
-    suspend fun getTgFile(fileId: String, fileUniqueId: String): moe.kurenai.tdlight.model.media.File {
+    suspend fun getTgFile(fileId: String, fileUniqueId: String): TelegramFile {
         try {
             return GetFile(fileId).send()
         } catch (e: TelegramApiException) {
             log.error(e.message, e)
         }
-        return moe.kurenai.tdlight.model.media.File(fileId, fileUniqueId)
+        return TelegramFile(fileId, fileUniqueId)
     }
 
     suspend fun downloadTgFile(fileId: String, fileUniqueId: String): File {
@@ -117,13 +119,14 @@ object BotUtil {
         }
     }
 
-    suspend fun webp2png(file: moe.kurenai.tdlight.model.media.File): File {
-        val pngFile = File(getImagePath("${file.fileId}.png"))
+    suspend fun webp2png(file: TelegramFile): File {
+        val filename = file.fileUniqueId
+        val pngFile = File(getImagePath("$filename.png"))
         val webpFile: File
         if (pngFile.exists()) return pngFile
         else {
             pngFile.parentFile.mkdirs()
-            webpFile = File(file.filePath!!).takeIf { it.exists() } ?: File(getImagePath("${file.fileId}.webp"))
+            webpFile = File(file.filePath!!).takeIf { it.exists() } ?: File(getImagePath("$filename.webp"))
             if (!webpFile.exists()) {
                 HttpUtil.download(file, webpFile)
             }
@@ -137,17 +140,21 @@ object BotUtil {
         return pngFile
     }
 
-    suspend fun mp42gif(id: String, tgFile: moe.kurenai.tdlight.model.media.File): File? {
-        val gifFile = File(getImagePath("$id.gif"))
+    suspend fun mp42gif(width: Int, tgFile: TelegramFile): File? {
+        val filename = tgFile.fileUniqueId
+        val gifFile = File(getImagePath("$filename.gif"))
         if (gifFile.exists()) return gifFile
-        val mp4File = File(tgFile.filePath!!)
-        if (!mp4File.exists()) HttpUtil.download(tgFile, mp4File)
+        var mp4File = File(tgFile.filePath!!)
+        if (!mp4File.exists()) {
+            mp4File = File(getImagePath("$filename.mp4"))
+            HttpUtil.download(tgFile, mp4File)
+        }
         gifFile.parentFile.mkdirs()
         try {
             val process =
                 withContext(Dispatchers.IO) {
                     Runtime.getRuntime()
-                        .exec(String.format(MP4_TO_GIF_CMD_PATTERN, mp4File.path, gifFile.path).replace("\\", "\\\\"))
+                        .exec(String.format(MP4_TO_GIF_CMD_PATTERN, mp4File.path, minOf(width, 320), gifFile.path).replace("\\", "\\\\"))
                 }.onExit().await()
             if (process.exitValue() >= 0 || gifFile.exists()) return gifFile
             else gifFile.delete()

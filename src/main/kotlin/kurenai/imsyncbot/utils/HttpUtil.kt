@@ -20,6 +20,7 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
+import moe.kurenai.tdlight.model.media.File as TelegramFile
 
 object HttpUtil {
 
@@ -40,7 +41,7 @@ object HttpUtil {
             }
         })
 
-    suspend fun download(tgFile: moe.kurenai.tdlight.model.media.File, file: File): File {
+    suspend fun download(tgFile: TelegramFile, file: File): File {
         return download(file, tgFile.getFileUrl(getBotOrThrow().tg.token), true)
     }
 

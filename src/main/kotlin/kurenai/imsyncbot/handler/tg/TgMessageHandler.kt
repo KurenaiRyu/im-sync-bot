@@ -23,6 +23,7 @@ import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import java.io.File
 import java.io.IOException
+import moe.kurenai.tdlight.model.media.File as TelegramFile
 
 class TgMessageHandler(
     configProperties: ConfigProperties,
@@ -112,11 +113,20 @@ class TgMessageHandler(
                 val builder = MessageChainBuilder()
                 val animation = message.animation!!
                 val tgFile = getTgFile(animation.fileId, animation.fileUniqueId)
-                BotUtil.mp42gif(animation.fileId, tgFile)?.let { gifFile ->
-                    gifFile.toExternalResource().use {
-                        builder.add(group.uploadImage(it))
-                        formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
+                if ((animation.fileSize ?: 0) > 500 * 1024 || animation.duration > 8) {
+                    uploadAndSend(group, getTgFile(animation.fileId, animation.fileUniqueId))
+                    if (!isMaster) group.sendMessage("Upload by $senderName.")
+                    if (caption.isNotBlank()) {
+                        formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.captionEntities, message.caption, builder)
                         CacheService.cache(group.sendMessage(builder.build()), message)
+                    }
+                } else {
+                    BotUtil.mp42gif(animation.width, tgFile)?.let { gifFile ->
+                        gifFile.toExternalResource().use {
+                            builder.add(group.uploadImage(it))
+                            formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
+                            CacheService.cache(group.sendMessage(builder.build()), message)
+                        }
                     }
                 }
             }
@@ -124,7 +134,7 @@ class TgMessageHandler(
                 val sticker = message.sticker!!
                 val builder = MessageChainBuilder()
                 if (sticker.isVideo) {
-                    BotUtil.mp42gif(sticker.fileId, getTgFile(sticker.fileId, sticker.fileUniqueId))?.let { gifFile ->
+                    BotUtil.mp42gif(sticker.width, getTgFile(sticker.fileId, sticker.fileUniqueId))?.let { gifFile ->
                         gifFile.toExternalResource().use {
                             builder.add(group.uploadImage(it))
                             formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
@@ -177,8 +187,8 @@ class TgMessageHandler(
 
     private suspend fun uploadAndSend(
         group: Group,
-        file: moe.kurenai.tdlight.model.media.File,
-        fileName: String = "${file.fileId.substring(0, 40)}.${BotUtil.getSuffix(file.filePath)}",
+        file: TelegramFile,
+        fileName: String = "${file.fileUniqueId}.${BotUtil.getSuffix(file.filePath)}",
     ) {
         var cacheFile = File(file.filePath!!)
         if (!cacheFile.exists() || !cacheFile.isFile) {
@@ -271,13 +281,13 @@ class TgMessageHandler(
         return ret
     }
 
-    private suspend fun getTgFile(fileId: String, fileUniqueId: String): moe.kurenai.tdlight.model.media.File {
+    private suspend fun getTgFile(fileId: String, fileUniqueId: String): TelegramFile {
         try {
             return GetFile(fileId).send()
         } catch (e: TelegramApiException) {
             log.error(e.message, e)
         }
-        return moe.kurenai.tdlight.model.media.File(fileId, fileUniqueId)
+        return TelegramFile(fileId, fileUniqueId)
     }
 
     private suspend fun getSenderName(message: Message): String {
