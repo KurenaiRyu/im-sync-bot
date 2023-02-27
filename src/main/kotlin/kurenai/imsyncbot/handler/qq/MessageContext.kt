@@ -66,7 +66,7 @@ data class GroupMessageContext(
     val hasReply: Boolean by lazy { replyId != null }
     val normalType: Normal = Normal()
 
-    suspend fun getType() = type ?: handleType(messageChain).also { type = it }
+    fun getType() = type ?: handleType(messageChain).also { type = it }
 
     @OptIn(MiraiExperimentalApi::class)
     private fun handleType(messageChain: MessageChain): MessageType {

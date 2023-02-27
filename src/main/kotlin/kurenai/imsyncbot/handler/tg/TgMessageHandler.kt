@@ -1,6 +1,8 @@
 package kurenai.imsyncbot.handler.tg
 
 import jodd.util.StringPool
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
@@ -23,6 +25,7 @@ import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import java.io.File
 import java.io.IOException
+import kotlin.coroutines.coroutineContext
 import moe.kurenai.tdlight.model.media.File as TelegramFile
 
 class TgMessageHandler(
@@ -89,32 +92,36 @@ class TgMessageHandler(
         }
 
         when {
-            message.hasVoice() -> {
+            message.hasVoice() -> CoroutineScope(coroutineContext).launch {
                 val voice = message.voice!!
                 val file = getTgFile(voice.fileId, voice.fileUniqueId)
                 uploadAndSend(group, file)
+                if (!isMaster) group.sendMessage("Upload by $senderName.")
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
                     formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.captionEntities, message.caption, builder)
                     CacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
-            message.hasVideo() -> {
+
+            message.hasVideo() -> CoroutineScope(coroutineContext).launch {
                 val video = message.video!!
                 val file = getTgFile(video.fileId, video.fileUniqueId)
-                uploadAndSend(group, file, video.fileName ?: video.fileId.plus(".mp4"))
+                uploadAndSend(group, file, video.fileId + ".mp4")
+                if (!isMaster) group.sendMessage("Upload by $senderName.")
                 if (caption.isNotBlank()) {
                     val builder = MessageChainBuilder()
                     formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.captionEntities, message.caption, builder)
                     CacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
-            message.hasAnimation() -> {
+
+            message.hasAnimation() -> CoroutineScope(coroutineContext).launch {
                 val builder = MessageChainBuilder()
                 val animation = message.animation!!
                 val tgFile = getTgFile(animation.fileId, animation.fileUniqueId)
-                if ((animation.fileSize ?: 0) > 500 * 1024 || animation.duration > 8) {
-                    uploadAndSend(group, getTgFile(animation.fileId, animation.fileUniqueId))
+                if ((animation.fileSize ?: 0) > 800 * 1024) {
+                    uploadAndSend(group, getTgFile(animation.fileId, "${animation.fileUniqueId}.mp4"))
                     if (!isMaster) group.sendMessage("Upload by $senderName.")
                     if (caption.isNotBlank()) {
                         formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.captionEntities, message.caption, builder)
@@ -130,6 +137,8 @@ class TgMessageHandler(
                     }
                 }
             }
+
+
             message.hasSticker() -> {
                 val sticker = message.sticker!!
                 val builder = MessageChainBuilder()
@@ -141,7 +150,6 @@ class TgMessageHandler(
                             CacheService.cache(group.sendMessage(builder.build()), message)
                         }
                     }
-                    return CONTINUE
                 }
                 if (sticker.isAnimated) {
                     formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, sticker.emoji ?: "NaN", builder)
@@ -153,7 +161,8 @@ class TgMessageHandler(
                     CacheService.cache(it, message)
                 }
             }
-            message.hasDocument() -> {
+
+            message.hasDocument() -> CoroutineScope(coroutineContext).launch {
                 val document = message.document!!
                 val file = getTgFile(document.fileId, document.fileUniqueId)
                 uploadAndSend(group, file, document.fileName ?: document.fileId)
@@ -164,6 +173,7 @@ class TgMessageHandler(
                     CacheService.cache(group.sendMessage(builder.build()), message)
                 }
             }
+
             message.hasPhoto() -> {
                 val builder = MessageChainBuilder()
                 message.photo!!.groupBy { it.fileId.substring(0, 40) }
@@ -176,6 +186,7 @@ class TgMessageHandler(
                 formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.captionEntities, message.caption, builder)
                 CacheService.cache(group.sendMessage(builder.build()), message)
             }
+
             message.hasText() -> {
                 val builder = MessageChainBuilder()
                 formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.entities, message.text, builder)
