@@ -13,9 +13,10 @@ class QQAdminCommand : AbstractTelegramCommand() {
     override val command = "qqadmin"
     override val onlySupperAdmin = true
     override val onlyGroupMessage = true
+    override val onlyReply = true
 
     override suspend fun execute(update: Update, message: Message): String {
-        val member = getBotOrThrow().getMemberFromMessage(message)
+        val member = getBotOrThrow().getMemberFromMessageReply(message)
         return kotlin.runCatching {
             if (member.isAdministrator()) {
                 member.modifyAdmin(false)

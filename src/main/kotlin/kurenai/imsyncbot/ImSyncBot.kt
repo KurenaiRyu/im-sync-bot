@@ -87,7 +87,7 @@ class ImSyncBot(
     }
 
     suspend fun getMemberFromMessage(message: Message): NormalMember {
-        val tgId = message.replyToMessage?.from?.id ?: throw BotException("未找到该消息发送用户id")
+        val tgId = message.from?.id ?: throw BotException("未找到该消息发送用户id")
         val group = getGroupFromMessage(message)
         val qq = if (tgId == tg.tgBot.me.id) { //bot id
             CacheService.getQQByTg(message)?.source?.fromId ?: throw BotException("未找到该用户qq")
