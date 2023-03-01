@@ -1,5 +1,6 @@
 package kurenai.imsyncbot.telegram
 
+import com.elbekd.bot.Bot
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -41,8 +42,8 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class TelegramBot(
     parentCoroutineContext: CoroutineContext,
-    private val telegramProperties: TelegramProperties,
-    private val bot: ImSyncBot,
+    internal val telegramProperties: TelegramProperties,
+    internal val bot: ImSyncBot,
 ) : AbstractUpdateSubscriber() {
 
     companion object {
@@ -64,6 +65,7 @@ class TelegramBot(
     val username: String = telegramProperties.username
     val token: String = telegramProperties.token
     lateinit var client: TDLightCoroutineClient
+    internal val anotherBot = Bot.createPolling(telegramProperties.token)
 
     internal lateinit var tgBot: LongPollingCoroutineTelegramBot
     suspend fun start() {
@@ -106,7 +108,7 @@ class TelegramBot(
             while (count <= 0) {
                 val request = message.request
                 try {
-                    response = client.send(request)
+                    response = client.send(request, baseUrl = message.baseUrl)
                     count++
                 } catch (e: Exception) {
                     ex?.also { it.addSuppressed(e) } ?: kotlin.run { ex = e }
@@ -179,34 +181,17 @@ class TelegramBot(
         handleUpdate()
     }
 
-    override fun onComplete0() {
-    }
+    override fun onComplete0() {}
 
-    override fun onError0(e: Throwable) {
-    }
+    override fun onError0(e: Throwable) {}
 
-    //    override fun onNext0(update: Update) {
-//        CoroutineScope(handlerContext).launch {
-//            messageReceiveLock.withLock {
-//                try {
-//                    onUpdateReceivedSuspend(update)
-//                } catch (e: Exception) {
-//                    reportError(
-//                        update,
-//                        BotException("Error on update received: ${e.message ?: e::class.java.simpleName}", e)
-//                    )
-//                }
-//            }
-//        }
-//    }
     override fun onNext0(update: Update) {
         CoroutineScope(handlerContext).launch {
             messageInChannel.send(update)
         }
     }
 
-    override fun onSubscribe0() {
-    }
+    override fun onSubscribe0() {}
 
     suspend fun onUpdateReceivedSuspend(update: Update) {
         log.info("${update.chatInfoString()}: {}", MAPPER.writeValueAsString(update))
@@ -302,54 +287,18 @@ class TelegramBot(
 
     data class ChannelMessage<T>(
         val request: Request<ResponseWrapper<T>>,
-        val result: CompletableDeferred<Result<T>>
+        val result: CompletableDeferred<Result<T>>,
+        val baseUrl: String? = null
     )
 }
 
-//suspend fun <T> Request<ResponseWrapper<T>>.sendCatching(param: TelegramBot? = null): Result<T> {
-//    return kotlin.runCatching {
-//        send(param)
-//    }
-//}
-
-//suspend fun <T> Request<ResponseWrapper<T>>.send(param: TelegramBot? = null): T {
-//    val bot = param ?: getBotOrThrow().tg
-//    var ex: Throwable? = null
-//    bot.clientLock.withLock {
-//        var count = 0
-//        while (count <= 0) {
-//            try {
-//                return bot.client.send(this@send)
-//            } catch (e: Exception) {
-//                ex?.also { it.addSuppressed(e) } ?: kotlin.run { ex = e }
-//                when (e) {
-//                    is TelegramApiRequestException -> {
-//                        e.response?.parameters?.retryAfter?.also { retryAfter ->
-//                            log.info("Wait for ${retryAfter}s")
-//                            delay(retryAfter * 1000L)
-//                        } ?: run {
-//                            count++
-//                            log.warn("消息发送失败", e)
-//                        }
-//                    }
-//                    else -> {
-//                        count++
-//                        log.warn("消息发送失败", e)
-//                    }
-//                }
-//            }
-//        }
-//        throw BotException(ex!!.message?.replace(bot.token, "{mask}") ?: "信息发送失败", ex)
-//    }
-//}
-
-suspend fun <T> Request<ResponseWrapper<T>>.sendCatching(bot: TelegramBot? = null): Result<T> {
+suspend fun <T> Request<ResponseWrapper<T>>.sendCatching(bot: TelegramBot? = null, baseUrl: String? = null): Result<T> {
     val tg = bot ?: getBotOrThrow().tg
     val result = CompletableDeferred<Result<T>>()
-    tg.messageOutChannel.send(TelegramBot.ChannelMessage(this, result))
+    tg.messageOutChannel.send(TelegramBot.ChannelMessage(this, result, baseUrl = baseUrl))
     return withTimeout(30.seconds) { result.await() }
 }
 
-suspend fun <T> Request<ResponseWrapper<T>>.send(bot: TelegramBot? = null): T {
-    return this.sendCatching(bot).getOrThrow()
+suspend fun <T> Request<ResponseWrapper<T>>.send(bot: TelegramBot? = null, baseUrl: String? = null): T {
+    return this.sendCatching(bot, baseUrl).getOrThrow()
 }

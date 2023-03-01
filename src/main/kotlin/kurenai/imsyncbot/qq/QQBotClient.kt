@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.qq
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.sync.Mutex
@@ -40,14 +41,17 @@ class QQBotClient(
 
     private val log = LogManager.getLogger()
     val statusChannel = Channel<QQBotStatus>(Channel.BUFFERED)
+    private val messageChannel = Channel<MessageEvent>(1000, BufferOverflow.DROP_OLDEST) {
+        log.warn("Drop oldest event $it")
+    }
     private val scopeMap = HashMap<String, CoroutineScope>()
     var qqBot: Bot = buildMiraiBot()
 
-    var messageCount = 0
     val mapLock: Mutex = Mutex()
 
     @OptIn(DelicateCoroutinesApi::class)
-    val workerContext = newFixedThreadPoolContext(10, "${qqProperties.account}-worker")
+    private val workerContext = newFixedThreadPoolContext(10, "${qqProperties.account}-worker")
+    private val defaultScope = CoroutineScope(parentCoroutineContext + workerContext)
 
     private fun buildMiraiBot(): Bot {
         return BotFactory.newBot(qqProperties.account, qqProperties.password) {
@@ -66,7 +70,9 @@ class QQBotClient(
     suspend fun start() {
         log.info("Login qq ${qqProperties.account}...")
         qqBot.login()
-        CoroutineScope(bot.coroutineContext).launch {
+        defaultScope.launch {
+            // TODO: 获取之前已存在的queue
+            // bot.redisson.keys
             statusChannel.send(Initialized)
             var telegramBotStatus = bot.tg.statusChannel.receive()
             while (telegramBotStatus !is TelegramBot.Initialized) {
@@ -105,10 +111,6 @@ class QQBotClient(
                 }.getOrDefault(false)
             }.subscribeAlways<Event> { event ->
                 try {
-                    messageCount = (messageCount + 1) and Int.MAX_VALUE
-                    val c = messageCount
-                    log.debug("message-$c $event")
-
                     when (event) {
                         is MessageEvent -> {
                             val json = event.message.serializeToJsonString()
@@ -148,7 +150,7 @@ class QQBotClient(
                                             }
                                         }
                                     }
-                                    queue.add(json)
+                                    queue.addAsync(json)
                                 }
 
                                 is GroupAwareMessageEvent -> {
@@ -203,18 +205,22 @@ class QQBotClient(
                         }
 
                         is MessageRecallEvent.GroupRecall -> {
-                            bot.qqMessageHandler.onRecall(event)
+                            event.messageIds
+                            defaultScope.launch {
+                                bot.qqMessageHandler.onRecall(event)
+                            }
                         }
 
                         is GroupEvent -> {
-                            bot.qqMessageHandler.onGroupEvent(event)
+                            defaultScope.launch {
+                                bot.qqMessageHandler.onGroupEvent(event)
+                            }
                         }
                     }
-
                 } catch (e: CancellationException) {
-                    log.error("[message-$messageCount]Coroutine was canceled: ${e.message}", e)
+                    log.error("Coroutine was canceled: ${e.message}\n$event", e)
                 } catch (e: Exception) {
-                    log.error("[message-$messageCount]${e.message}", e)
+                    log.error("Subscribe error: ${e.message}\n$event", e)
                 }
             }
             log.info("Started qq-bot ${qqBot.nick}(${qqBot.id})")

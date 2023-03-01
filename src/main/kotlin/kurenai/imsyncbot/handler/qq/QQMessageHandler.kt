@@ -47,22 +47,32 @@ class QQMessageHandler(
 
         val messageType = context.getType()
         val list = if (messageType is GroupMessageContext.Forward) messageType.contextList else listOf(context)
-        for (c in list) {
-            val t = c.getType()
+        for (resolvedContext in list) {
+            val type = resolvedContext.getType()
             val tg = bot.tg
             kotlin.runCatching {
-                when (t) {
-                    is GroupMessageContext.App -> t.telegramMessage.send(tg)
-                    is GroupMessageContext.GifImage -> t.getTelegramMessage().send(tg)
-                    is GroupMessageContext.MultiImage -> t.getTelegramMessage().send(tg)
-                    is GroupMessageContext.Rich -> t.telegramMessage.send(tg)
-                    is GroupMessageContext.SingleImage -> if (t.shouldBeFile) t.getFileMessage().send(tg) else t.getImageMessage().send(tg)
-                    is GroupMessageContext.File -> if (t.shouldBeFile) t.getFileMessage().send(tg) else t.getTextMessage().send(tg)
-                    is GroupMessageContext.Normal -> t.telegramMessage.send(tg)
+                when (type) {
+                    is GroupMessageContext.App -> type.telegramMessage.send(tg)
+                    is GroupMessageContext.GifImage -> type.getTelegramMessage().send(tg)
+                    is GroupMessageContext.MultiImage -> kotlin.runCatching {
+                        type.getTelegramMessage().send(tg)
+                    }.recover {
+                        type.resolvedHttpUrlInvalid().send(tg)
+                    }.getOrThrow()
+
+                    is GroupMessageContext.Rich -> type.telegramMessage.send(tg)
+                    is GroupMessageContext.SingleImage -> kotlin.runCatching {
+                        type.getTelegramMessage().send(tg)
+                    }.recover {
+                        type.resolvedHttpUrlInvalid().send(tg)
+                    }.getOrThrow()
+
+                    is GroupMessageContext.File -> if (type.shouldBeFile) type.getFileMessage().send(tg) else type.getTextMessage().send(tg)
+                    is GroupMessageContext.Normal -> type.telegramMessage.send(tg)
                     else -> null
                 }
             }.recoverCatching {
-                c.normalType.telegramMessage.send(tg)
+                resolvedContext.normalType.telegramMessage.send(tg)
             }.getOrThrow()?.also { message ->
                 log.debug("${context.groupInfoString()} Sent ${mapper.writeValueAsString(message)}")
                 if (message is Message) {

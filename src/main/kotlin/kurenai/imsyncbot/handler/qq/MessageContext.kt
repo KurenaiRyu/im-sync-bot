@@ -1,10 +1,10 @@
 package kurenai.imsyncbot.handler.qq
 
 import com.fasterxml.jackson.core.exc.StreamReadException
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.dataformat.xml.XmlMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import io.ktor.client.*
+import io.ktor.client.request.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.callback.impl.GetFileUrlCallback.Companion.METHOD
 import kurenai.imsyncbot.domain.QQAppMessage
@@ -13,9 +13,12 @@ import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.BotUtil.formatUsername
 import moe.kurenai.tdlight.model.ParseMode
+import moe.kurenai.tdlight.model.ResponseWrapper
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardMarkup
 import moe.kurenai.tdlight.model.media.InputFile
+import moe.kurenai.tdlight.model.message.Message
+import moe.kurenai.tdlight.request.Request
 import moe.kurenai.tdlight.request.message.*
 import moe.kurenai.tdlight.util.MarkdownUtil.fm2md
 import net.mamoe.mirai.contact.*
@@ -23,6 +26,10 @@ import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.ForwardMessage
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.utils.MiraiExperimentalApi
+import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
+import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
+import nl.adaptivity.xmlutil.serialization.XML
+import nl.adaptivity.xmlutil.serialization.XmlSerializationPolicy
 import org.apache.logging.log4j.LogManager
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
@@ -78,11 +85,11 @@ data class GroupMessageContext(
                 if (uuid.isNotBlank()) {
                     SingleImage(Image(uuid), true)
                 } else {
-                    Rich(xmlMapper.readValue(content, QQRichMessage::class.java))
+                    Rich(xml.decodeFromString(QQRichMessage.serializer(), content))
                 }
             } catch (e: Exception) {
                 try {
-                    App(jsonMapper.readValue(content, QQAppMessage::class.java))
+                    App(json.decodeFromString(QQAppMessage.serializer(), content))
                 } catch (e: StreamReadException) {
                     Normal()
                 }
@@ -174,13 +181,34 @@ data class GroupMessageContext(
         } else this
     }
 
+    private fun Image.shouldBeFile(): Boolean {
+        val maxSide = maxOf(this.width, this.height)
+        val minSide = minOf(this.width, this.height)
+        val ratio: Float = maxSide / minSide.toFloat()
+        return !this.isEmoji &&
+                !((maxSide <= 1280 && ratio <= 20) || ratio <= MAX_IMAGE_RATIO)
+    }
+
     companion object {
-        private val jsonMapper = jacksonObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        private val xmlMapper = XmlMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        private const val maxImageRatio = 16 / 7.0F
-        private const val minImageRatio = 7 / 16.0F
+
+        private val json = Json {
+            encodeDefaults = false
+            ignoreUnknownKeys = true
+            isLenient = true
+            prettyPrint = true
+        }
+
+        @OptIn(ExperimentalXmlUtilApi::class)
+        private val xml = XML {
+            encodeDefault = XmlSerializationPolicy.XmlEncodeDefault.NEVER
+            unknownChildHandler = UnknownChildHandler { input, inputKind, descriptor, name, candidates ->
+                emptyList()
+            }
+        }
+
+        private const val MAX_IMAGE_RATIO = 2.7
+
+        private val client = HttpClient()
     }
 
     sealed interface MessageType
@@ -208,53 +236,90 @@ data class GroupMessageContext(
 
     inner class SingleImage(val image: Image, val onlyImage: Boolean = false) : MessageType {
 
-        val ratio: Float = image.width / image.height.toFloat()
-        val shouldBeFile: Boolean = !image.isEmoji &&
-                (ratio > maxImageRatio || ratio < minImageRatio)
+        private val shouldBeFile: Boolean = image.shouldBeFile()
+        private var inputFile: InputFile? = null
+        private var telegramMessage: Request<ResponseWrapper<Message>>? = null
 
-        suspend fun getImageMessage(): SendPhoto {
-            return SendPhoto(chatId, InputFile(image.queryUrl()).apply { fileName = image.imageId }).apply {
-                parseMode = ParseMode.MARKDOWN_V2
-                caption = if (onlyImage) {
-                    "".formatMsg(senderId, senderName)
-                } else {
-                    getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
+        suspend fun getTelegramMessage(): Request<ResponseWrapper<Message>> {
+            return telegramMessage ?: buildMessage()
+        }
+
+        suspend fun resolvedHttpUrlInvalid(): Request<ResponseWrapper<Message>> {
+            val message = getTelegramMessage()
+            val file = BotUtil.downloadImg(inputFile!!.fileName!!, inputFile!!.attachName)
+            inputFile!!.file = file
+            inputFile!!.attachName = "attach://${file.name}"
+            return message
+        }
+
+        private suspend fun buildMessage(): Request<ResponseWrapper<Message>> {
+            return if (shouldBeFile) {
+                SendDocument(chatId, InputFile(image.queryUrl()).apply { fileName = image.imageId }.also { inputFile = it }).apply {
+                    parseMode = ParseMode.MARKDOWN_V2
+                    caption = if (onlyImage) {
+                        "".formatMsg(senderId, senderName)
+                    } else {
+                        getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
+                    }
+                    replyId?.let { replyToMessageId = replyId }
                 }
-                replyId?.let { replyToMessageId = replyId }
+            } else {
+                SendPhoto(chatId, InputFile(image.queryUrl()).apply { fileName = image.imageId }.also { inputFile = it }).apply {
+                    parseMode = ParseMode.MARKDOWN_V2
+                    caption = if (onlyImage) {
+                        "".formatMsg(senderId, senderName)
+                    } else {
+                        getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
+                    }
+                    replyId?.let { replyToMessageId = replyId }
+                }
+            }.also {
+                telegramMessage = it
             }
         }
 
-        suspend fun getFileMessage(): SendDocument {
-            return SendDocument(chatId, InputFile(image.queryUrl()).apply { fileName = image.imageId }).apply {
-                parseMode = ParseMode.MARKDOWN_V2
-                caption = if (onlyImage) {
-                    "".formatMsg(senderId, senderName)
-                } else {
-                    getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
-                }
-                replyId?.let { replyToMessageId = replyId }
-            }
-        }
+
     }
 
     inner class MultiImage(val images: List<Image>) : MessageType {
         val shouldBeFile: Boolean = images.any {
-            if (it.imageType == ImageType.GIF || it.imageType == ImageType.APNG || it.imageType == ImageType.UNKNOWN && !it.isEmoji)
-                return@any true
-            val ratio = it.width / it.height.toFloat()
-            ratio > maxImageRatio || ratio < minImageRatio
+            if (it.imageType == ImageType.GIF ||
+                it.imageType == ImageType.APNG ||
+                it.imageType == ImageType.UNKNOWN && !it.isEmoji
+            )
+                true
+            else
+                it.shouldBeFile()
         }
 
+        private val inputFiles = mutableListOf<InputFile>()
+        private var telegramMessage: SendMediaGroup? = null
+
         suspend fun getTelegramMessage(): SendMediaGroup {
+            return telegramMessage ?: buildTelegramMessage()
+        }
+
+        suspend fun resolvedHttpUrlInvalid(): SendMediaGroup {
+            val message = getTelegramMessage()
+            inputFiles.forEach {
+                val file = BotUtil.downloadImg(it.fileName!!, it.attachName)
+                it.file = file
+                it.attachName = "attach://${file.name}"
+            }
+            return message
+        }
+
+        private suspend fun buildTelegramMessage(): SendMediaGroup {
+            inputFiles.clear()
             return SendMediaGroup(chatId).apply {
                 media = images.mapNotNull {
                     if (it.imageType == ImageType.GIF) null
                     else if (shouldBeFile)
-                        InputMediaDocument(InputFile(it.queryUrl()).apply { fileName = it.imageId }).apply {
+                        InputMediaDocument(InputFile(it.queryUrl()).apply { fileName = it.imageId }.also(inputFiles::add)).apply {
                             parseMode = ParseMode.MARKDOWN_V2
                         }
                     else
-                        InputMediaPhoto(InputFile(it.queryUrl()).apply { fileName = it.imageId }).apply {
+                        InputMediaPhoto(InputFile(it.queryUrl()).apply { fileName = it.imageId }.also(inputFiles::add)).apply {
                             parseMode = ParseMode.MARKDOWN_V2
                         }
                 }.also {
@@ -263,6 +328,8 @@ data class GroupMessageContext(
                     }
                 }
                 replyId?.let { replyToMessageId = replyId }
+            }.also {
+                telegramMessage = it
             }
         }
     }
