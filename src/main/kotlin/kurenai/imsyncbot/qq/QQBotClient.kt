@@ -8,7 +8,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.QQProperties
-import kurenai.imsyncbot.exception.ImSyncBotRuntimeException
+import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.qq.GroupMessageContext
 import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
@@ -186,7 +186,7 @@ class QQBotClient(
                                                                 delay(count * 2000L)
                                                             }
                                                         }
-                                                    } catch (e: ImSyncBotRuntimeException) {
+                                                    } catch (e: BotException) {
                                                         log.warn(e.message)
                                                     } catch (e: Exception) {
                                                         reportError(group, messageChain!!, e)

@@ -65,6 +65,7 @@ internal lateinit var instants: MutableList<ImSyncBot>
 
 suspend fun main() {
     loadProperties()
+    configs.first()
     commonInit()
     instants.forEach { it.start() }
 }
@@ -159,7 +160,9 @@ private val clearCacheTimer = Timer("ClearCache", true)
 
 private fun setUpTimer() {
     clearCacheTimer.scheduleAtFixedRate(timerTask {
-        for (dirFile in File(cachePath).listFiles()?.filter { it.isDirectory } ?: emptyList()) {
+        val cacheDir = File(cachePath)
+        cacheDir.mkdirs()
+        for (dirFile in cacheDir.listFiles()?.filter { it.isDirectory } ?: emptyList()) {
             try {
                 if (!dirFile.exists()) {
                     log.warn("${dirFile.absolutePath} not exist!")

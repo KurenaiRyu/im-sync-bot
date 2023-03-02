@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm") version "1.8.10"
     application
+    kotlin("plugin.serialization") version "1.8.10"
 }
 
 group = "moe.kurenai.bot"
@@ -19,6 +20,8 @@ repositories {
 }
 
 dependencies {
+    implementation("org.jetbrains.kotlin", "kotlin-reflect")
+    implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
     val miraiVersion = "2.14.0"
 
@@ -29,7 +32,6 @@ dependencies {
 
     //telegram
     implementation("moe.kurenai.tdlight", "td-light-sdk", "0.1.0-SNAPSHOT")
-    implementation("com.github.elbekD:kt-telegram-bot:2.2.0")
 
     val ktor = "2.1.3"
     implementation("io.ktor:ktor-client-core:${ktor}")
@@ -42,20 +44,18 @@ dependencies {
     implementation("org.apache.logging.log4j:log4j-slf4j2-impl:$log4j")
     implementation("com.lmax:disruptor:3.4.4")
 
-    //kotlin
-    implementation("org.jetbrains.kotlin", "kotlin-reflect")
-    implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
+    //xml
+    implementation("io.github.pdvrieze.xmlutil:core-jvm:0.84.3")
+    implementation("io.github.pdvrieze.xmlutil:serialization-jvm:0.84.3")
+
+    //json
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.4.1")
 
     //cache
     implementation("com.sksamuel.aedile:aedile-core:1.2.0")
 
     //tool kit
     implementation("com.google.guava:guava:31.1-jre")
-    implementation("org.sejda.imageio:webp-imageio:0.1.6")
-    implementation("com.squareup.okhttp3:okhttp:4.10.0")
-    implementation("com.fasterxml.jackson.module", "jackson-module-kotlin")
-    implementation("com.fasterxml.jackson.dataformat", "jackson-dataformat-xml")
-    implementation("com.fasterxml.jackson.dataformat", "jackson-dataformat-yaml")
     implementation("org.apache.commons", "commons-lang3")
     implementation("org.apache.commons:commons-io:1.3.2")
     implementation("com.esotericsoftware", "kryo", "5.1.1")

@@ -74,7 +74,7 @@ class InfoCommand : AbstractTelegramCommand() {
                                 list.add("状态: ${config.status.toString().fm2md()}")
 
                             withContext(Dispatchers.IO) {
-                                val file = BotUtil.downloadImg("avatar-${member.id}.png", member.avatarUrl)
+                                val file = BotUtil.downloadImg("avatar-${member.id}.png", member.avatarUrl).toFile()
                                 SendPhoto(message.chatId, InputFile(file)).apply {
                                     caption = list.joinToString("\n")
                                     parseMode = ParseMode.MARKDOWN_V2
@@ -113,8 +113,8 @@ class InfoCommand : AbstractTelegramCommand() {
                 if (config?.status?.isNotEmpty() == true)
                     list.add("状态: ${config.status.toString().format2Markdown()}")
 
-                val file = BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl)
-                SendPhoto(message.chatId, InputFile(file)).apply {
+                val path = BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl)
+                SendPhoto(message.chatId, InputFile(path.toFile())).apply {
                     caption = list.joinToString("\n")
                     parseMode = ParseMode.MARKDOWN_V2
                 }.send()

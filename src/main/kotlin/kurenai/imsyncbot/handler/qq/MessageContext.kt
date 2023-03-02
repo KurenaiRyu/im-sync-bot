@@ -246,9 +246,9 @@ data class GroupMessageContext(
 
         suspend fun resolvedHttpUrlInvalid(): Request<ResponseWrapper<Message>> {
             val message = getTelegramMessage()
-            val file = BotUtil.downloadImg(inputFile!!.fileName!!, inputFile!!.attachName)
-            inputFile!!.file = file
-            inputFile!!.attachName = "attach://${file.name}"
+            val path = BotUtil.downloadImg(inputFile!!.fileName!!, inputFile!!.attachName)
+            inputFile!!.file = path.toFile()
+            inputFile!!.attachName = "attach://${path.fileName}"
             return message
         }
 
@@ -302,9 +302,9 @@ data class GroupMessageContext(
         suspend fun resolvedHttpUrlInvalid(): SendMediaGroup {
             val message = getTelegramMessage()
             inputFiles.forEach {
-                val file = BotUtil.downloadImg(it.fileName!!, it.attachName)
-                it.file = file
-                it.attachName = "attach://${file.name}"
+                val path = BotUtil.downloadImg(it.fileName!!, it.attachName)
+                it.file = path.toFile()
+                it.attachName = "attach://${path.fileName}"
             }
             return message
         }

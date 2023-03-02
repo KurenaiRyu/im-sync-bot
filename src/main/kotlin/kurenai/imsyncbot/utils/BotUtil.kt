@@ -3,26 +3,31 @@ package kurenai.imsyncbot.utils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
+import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.exception.TelegramApiException
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
+import moe.kurenai.tdlight.model.media.File
 import moe.kurenai.tdlight.request.GetFile
 import moe.kurenai.tdlight.util.getLogger
 import net.mamoe.mirai.contact.Contact
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import java.io.File
 import java.io.IOException
+import java.nio.file.Path
 import java.util.*
+import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
+import kotlin.io.path.fileSize
+import kotlin.io.path.pathString
 import moe.kurenai.tdlight.model.media.File as TelegramFile
 
 
 object BotUtil {
 
     const val WEBP_TO_PNG_CMD_PATTERN = "dwebp %s -o %s"
-    const val MP4_TO_GIF_CMD_PATTERN = "ffmpeg -i %s -vf \"scale=%s:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse\" %s"
     const val IMAGE_PATH = "./cache/img/"
     const val DOCUMENT_PATH = "./cache/doc/"
     const val NAME_PATTERN = "\$name"
@@ -40,12 +45,12 @@ object BotUtil {
         val image = if (file.filePath!!.lowercase().endsWith(".webp")) {
             webp2png(file)
         } else {
-            File(file.filePath!!).takeIf { it.exists() } ?: HttpUtil.download(file, File(getImagePath("$fileId.webp")))
+            Path.of(file.filePath!!).takeIf { it.exists() } ?: HttpUtil.download(file, Path.of(getImagePath("$fileId.webp")))
         }
 
         var ret: Image? = null
         try {
-            image.toExternalResource().use {
+            image.toFile().toExternalResource().use {
                 ret = friend.uploadImage(it)
             }
         } catch (e: IOException) {
@@ -63,9 +68,9 @@ object BotUtil {
         return TelegramFile(fileId, fileUniqueId)
     }
 
-    suspend fun downloadTgFile(fileId: String, fileUniqueId: String): File {
+    suspend fun downloadTgFile(fileId: String, fileUniqueId: String): Path {
         val tgFile = GetFile(fileId).send()
-        val cacheFile = tgFile.filePath?.let { File(it) }
+        val cacheFile = tgFile.filePath?.let { Path.of(it) }
         return if (cacheFile?.exists() == true) {
             cacheFile
         } else {
@@ -74,22 +79,22 @@ object BotUtil {
         }
     }
 
-    suspend fun downloadDoc(filename: String, url: String, reject: Boolean = false): File {
-        return download(File(getDocumentPath(filename)), url, reject)
+    suspend fun downloadDoc(filename: String, url: String, reject: Boolean = false): Path {
+        return download(Path.of(getDocumentPath(filename)), url, reject)
     }
 
-    suspend fun downloadImg(filename: String, url: String, reject: Boolean = false): File {
-        val image = File(getImagePath(filename))
+    suspend fun downloadImg(filename: String, url: String, reject: Boolean = false): Path {
+        val image = Path.of(getImagePath(filename))
         return download(image, url, reject).also {
             CacheService.cacheImg(image)
         }
     }
 
-    private suspend fun download(file: File, url: String, reject: Boolean): File {
+    private suspend fun download(path: Path, url: String, reject: Boolean): Path {
         if (!reject) {
-            HttpUtil.download(file, url)
+            HttpUtil.download(path, url)
         }
-        return file
+        return path
     }
 
     fun getImagePath(imageName: String): String {
@@ -119,51 +124,66 @@ object BotUtil {
         }
     }
 
-    suspend fun webp2png(file: TelegramFile): File {
+    suspend fun webp2png(file: TelegramFile): Path {
         val filename = file.fileUniqueId
-        val pngFile = File(getImagePath("$filename.png"))
-        val webpFile: File
+        val pngFile = Path.of(getImagePath("$filename.png"))
+        val webpFile: Path
         if (pngFile.exists()) return pngFile
         else {
-            pngFile.parentFile.mkdirs()
-            webpFile = File(file.filePath!!).takeIf { it.exists() } ?: File(getImagePath("$filename.webp"))
+            pngFile.parent.createDirectories()
+            webpFile = Path.of(file.filePath!!).takeIf { it.exists() } ?: Path.of(getImagePath("$filename.webp"))
             if (!webpFile.exists()) {
                 HttpUtil.download(file, webpFile)
             }
         }
         withContext(Dispatchers.IO) {
             Runtime.getRuntime()
-                .exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.path, pngFile.path).replace("\\", "\\\\"))
+                .exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.pathString, pngFile.pathString).replace("\\", "\\\\"))
         }.onExit().await()
 //        val webp = ImageIO.read(webpFile)
 //        ImageIO.write(webp, "png", pngFile)
         return pngFile
     }
 
-    suspend fun mp42gif(width: Int, tgFile: TelegramFile): File? {
+    suspend fun mp42gif(width: Int, tgFile: File): Path {
         val filename = tgFile.fileUniqueId
-        val gifFile = File(getImagePath("$filename.gif"))
-        if (gifFile.exists()) return gifFile
-        var mp4File = File(tgFile.filePath!!)
-        if (!mp4File.exists()) {
-            mp4File = File(getImagePath("$filename.mp4"))
-            HttpUtil.download(tgFile, mp4File)
+        val gifPath = Path.of(getImagePath("$filename.gif"))
+        if (gifPath.exists()) return gifPath
+        var mp4Path = Path.of(tgFile.filePath!!)
+        if (!mp4Path.exists()) {
+            mp4Path = Path.of(getImagePath("$filename.mp4"))
+            HttpUtil.download(tgFile, mp4Path)
         }
-        gifFile.parentFile.mkdirs()
-        try {
-            val process =
-                withContext(Dispatchers.IO) {
-                    Runtime.getRuntime()
-                        .exec(String.format(MP4_TO_GIF_CMD_PATTERN, mp4File.path, minOf(width, 320), gifFile.path).replace("\\", "\\\\"))
-                }.onExit().await()
-            if (process.exitValue() >= 0 || gifFile.exists()) return gifFile
-            else gifFile.delete()
-        } catch (e: Exception) {
-            log.error(e.message, e)
-            gifFile.delete()
-            throw e
+        gifPath.parent.createDirectories()
+        val process = withContext(Dispatchers.IO) {
+            val builder = ProcessBuilder(
+                "ffmpeg",
+                "-y",
+                "-i",
+                mp4Path.pathString,
+                "-vf",
+                "scale=${minOf(width, 320)}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+                gifPath.pathString
+            )
+            builder.redirectErrorStream(true)
+            val process = builder.start()
+            println("Execute ${builder.command().joinToString(" ")}")
+            process.inputStream.bufferedReader().use { input ->
+                var line = input.readLine()
+                while (line != null) {
+                    println(line)
+                    line = input.readLine()
+                }
+            }
+            process.onExit().await()
+            println("Exit code: " + process.exitValue())
+            process
         }
-        return null
+
+        if (process.exitValue() == 0 && gifPath.exists() && gifPath.fileSize() > 0) return gifPath
+        else {
+            throw BotException("Mp4 to Gif error")
+        }
     }
 
 }

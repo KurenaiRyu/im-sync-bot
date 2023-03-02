@@ -5,7 +5,10 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import kurenai.imsyncbot.configs
-import java.io.File
+import java.nio.file.Path
+import kotlin.io.path.createDirectories
+import kotlin.io.path.createFile
+import kotlin.io.path.exists
 
 val configDefaultMapper: ObjectMapper = jacksonObjectMapper()
     .setSerializationInclusion(JsonInclude.Include.NON_NULL)
@@ -15,26 +18,26 @@ abstract class AbstractConfig<T> {
     open val mapper = configDefaultMapper
     abstract val items: ArrayList<T>
     protected abstract val typeRef: TypeReference<ArrayList<T>>
-    abstract val file: File
+    abstract val path: Path
 
     init {
         configs.add(this)
     }
 
     fun save() {
-        if (!file.exists()) {
-            file.parentFile.mkdirs()
-            file.createNewFile()
+        if (!path.exists()) {
+            path.parent.createDirectories()
+            path.createFile()
         }
-        mapper.writeValue(file, items)
+        mapper.writeValue(path.toFile(), items)
         refresh()
     }
 
     fun reload() = load()
 
-    fun load(file: File = this.file) {
+    fun load(file: Path = this.path) {
         if (file.exists()) {
-            val configs = mapper.readValue(file, typeRef)
+            val configs = mapper.readValue(file.toFile(), typeRef)
             if (configs.isNotEmpty()) {
                 items.clear()
                 items.addAll(configs)

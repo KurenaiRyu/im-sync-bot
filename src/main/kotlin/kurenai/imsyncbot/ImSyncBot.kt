@@ -20,6 +20,8 @@ import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.NormalMember
 import net.mamoe.mirai.contact.getMember
 import net.mamoe.mirai.message.data.source
+import org.apache.logging.log4j.Level
+import org.apache.logging.log4j.core.config.Configurator
 import org.redisson.Redisson
 import org.redisson.api.RedissonClient
 import org.redisson.codec.JsonJacksonCodec
@@ -45,12 +47,7 @@ class ImSyncBot(
 
     internal val name: String = File(configPath).name.let { if (it == "config") "root" else it }
     override val coroutineContext: CoroutineContext = CoroutineName(name)
-        .plus(this)
-        .plus(
-            CoroutineExceptionHandler { context, e ->
-                TelegramBot.log.error(context[CoroutineName]?.let { "Exception in coroutine '${it.name}'." }
-                    ?: "Exception in unnamed coroutine.", e)
-            }).childScopeContext()
+        .plus(this).childScopeContext()
         .apply {
             job.invokeOnCompletion {
                 kotlin.runCatching {
@@ -72,6 +69,9 @@ class ImSyncBot(
     internal val privateHandle = PrivateChatHandler(configProperties)
 
     init {
+        if (configProperties.debug) {
+            Configurator.setLevel("kurenai.imsyncbot", Level.DEBUG)
+        }
         checkRedisCodec()
         configProxy()
     }
@@ -134,7 +134,7 @@ class ImSyncBot(
 
     private fun checkRedisCodec() {
         val tgProperties = configProperties.bot.telegram
-        val serializeType: String? = cache.get("SERIALIZE_TYPE", tgProperties.token.substringBefore(":"))
+        val serializeType: String? = redisson.getBucket<String>("SERIALIZE_TYPE:${tgProperties.token.substringBefore(":")}").get()
         if ("json" != serializeType?.lowercase()) {
             cache.clearAll()
             cache.put("SERIALIZE_TYPE", tgProperties.token.substringBefore(":"), "json")

@@ -3,7 +3,7 @@ package kurenai.imsyncbot.config
 import com.fasterxml.jackson.core.type.TypeReference
 import kurenai.imsyncbot.ConfigProperties
 import moe.kurenai.tdlight.model.message.Message
-import java.io.File
+import java.nio.file.Path
 
 /**
  * 用户配置类
@@ -30,7 +30,7 @@ class UserConfig(
     var admins = emptyList<Long>()
     var superAdmins = emptyList<Long>()
     override val items = ArrayList<User>()
-    override val file = File(configPath, "user.json")
+    override val path = Path.of(configPath, "user.json")
     override val typeRef = object : TypeReference<ArrayList<User>>() {}
 
     init {

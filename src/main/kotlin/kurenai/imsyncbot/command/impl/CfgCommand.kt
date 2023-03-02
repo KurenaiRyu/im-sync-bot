@@ -20,13 +20,13 @@ class GroupCfgCommand : AbstractTelegramCommand() {
         val bot = getBotOrThrow()
         return if (message.isReply()) {
             message.replyToMessage?.document?.let { doc ->
-                val file = BotUtil.downloadTgFile(doc.fileId, doc.fileUniqueId)
-                bot.groupConfig.load(file)
+                val path = BotUtil.downloadTgFile(doc.fileId, doc.fileUniqueId)
+                bot.groupConfig.load(path)
                 "配置已更新"
             } ?: "无效引用"
         } else {
             bot.groupConfig.save()
-            SendDocument(message.chatId, InputFile(bot.groupConfig.file)).send()
+            SendDocument(message.chatId, InputFile(bot.groupConfig.path.toFile())).send()
             null
         }
     }
@@ -49,7 +49,7 @@ class UserCfgCommand : AbstractTelegramCommand() {
             } ?: "无效引用"
         } else {
             bot.userConfig.save()
-            SendDocument(message.chatId, InputFile(bot.userConfig.file)).send()
+            SendDocument(message.chatId, InputFile(bot.userConfig.path.toFile())).send()
             null
         }
     }

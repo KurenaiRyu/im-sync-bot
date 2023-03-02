@@ -13,7 +13,8 @@ data class ConfigProperties(
     val enable: Boolean = true,
     val redis: RedisProperties = RedisProperties(),
     val bot: BotProperties = BotProperties(),
-    val handler: HandlerProperties = HandlerProperties()
+    val handler: HandlerProperties = HandlerProperties(),
+    val debug: Boolean = false
 )
 
 data class RedisProperties(

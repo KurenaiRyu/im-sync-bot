@@ -2,7 +2,7 @@ package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
 import moe.kurenai.tdlight.model.message.Message
-import java.io.File
+import java.nio.file.Path
 
 class GroupConfig(
     configPath: String,
@@ -17,7 +17,7 @@ class GroupConfig(
     var picBannedGroups = emptyList<Long>()
     var filterGroups = emptyList<Long>()
     override val items = ArrayList<Group>()
-    override val file = File(configPath, "group.json")
+    override val path = Path.of(configPath, "group.json")
     override val typeRef = object : TypeReference<ArrayList<Group>>() {}
 
     init {

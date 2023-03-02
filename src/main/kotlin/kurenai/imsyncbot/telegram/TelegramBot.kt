@@ -1,6 +1,5 @@
 package kurenai.imsyncbot.telegram
 
-import com.elbekd.bot.Bot
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -41,7 +40,7 @@ import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TelegramBot(
-    parentCoroutineContext: CoroutineContext,
+    private val parentCoroutineContext: CoroutineContext,
     internal val telegramProperties: TelegramProperties,
     internal val bot: ImSyncBot,
 ) : AbstractUpdateSubscriber() {
@@ -54,18 +53,20 @@ class TelegramBot(
     internal val messageOutChannel = Channel<ChannelMessage<*>>()
 
     //接收消息
-    private val messageInChannel = Channel<Update>()
+    private val updateMessageChannel = Channel<Update>()
 
-    private val coroutineContext = parentCoroutineContext + CoroutineName("TelegramBot") + SupervisorJob(parentCoroutineContext[Job])
+    private val coroutineContext = parentCoroutineContext + CoroutineName("TelegramBot")
 
     @OptIn(DelicateCoroutinesApi::class)
     private val workerContext = newFixedThreadPoolContext(10, "${telegramProperties.username}-worker")
-    private val handlerContext = parentCoroutineContext + workerContext.limitedParallelism(9)
+    private val handlerContext = coroutineContext + workerContext.limitedParallelism(9)
     val statusChannel = Channel<TelegramBotStatus>(Channel.BUFFERED)
     val username: String = telegramProperties.username
     val token: String = telegramProperties.token
     lateinit var client: TDLightCoroutineClient
-    internal val anotherBot = Bot.createPolling(telegramProperties.token)
+
+    private val updateContext = coroutineContext + workerContext.limitedParallelism(1) + CoroutineName("TelegramHandleUpdate")
+    private val sendMessageContext = coroutineContext + workerContext.limitedParallelism(1) + CoroutineName("TelegramSendMessage")
 
     internal lateinit var tgBot: LongPollingCoroutineTelegramBot
     suspend fun start() {
@@ -89,10 +90,10 @@ class TelegramBot(
             }
             tgBot.start()
         }
-        CoroutineScope(coroutineContext + workerContext.limitedParallelism(1) + CoroutineName("TelegramSendMessage")).launch {
+        CoroutineScope(coroutineContext).launch {
             sendMessage()
         }
-        CoroutineScope(coroutineContext + workerContext.limitedParallelism(1) + CoroutineName("TelegramHandleUpdate")).launch {
+        CoroutineScope(coroutineContext).launch {
             handleUpdate()
         }
     }
@@ -100,83 +101,87 @@ class TelegramBot(
     @Suppress("UNCHECKED_CAST")
     private tailrec suspend fun sendMessage() {
         val message = messageOutChannel.receive() as ChannelMessage<Any>
-        var ex: Throwable? = null
-        var count = 0
-        var response: Any? = null
-        try {
-
-            while (count <= 0) {
-                val request = message.request
-                try {
-                    response = client.send(request, baseUrl = message.baseUrl)
-                    count++
-                } catch (e: Exception) {
-                    ex?.also { it.addSuppressed(e) } ?: kotlin.run { ex = e }
-                    when (e) {
-                        is TelegramApiRequestException -> {
-                            val retryAfter = e.response?.parameters?.retryAfter
-                            if (retryAfter != null) {
-                                log.info("Wait for ${retryAfter}s")
-                                delay(retryAfter * 1000L)
-                            } else if (e.response?.description?.contains("wrong file identifier/HTTP URL specified") == true) {
-                                val inputFile = (request as? SendDocument)?.let {
-                                    request.document
-                                } ?: (request as? SendPhoto)?.let {
-                                    request.photo
-                                } ?: (request as? SendAnimation)?.let {
-                                    request.animation
-                                } ?: (request as? SendAudio)?.let {
-                                    request.audio
-                                }
-                                inputFile?.let { file ->
-                                    log.warn(e.response?.description + ": ${inputFile.attachName}")
-                                    val filename = file.fileName ?: UUID.randomUUID().toString()
-                                    BotUtil.downloadImg(file.fileName ?: UUID.randomUUID().toString(), file.attachName).let {
-                                        file.file = it
-                                        file.attachName = "attach://${filename}"
-                                        file.mimeType = Files.probeContentType(it.toPath())
+        CoroutineScope(sendMessageContext).launch {
+            var ex: Throwable? = null
+            var count = 0
+            var response: Any? = null
+            try {
+                while (count <= 0) {
+                    val request = message.request
+                    try {
+                        response = client.send(request, baseUrl = message.baseUrl)
+                        count++
+                    } catch (e: Exception) {
+                        ex?.also { it.addSuppressed(e) } ?: kotlin.run { ex = e }
+                        when (e) {
+                            is TelegramApiRequestException -> {
+                                val retryAfter = e.response?.parameters?.retryAfter
+                                if (retryAfter != null) {
+                                    log.info("Wait for ${retryAfter}s")
+                                    delay(retryAfter * 1000L)
+                                } else if (e.response?.description?.contains("wrong file identifier/HTTP URL specified") == true) {
+                                    val inputFile = (request as? SendDocument)?.let {
+                                        request.document
+                                    } ?: (request as? SendPhoto)?.let {
+                                        request.photo
+                                    } ?: (request as? SendAnimation)?.let {
+                                        request.animation
+                                    } ?: (request as? SendAudio)?.let {
+                                        request.audio
                                     }
-                                    response = client.send(request)
-                                } ?: kotlin.run {
+                                    inputFile?.let { file ->
+                                        log.warn(e.response?.description + ": ${inputFile.attachName}")
+                                        val filename = file.fileName ?: UUID.randomUUID().toString()
+                                        BotUtil.downloadImg(file.fileName ?: UUID.randomUUID().toString(), file.attachName).let {
+                                            file.file = it.toFile()
+                                            file.attachName = "attach://${filename}"
+                                            file.mimeType = Files.probeContentType(it)
+                                        }
+                                        response = client.send(request)
+                                    } ?: kotlin.run {
+                                        log.warn("消息发送失败", e)
+                                    }
+                                    count++
+                                } else {
+                                    count++
                                     log.warn("消息发送失败", e)
                                 }
-                                count++
-                            } else {
+                            }
+
+                            else -> {
                                 count++
                                 log.warn("消息发送失败", e)
                             }
                         }
-
-                        else -> {
-                            count++
-                            log.warn("消息发送失败", e)
-                        }
                     }
                 }
+            } catch (e: Exception) {
+                log.error("Send message error", e)
+            } finally {
+                message.result.complete(response?.let {
+                    Result.success(it)
+                } ?: Result.failure(ex ?: BotException("异常不应该为空")))
             }
-        } catch (e: Exception) {
-            log.error("Send message error", e)
-        } finally {
-            message.result.complete(response?.let {
-                Result.success(it)
-            } ?: Result.failure(ex ?: BotException("异常不应该为空")))
         }
         sendMessage()
     }
 
     private tailrec suspend fun handleUpdate() {
         try {
-            val update = messageInChannel.receive()
-            try {
-                onUpdateReceivedSuspend(update)
-            } catch (e: Exception) {
-                reportError(
-                    update,
-                    BotException("Error on update received: ${e.message ?: e::class.java.simpleName}", e)
-                )
+            val update = updateMessageChannel.receive()
+            CoroutineScope(updateContext).launch {
+                try {
+                    doHandleUpdate(update)
+                } catch (e: Exception) {
+                    reportError(
+                        update,
+                        BotException("Error on update received: ${e.message ?: e::class.java.simpleName}", e)
+                    )
+                }
             }
         } catch (e: Exception) {
-            log.error("Handle update error", e)
+            parentCoroutineContext.cancel(CancellationException("Handle update error", e))
+            throw e
         }
         handleUpdate()
     }
@@ -186,14 +191,14 @@ class TelegramBot(
     override fun onError0(e: Throwable) {}
 
     override fun onNext0(update: Update) {
-        CoroutineScope(handlerContext).launch {
-            messageInChannel.send(update)
+        runBlocking {
+            updateMessageChannel.send(update)
         }
     }
 
     override fun onSubscribe0() {}
 
-    suspend fun onUpdateReceivedSuspend(update: Update) {
+    suspend fun doHandleUpdate(update: Update) {
         log.info("${update.chatInfoString()}: {}", MAPPER.writeValueAsString(update))
         val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message
         if (message == null) {

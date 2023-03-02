@@ -28,6 +28,7 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlin.io.path.fileSize
 
 class PrivateChatHandler(
     configProperties: ConfigProperties
@@ -91,11 +92,11 @@ class PrivateChatHandler(
                             var sendByFile = aspectRatio > 10 || aspectRatio < 0.1 || msg.width > 1920 || msg.height > 1920
                             val inputFile = CacheService.getFile(msg.imageId).let {
                                 if (it == null) {
-                                    val file = BotUtil.downloadImg(msg.imageId, msg.queryUrl())
-                                    if (!sendByFile && file.length() > picToFileSize) {
+                                    val path = BotUtil.downloadImg(msg.imageId, msg.queryUrl())
+                                    if (!sendByFile && path.fileSize() > picToFileSize) {
                                         sendByFile = true
                                     }
-                                    InputFile(file)
+                                    InputFile(path.toFile())
                                 } else {
                                     if (!sendByFile && it.fileSize > picToFileSize) {
                                         sendByFile = true
@@ -138,8 +139,8 @@ class PrivateChatHandler(
                     }
 
                     is OnlineAudio -> {
-                        val file = BotUtil.downloadDoc(msg.filename, msg.urlForDownload)
-                        SendVoice(privateChat.toString(), InputFile(file)).apply {
+                        val path = BotUtil.downloadDoc(msg.filename, msg.urlForDownload)
+                        SendVoice(privateChat.toString(), InputFile(path.toFile())).apply {
                             replyToMessageId = replyMsgId
                             if (isSync) {
                                 caption = "同步消息"

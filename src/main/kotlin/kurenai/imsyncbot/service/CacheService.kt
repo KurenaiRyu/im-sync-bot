@@ -16,10 +16,12 @@ import net.mamoe.mirai.message.sourceMessage
 import org.redisson.api.RAtomicLong
 import org.redisson.client.protocol.ScoredEntry
 import java.io.File
+import java.nio.file.Path
 import java.text.NumberFormat
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.pathString
 
 
 object CacheService {
@@ -88,11 +90,23 @@ object CacheService {
     }
 
     suspend fun cacheFile(file: File) {
+        cacheFile(file.path)
+    }
+
+    suspend fun cacheFile(path: String) {
         val ttlSet = getBotOrThrow().redisson.getScoredSortedSet<String>(TG_FILE_CACHE_TTL_KEY)
-        ttlSet.addScore(file.path, LocalDateTime.now().plusHours(1).durationSeconds())
+        ttlSet.addScore(path, LocalDateTime.now().plusHours(1).durationSeconds())
     }
 
     suspend fun cacheImg(image: File) {
+        cacheFile(image)
+    }
+
+    suspend fun cacheFile(path: Path) {
+        cacheFile(path.pathString)
+    }
+
+    suspend fun cacheImg(image: Path) {
         cacheFile(image)
     }
 

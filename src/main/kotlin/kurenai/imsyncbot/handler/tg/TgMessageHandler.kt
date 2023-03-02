@@ -23,9 +23,11 @@ import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import java.io.File
+import net.mamoe.mirai.utils.isFile
 import java.io.IOException
+import java.nio.file.Path
 import kotlin.coroutines.coroutineContext
+import kotlin.io.path.exists
 import moe.kurenai.tdlight.model.media.File as TelegramFile
 
 class TgMessageHandler(
@@ -128,8 +130,8 @@ class TgMessageHandler(
                         CacheService.cache(group.sendMessage(builder.build()), message)
                     }
                 } else {
-                    BotUtil.mp42gif(animation.width, tgFile)?.let { gifFile ->
-                        gifFile.toExternalResource().use {
+                    BotUtil.mp42gif(animation.width, tgFile).let { gifFile ->
+                        gifFile.toFile().toExternalResource().use {
                             builder.add(group.uploadImage(it))
                             formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
                             CacheService.cache(group.sendMessage(builder.build()), message)
@@ -143,22 +145,23 @@ class TgMessageHandler(
                 val sticker = message.sticker!!
                 val builder = MessageChainBuilder()
                 if (sticker.isVideo) {
-                    BotUtil.mp42gif(sticker.width, getTgFile(sticker.fileId, sticker.fileUniqueId))?.let { gifFile ->
-                        gifFile.toExternalResource().use {
+                    BotUtil.mp42gif(sticker.width, getTgFile(sticker.fileId, sticker.fileUniqueId)).let { gifFile ->
+                        gifFile.toFile().toExternalResource().use {
                             builder.add(group.uploadImage(it))
                             formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
                             CacheService.cache(group.sendMessage(builder.build()), message)
                         }
                     }
-                }
-                if (sticker.isAnimated) {
-                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, sticker.emoji ?: "NaN", builder)
                 } else {
-                    getImage(group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
-                    formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
-                }
-                group.sendMessage(builder.build()).let {
-                    CacheService.cache(it, message)
+                    if (sticker.isAnimated) {
+                        formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, sticker.emoji ?: "NaN", builder)
+                    } else {
+                        getImage(group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
+                        formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
+                    }
+                    group.sendMessage(builder.build()).let {
+                        CacheService.cache(it, message)
+                    }
                 }
             }
 
@@ -201,20 +204,20 @@ class TgMessageHandler(
         file: TelegramFile,
         fileName: String = "${file.fileUniqueId}.${BotUtil.getSuffix(file.filePath)}",
     ) {
-        var cacheFile = File(file.filePath!!)
+        var cacheFile = Path.of(file.filePath!!)
         if (!cacheFile.exists() || !cacheFile.isFile) {
-            cacheFile = File(BotUtil.getDocumentPath(fileName))
+            cacheFile = Path.of(BotUtil.getDocumentPath(fileName))
             if (!cacheFile.exists() || !cacheFile.isFile) {
                 HttpUtil.download(file, cacheFile)
             }
         }
 
-        return cacheFile.toExternalResource().use {
+        return cacheFile.toFile().toExternalResource().use {
             group.files.uploadNewFile("/$fileName", it)
         }
     }
 
-    private suspend fun formatMsgAndQuote(
+    private fun formatMsgAndQuote(
         quoteMsgChain: MessageChain?,
         isMaster: Boolean,
         id: Long,
@@ -273,17 +276,19 @@ class TgMessageHandler(
 
     @Throws(TelegramApiException::class, IOException::class)
     private suspend fun getImage(group: Group, fileId: String, fileUniqueId: String): Image? {
-        val file = getTgFile(fileId, fileUniqueId)
-        val suffix = BotUtil.getSuffix(file.filePath)
+        val tgFile = getTgFile(fileId, fileUniqueId)
+        val suffix = BotUtil.getSuffix(tgFile.filePath)
         val image = if (suffix.equals("webp", true)) {
-            BotUtil.webp2png(file)
+            BotUtil.webp2png(tgFile)
         } else {
-            File(file.filePath!!).takeIf { it.exists() } ?: HttpUtil.download(file, File(BotUtil.getImagePath("$fileId.webp")))
+            val path = Path.of(BotUtil.getImagePath("$fileId.webp"))
+            tgFile.filePath?.let { Path.of(it) }?.takeIf { it.exists() } ?: HttpUtil.download(tgFile, path)
+            path
         }
 
         var ret: Image? = null
         try {
-            image.toExternalResource().use {
+            image.toFile().toExternalResource().use {
                 ret = group.uploadImage(it)
             }
         } catch (e: IOException) {

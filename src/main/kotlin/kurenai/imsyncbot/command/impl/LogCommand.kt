@@ -21,6 +21,8 @@ class LogCommand : AbstractTelegramCommand() {
     override val help: String = "获取日志文件"
     override val command: String = "log"
 
+    override val onlyUserMessage = true
+
     override suspend fun execute(update: Update, message: Message): String? {
         return try {
             val msg = update.message!!
