@@ -114,3 +114,7 @@ fun Long.humanReadableByteCountBin(): String {
 fun Update.chatInfoString() = this.message?.chat?.let { "[${it.title ?: it.username}(${it.id})]" } ?: ""
 
 fun GroupMessageContext.groupInfoString() = "[${this.group.name}(${this.group.id})]"
+
+fun String?.suffix(): String {
+    return this?.substring(this.lastIndexOf('.').plus(1)) ?: ""
+}

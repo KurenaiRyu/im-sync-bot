@@ -11,6 +11,7 @@ import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
+import kurenai.imsyncbot.utils.suffix
 import moe.kurenai.tdlight.exception.TelegramApiException
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.media.PhotoSize
@@ -202,7 +203,7 @@ class TgMessageHandler(
     private suspend fun uploadAndSend(
         group: Group,
         file: TelegramFile,
-        fileName: String = "${file.fileUniqueId}.${BotUtil.getSuffix(file.filePath)}",
+        fileName: String = "${file.fileUniqueId}.${file.filePath.suffix()}",
     ) {
         var cacheFile = Path.of(file.filePath!!)
         if (!cacheFile.exists() || !cacheFile.isFile) {
@@ -277,13 +278,10 @@ class TgMessageHandler(
     @Throws(TelegramApiException::class, IOException::class)
     private suspend fun getImage(group: Group, fileId: String, fileUniqueId: String): Image? {
         val tgFile = getTgFile(fileId, fileUniqueId)
-        val suffix = BotUtil.getSuffix(tgFile.filePath)
-        val image = if (suffix.equals("webp", true)) {
+        val image = if (tgFile.filePath?.endsWith("webp", true) == true) {
             BotUtil.webp2png(tgFile)
         } else {
-            val path = Path.of(BotUtil.getImagePath("$fileId.webp"))
-            tgFile.filePath?.let { Path.of(it) }?.takeIf { it.exists() } ?: HttpUtil.download(tgFile, path)
-            path
+            tgFile.filePath?.let { Path.of(it) }?.takeIf { it.exists() } ?: HttpUtil.download(tgFile, Path.of(BotUtil.getImagePath("$fileId.${tgFile.filePath.suffix()}")))
         }
 
         var ret: Image? = null

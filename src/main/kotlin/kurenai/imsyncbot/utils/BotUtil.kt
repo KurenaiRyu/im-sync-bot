@@ -105,10 +105,6 @@ object BotUtil {
         return DOCUMENT_PATH + docName
     }
 
-    fun getSuffix(path: String?): String {
-        return path?.substring(path.lastIndexOf('.').plus(1)) ?: ""
-    }
-
     fun String.formatUsername(): String {
         return this.replace("https://", "_", true)
             .replace("http://", "", true)
@@ -127,19 +123,21 @@ object BotUtil {
     suspend fun webp2png(file: TelegramFile): Path {
         val filename = file.fileUniqueId
         val pngFile = Path.of(getImagePath("$filename.png"))
-        val webpFile: Path
+        var webpFile: Path
         if (pngFile.exists()) return pngFile
         else {
             pngFile.parent.createDirectories()
-            webpFile = Path.of(file.filePath!!).takeIf { it.exists() } ?: Path.of(getImagePath("$filename.webp"))
+            webpFile = Path.of(file.filePath!!)
             if (!webpFile.exists()) {
+                webpFile = Path.of(getImagePath("$filename.webp"))
                 HttpUtil.download(file, webpFile)
             }
         }
         withContext(Dispatchers.IO) {
             Runtime.getRuntime()
                 .exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.pathString, pngFile.pathString).replace("\\", "\\\\"))
-        }.onExit().await()
+                .onExit().await()
+        }
 //        val webp = ImageIO.read(webpFile)
 //        ImageIO.write(webp, "png", pngFile)
         return pngFile
