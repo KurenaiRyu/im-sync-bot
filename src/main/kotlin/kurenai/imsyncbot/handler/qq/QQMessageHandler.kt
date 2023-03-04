@@ -52,7 +52,7 @@ class QQMessageHandler(
             val tg = bot.tg
             kotlin.runCatching {
                 when (type) {
-                    is GroupMessageContext.App -> type.telegramMessage.send(tg)
+                    is GroupMessageContext.JsonMessage -> type.telegramMessage.send(tg)
                     is GroupMessageContext.GifImage -> type.getTelegramMessage().send(tg)
                     is GroupMessageContext.MultiImage -> kotlin.runCatching {
                         type.getTelegramMessage().send(tg)
@@ -60,7 +60,7 @@ class QQMessageHandler(
                         type.resolvedHttpUrlInvalid().send(tg)
                     }.getOrThrow()
 
-                    is GroupMessageContext.Rich -> type.telegramMessage.send(tg)
+                    is GroupMessageContext.XmlMessage -> type.telegramMessage.send(tg)
                     is GroupMessageContext.SingleImage -> kotlin.runCatching {
                         type.getTelegramMessage().send(tg)
                     }.recover {

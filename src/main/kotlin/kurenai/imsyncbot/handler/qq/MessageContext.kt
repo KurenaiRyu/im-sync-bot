@@ -1,14 +1,13 @@
 package kurenai.imsyncbot.handler.qq
 
-import com.fasterxml.jackson.core.exc.StreamReadException
 import io.ktor.client.*
 import io.ktor.client.request.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.callback.impl.GetFileUrlCallback.Companion.METHOD
-import kurenai.imsyncbot.domain.QQAppMessage
-import kurenai.imsyncbot.domain.QQRichMessage
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.BotUtil.formatUsername
@@ -79,21 +78,17 @@ data class GroupMessageContext(
     private fun handleType(messageChain: MessageChain): MessageType {
         return if (messageChain.contains(RichMessage.Key)) {
             val content = messageChain[RichMessage.Key]!!.content
-            try {
+            kotlin.runCatching {
+                JsonMessage(json.decodeFromString(JsonMessageContent.serializer(), content))
+            }.recoverCatching {
                 val document = Jsoup.parse(content, Parser.xmlParser())
                 val uuid = document.selectXpath("//image").attr("uuid")
                 if (uuid.isNotBlank()) {
                     SingleImage(Image(uuid), true)
                 } else {
-                    Rich(xml.decodeFromString(QQRichMessage.serializer(), content))
+                    XmlMessage(xml.decodeFromString(XmlMessageContent.serializer(), content))
                 }
-            } catch (e: Exception) {
-                try {
-                    App(json.decodeFromString(QQAppMessage.serializer(), content))
-                } catch (e: StreamReadException) {
-                    Normal()
-                }
-            }
+            }.recover { Normal() }.getOrThrow()
         } else if (messageChain.contains(Image.Key)) {
             val images = messageChain.filterIsInstance<Image>()
             if (images.size == 1) {
@@ -175,7 +170,7 @@ data class GroupMessageContext(
             }.replace(BotUtil.MSG_PATTERN.fm2md(), this, true)
     }
 
-    private fun String.handleUrl(): String {
+    fun String.handleUrl(): String {
         return if (this.contains("b23.tv")) {
             this.replace("b23.tv", "b23.wtf")
         } else this
@@ -207,34 +202,33 @@ data class GroupMessageContext(
         }
 
         private const val MAX_IMAGE_RATIO = 2.7
-
-        private val client = HttpClient()
     }
 
     sealed interface MessageType
-    inner class Rich(val msg: QQRichMessage) : MessageType {
+
+    inner class XmlMessage(val msg: XmlMessageContent) : MessageType {
         val url: String? = msg.url?.handleUrl()
         val telegramMessage: SendMessage = SendMessage(
             chatId,
-            (url?.fm2md()?.formatMsg(senderId, senderName) ?: simpleContent)
+            (url?.fm2md() ?: simpleContent).formatMsg(senderId, senderName)
         ).apply {
             parseMode = ParseMode.MARKDOWN_V2
             replyId?.let { replyToMessageId = replyId }
         }
     }
 
-    inner class App(val msg: QQAppMessage) : MessageType {
-        val url: String? = (msg.meta.news?.jumpUrl ?: msg.meta.detail1?.qqdocurl)?.handleUrl()
+    inner class JsonMessage(val msg: JsonMessageContent) : MessageType {
+        val url: String? = (msg.meta.news?.jumpUrl ?: msg.meta.detail1.qqdocurl)?.handleUrl()
         val telegramMessage: SendMessage = SendMessage(
             chatId,
-            (url?.fm2md()?.formatMsg(senderId, senderName) ?: simpleContent)
+            (url?.fm2md() ?: simpleContent).formatMsg(senderId, senderName)
         ).apply {
             parseMode = ParseMode.MARKDOWN_V2
             replyId?.let { replyToMessageId = replyId }
         }
     }
 
-    inner class SingleImage(val image: Image, val onlyImage: Boolean = false) : MessageType {
+    inner class SingleImage(private val image: Image, private val onlyImage: Boolean = false) : MessageType {
 
         private val shouldBeFile: Boolean = image.shouldBeFile()
         private var inputFile: InputFile? = null
@@ -315,17 +309,15 @@ data class GroupMessageContext(
                 media = images.mapNotNull {
                     if (it.imageType == ImageType.GIF) null
                     else if (shouldBeFile)
-                        InputMediaDocument(InputFile(it.queryUrl()).apply { fileName = it.imageId }.also(inputFiles::add)).apply {
+                        InputMediaDocument(InputFile(it.queryUrl()).also(inputFiles::add)).apply {
                             parseMode = ParseMode.MARKDOWN_V2
                         }
                     else
-                        InputMediaPhoto(InputFile(it.queryUrl()).apply { fileName = it.imageId }.also(inputFiles::add)).apply {
+                        InputMediaPhoto(InputFile(it.queryUrl()).also(inputFiles::add)).apply {
                             parseMode = ParseMode.MARKDOWN_V2
                         }
                 }.also {
-                    it[0].apply {
-                        caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
-                    }
+                    it[it.lastIndex].caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
                 }
                 replyId?.let { replyToMessageId = replyId }
             }.also {
@@ -402,6 +394,85 @@ data class GroupMessageContext(
         val telegramMessage: SendMessage = SendMessage(chatId, getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)).apply {
             parseMode = ParseMode.MARKDOWN_V2
             replyId?.let { replyToMessageId = replyId }
+        }
+    }
+}
+
+@Serializable
+data class XmlMessageContent(
+    val action: String,
+    val url: String?
+)
+
+@Serializable
+data class JsonMessageContent(
+    val app: String = "",
+    val config: Config = Config(),
+    val desc: String = "",
+    val extra: Extra = Extra(),
+    val meta: Meta = Meta(),
+    val needShareCallBack: Boolean = false,
+    val prompt: String = "",
+    val ver: String = "",
+    val view: String = ""
+) {
+    @Serializable
+    data class Config(
+        val autoSize: Int = 0,
+        val ctime: Int = 0,
+        val forward: Int = 0,
+        val height: Int = 0,
+        val token: String = "",
+        val type: String = "",
+        val width: Int = 0
+    )
+
+    @Serializable
+    data class Extra(
+        @SerialName("app_type")
+        val appType: Int = 0,
+        val appid: Int = 0,
+        val uin: Int = 0
+    )
+
+    @Serializable
+    data class Meta(
+        val news: News? = null,
+        @SerialName("detail_1")
+        val detail1: Detail1 = Detail1()
+    ) {
+
+        @Serializable
+        data class News(
+            val jumpUrl: String?
+        )
+
+        @Serializable
+        data class Detail1(
+            val appType: Int = 0,
+            val appid: String = "",
+            val desc: String = "",
+            val gamePoints: String = "",
+            val gamePointsUrl: String = "",
+            val host: Host = Host(),
+            val icon: String = "",
+            val preview: String = "",
+            val qqdocurl: String? = null,
+            val scene: Int = 0,
+            val shareTemplateData: ShareTemplateData = ShareTemplateData(),
+            val shareTemplateId: String = "",
+            val showLittleTail: String = "",
+            val title: String = "",
+            val url: String = ""
+        ) {
+            @Serializable
+            data class Host(
+                val nick: String = "",
+                val uin: Int = 0
+            )
+
+            @Serializable
+            class ShareTemplateData
         }
     }
 }
