@@ -33,8 +33,7 @@ build/
 .vscode/
 
 ### bot ###
-config/device.json
-device.json.*
+config
 cache
 
 ### log ###
