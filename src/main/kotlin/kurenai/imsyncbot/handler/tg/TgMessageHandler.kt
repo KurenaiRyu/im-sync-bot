@@ -27,6 +27,10 @@ import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import net.mamoe.mirai.utils.isFile
 import java.io.IOException
 import java.nio.file.Path
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.coroutineContext
 import kotlin.io.path.exists
 import moe.kurenai.tdlight.model.media.File as TelegramFile
@@ -49,6 +53,9 @@ class TgMessageHandler(
     override suspend fun onEditMessage(message: Message): Int {
         if (!bot.groupConfig.tgQQ.containsKey(message.chat.id)) {
             return CONTINUE
+        }
+        if (Instant.ofEpochSecond(message.date).plusSeconds(TimeUnit.MINUTES.toSeconds(2)).isBefore(Instant.now())) {
+            return END
         }
         CacheService.getQQByTg(message)?.recall()
         return onMessage(message)
