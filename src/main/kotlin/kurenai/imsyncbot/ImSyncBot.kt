@@ -11,7 +11,7 @@ import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.handler.qq.QQMessageHandler
 import kurenai.imsyncbot.handler.tg.TgMessageHandler
-import kurenai.imsyncbot.qq.QQBotClient
+import kurenai.imsyncbot.qq.QQBot
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.utils.childScopeContext
@@ -64,7 +64,7 @@ class ImSyncBot(
     internal val groupConfig: GroupConfig = GroupConfig(configPath)
     val tgMessageHandler: TgMessageHandler = TgMessageHandler(configProperties, this)
     var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
-    internal val qq: QQBotClient = QQBotClient(coroutineContext, configProperties.bot.qq, this)
+    internal val qq: QQBot = QQBot(coroutineContext, configProperties.bot.qq, this)
     internal val tg: TelegramBot = TelegramBot(coroutineContext, configProperties.bot.telegram, this)
     internal val privateHandle = PrivateChatHandler(configProperties)
 
@@ -81,8 +81,8 @@ class ImSyncBot(
             log.info("Start im-sync-bot $name ...")
             log.info("Telegram bot ${configProperties.bot.telegram.username}")
             log.info("QQ bot ${configProperties.bot.qq.account}")
-            qq.start()
             tg.start()
+            qq.start()
         }
     }
 

@@ -11,7 +11,7 @@ import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.command.CommandDispatcher
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.Handler.Companion.END
-import kurenai.imsyncbot.qq.QQBotClient
+import kurenai.imsyncbot.qq.QQBot
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.chatInfoString
@@ -81,7 +81,7 @@ class TelegramBot(
             )
             statusChannel.send(Initialized)
             var qqBotStatus = bot.qq.statusChannel.receive()
-            while (qqBotStatus !is QQBotClient.Initialized) {
+            while (qqBotStatus !is QQBot.Initialized) {
                 log.debug("QQ bot status: ${qqBotStatus.javaClass.simpleName}")
                 qqBotStatus = bot.qq.statusChannel.receive()
             }

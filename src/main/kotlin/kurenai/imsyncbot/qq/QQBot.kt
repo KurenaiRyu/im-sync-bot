@@ -12,6 +12,7 @@ import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.qq.GroupMessageContext
 import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
+import kurenai.imsyncbot.utils.FixProtocolVersion
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.message.MessageEntity
 import moe.kurenai.tdlight.model.message.User
@@ -33,7 +34,7 @@ import java.net.ConnectException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 
-class QQBotClient(
+class QQBot(
     private val parentCoroutineContext: CoroutineContext,
     private val qqProperties: QQProperties,
     private val bot: ImSyncBot,
@@ -45,7 +46,7 @@ class QQBotClient(
         log.warn("Drop oldest event $it")
     }
     private val scopeMap = HashMap<String, CoroutineScope>()
-    var qqBot: Bot = buildMiraiBot()
+    lateinit var qqBot: Bot
 
     val mapLock: Mutex = Mutex()
 
@@ -59,7 +60,8 @@ class QQBotClient(
             fileBasedDeviceInfo("${bot.configPath}/device.json") // 使用 device.json 存储设备信息
             protocol = qqProperties.protocol // 切换协议
             highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
-            parentCoroutineContext = this@QQBotClient.parentCoroutineContext
+            parentCoroutineContext = this@QQBot.parentCoroutineContext
+            loginSolver = CustomLoginSolver(bot)
 //        val file = File(BotConstant.LOG_FILE_PATH)
 //        redirectBotLogToFile(file)
 //        redirectNetworkLogToFile(file)
@@ -68,7 +70,13 @@ class QQBotClient(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun start() {
+        FixProtocolVersion.update()
+        log.info("QQ protocol version: ${FixProtocolVersion.info()[qqProperties.protocol]}")
+
+        qqBot = buildMiraiBot()
         log.info("Login qq ${qqProperties.account}...")
+
+        statusChannel.send(Initializing)
         qqBot.login()
         defaultScope.launch {
             // TODO: 获取之前已存在的queue
@@ -97,8 +105,14 @@ class QQBotClient(
                             }
                         }
 
-                        is BotOfflineEvent.Dropped -> {
-                            log.warn("QQ bot dropped.")
+                        is BotOfflineEvent.Force, is BotOfflineEvent.Dropped -> {
+                            statusChannel.send(Offline)
+                            log.warn("QQ bot offline.")
+                            false
+                        }
+
+                        is BotReloginEvent, is BotOnlineEvent -> {
+                            statusChannel.send(Online)
                             false
                         }
 
@@ -231,7 +245,7 @@ class QQBotClient(
         kotlin.runCatching {
             qqBot.login()
         }.recoverCatching { ex ->
-            log.error("Re login failed, try to create a new instance...")
+            log.error("Re login failed, try to create a new instance...", ex)
             qqBot = buildMiraiBot()
             start()
         }.getOrThrow()
@@ -291,6 +305,8 @@ class QQBotClient(
 
     object Initializing : QQBotStatus
     object Initialized : QQBotStatus
+    object Offline : QQBotStatus
+    object Online : QQBotStatus
 
 
 }
