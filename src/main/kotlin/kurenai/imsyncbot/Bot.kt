@@ -3,11 +3,8 @@ package kurenai.imsyncbot
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.*
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.KotlinFeature
-import com.fasterxml.jackson.module.kotlin.KotlinModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.command.AbstractInlineCommand
@@ -64,33 +61,22 @@ internal val tgHandlers = ArrayList<TelegramHandler>()
 internal lateinit var instants: MutableList<ImSyncBot>
 
 suspend fun main() {
-    loadProperties()
+    instants = loadInstants()
     configs.first()
     commonInit()
     instants.forEach { it.start() }
 }
 
-fun loadProperties() {
-    val mapper = ObjectMapper(YAMLFactory())
-        .registerModule(
-            KotlinModule.Builder()
-                .withReflectionCacheSize(512)
-                .configure(KotlinFeature.NullToEmptyCollection, false)
-                .configure(KotlinFeature.NullToEmptyMap, false)
-                .configure(KotlinFeature.NullIsSameAsDefault, false)
-                .configure(KotlinFeature.SingletonSupport, false)
-                .configure(KotlinFeature.StrictNullChecks, false)
-                .build()
-        )
-        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-        .setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
-    instants = File("./config").walk().mapNotNull { file ->
+fun loadInstants() = File("./config")
+    .walk()
+    .mapNotNull { file ->
         if ((file.name == "config.yaml" || file.name == "config.yml") && !file.parentFile.name.startsWith('.')) {
-            mapper.readValue(file, ConfigProperties::class.java).takeIf { it.enable }?.let { file.parentFile.path to it }
+            loadConfig(file)?.takeIf { it.enable }?.let { file.parentFile.path to it }
         } else null
-    }.map { (path, props) -> ImSyncBot(path, props) }.toMutableList()
-        .takeIf { it.isNotEmpty() } ?: throw IllegalStateException("找不到配置文件，请确认配置文件路径是否在 ./config/config.yaml")
-}
+    }
+    .map { (path, props) -> ImSyncBot(path, props) }
+    .toMutableList()
+    .takeIf { it.isNotEmpty() } ?: throw IllegalStateException("找不到配置文件，请确认配置文件配置是否正确并且开启，或者路径是否在 ./config/config.yaml")
 
 fun commonInit() {
     registerTgCommand()

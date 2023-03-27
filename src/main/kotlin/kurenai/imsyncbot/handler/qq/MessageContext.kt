@@ -54,7 +54,7 @@ data class GroupMessageContext(
             ?.formatUsername()
 ) : MessageContext {
 
-    private var tgMsgFormat = if (bot.configProperties.handler.tgMsgFormat.contains("\$msg")) bot.configProperties.handler.tgMsgFormat else "\$name: \$msg"
+    private var tgMsgFormat = if (bot.configProperties.bot.tgMsgFormat.contains("\$msg")) bot.configProperties.bot.tgMsgFormat else "\$name: \$msg"
     private var type: MessageType? = null
 
     val simpleContent: String = messageChain.contentToString()
@@ -407,9 +407,9 @@ data class XmlMessageContent(
 @Serializable
 data class JsonMessageContent(
     val app: String = "",
-    val config: Config = Config(),
+//    val config: Config = Config(),
     val desc: String = "",
-    val extra: Extra = Extra(),
+//    val extra: Extra = Extra(),
     val meta: Meta = Meta(),
     val needShareCallBack: Boolean = false,
     val prompt: String = "",
@@ -420,7 +420,7 @@ data class JsonMessageContent(
     data class Config(
         val autoSize: Int = 0,
         val ctime: Int = 0,
-        val forward: Int = 0,
+        val forward: Boolean = false,
         val height: Int = 0,
         val token: String = "",
         val type: String = "",
@@ -431,8 +431,8 @@ data class JsonMessageContent(
     data class Extra(
         @SerialName("app_type")
         val appType: Int = 0,
-        val appid: Int = 0,
-        val uin: Int = 0
+        val appid: Long = 0,
+        val uin: Long = 0
     )
 
     @Serializable

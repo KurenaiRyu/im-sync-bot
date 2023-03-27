@@ -6,6 +6,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.serialization.json.Json
 import kurenai.imsyncbot.handler.qq.GroupMessageContext
 import moe.kurenai.tdlight.model.message.Update
 import org.reflections.Reflections
@@ -117,4 +118,11 @@ fun GroupMessageContext.groupInfoString() = "[${this.group.name}(${this.group.id
 
 fun String?.suffix(): String {
     return this?.substring(this.lastIndexOf('.').plus(1)) ?: ""
+}
+
+val json = Json {
+    encodeDefaults = true
+    isLenient = true
+    ignoreUnknownKeys = true
+    prettyPrint = true
 }

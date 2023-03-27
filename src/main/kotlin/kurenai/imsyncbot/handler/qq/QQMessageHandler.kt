@@ -31,13 +31,13 @@ class QQMessageHandler(
 
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
-    private var enableRecall = configProperties.handler.enableRecall
+    private var enableRecall = configProperties.bot.enableRecall
     private val mapper = jacksonObjectMapper()
         .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
 
     init {
-        if (configProperties.handler.tgMsgFormat.contains("\$msg")) tgMsgFormat = configProperties.handler.tgMsgFormat
-        if (configProperties.handler.qqMsgFormat.contains("\$msg")) qqMsgFormat = configProperties.handler.qqMsgFormat
+        if (configProperties.bot.tgMsgFormat.contains("\$msg")) tgMsgFormat = configProperties.bot.tgMsgFormat
+        if (configProperties.bot.qqMsgFormat.contains("\$msg")) qqMsgFormat = configProperties.bot.qqMsgFormat
     }
 
     @Throws(Exception::class)
