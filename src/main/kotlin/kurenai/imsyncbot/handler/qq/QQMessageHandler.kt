@@ -68,6 +68,7 @@ class QQMessageHandler(
                     }.getOrThrow()
 
                     is GroupMessageContext.File -> if (type.shouldBeFile) type.getFileMessage().send(tg) else type.getTextMessage().send(tg)
+                    is GroupMessageContext.Video -> type.getTelegramMessage().send(tg)
                     is GroupMessageContext.Normal -> type.telegramMessage.send(tg)
                     else -> null
                 }
