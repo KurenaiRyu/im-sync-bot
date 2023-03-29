@@ -238,9 +238,24 @@ data class GroupMessageContext(
             return telegramMessage ?: buildMessage()
         }
 
-        suspend fun resolvedHttpUrlInvalid(): Request<ResponseWrapper<Message>> {
+        suspend fun resolvedHttpUrlInvalidByModifyUrl(): Request<ResponseWrapper<Message>> {
             val message = getTelegramMessage()
-            val path = BotUtil.downloadImg(inputFile!!.fileName!!, inputFile!!.attachName)
+            inputFile!!.attachName = inputFile!!.attachName.substringBefore("?")
+            return message
+        }
+
+        suspend fun resolvedHttpUrlInvalidByLocalDownload(): Request<ResponseWrapper<Message>> {
+            val message = getTelegramMessage()
+            val path = kotlin.runCatching {
+                BotUtil.downloadImg(inputFile!!.fileName!!, inputFile!!.attachName)
+            }.recover {
+                val url = if (inputFile!!.attachName.endsWith("?term=2")) {
+                    inputFile!!.attachName.substringBefore("?")
+                } else {
+                    inputFile!!.attachName + "?term=2"
+                }
+                BotUtil.downloadImg(inputFile!!.fileName!!, url)
+            }.getOrThrow()
             inputFile!!.file = path.toFile()
             inputFile!!.attachName = "attach://${path.fileName}"
             return message
@@ -293,12 +308,29 @@ data class GroupMessageContext(
             return telegramMessage ?: buildTelegramMessage()
         }
 
-        suspend fun resolvedHttpUrlInvalid(): SendMediaGroup {
+        suspend fun resolvedHttpUrlInvalidByModifyUrl(): SendMediaGroup {
             val message = getTelegramMessage()
             inputFiles.forEach {
-                val path = BotUtil.downloadImg(it.fileName!!, it.attachName)
-                it.file = path.toFile()
-                it.attachName = "attach://${path.fileName}"
+                it.attachName = it.attachName.substringBefore("?")
+            }
+            return message
+        }
+
+        suspend fun resolvedHttpUrlInvalidByLocalDownload(): SendMediaGroup {
+            val message = getTelegramMessage()
+            inputFiles.forEach { inputFile ->
+                val path = kotlin.runCatching {
+                    BotUtil.downloadImg(inputFile.fileName!!, inputFile.attachName)
+                }.recover {
+                    val url = if (inputFile.attachName.endsWith("?term=2")) {
+                        inputFile.attachName.substringBefore("?")
+                    } else {
+                        inputFile.attachName + "?term=2"
+                    }
+                    BotUtil.downloadImg(inputFile.fileName!!, url)
+                }.getOrThrow()
+                inputFile.file = path.toFile()
+                inputFile.attachName = "attach://${path.fileName}"
             }
             return message
         }

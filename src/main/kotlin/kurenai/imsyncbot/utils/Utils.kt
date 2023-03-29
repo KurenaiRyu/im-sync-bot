@@ -1,5 +1,13 @@
 package kurenai.imsyncbot.utils
 
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
+import com.fasterxml.jackson.databind.PropertyNamingStrategy
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
+import com.fasterxml.jackson.module.kotlin.KotlinFeature
+import com.fasterxml.jackson.module.kotlin.kotlinModule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -126,3 +134,15 @@ val json = Json {
     ignoreUnknownKeys = true
     prettyPrint = true
 }
+
+val yamlMapper = ObjectMapper(
+    YAMLFactory().disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+).registerModule(kotlinModule {
+    withReflectionCacheSize(512)
+    configure(KotlinFeature.NullToEmptyCollection, false)
+    configure(KotlinFeature.NullToEmptyMap, false)
+    configure(KotlinFeature.NullIsSameAsDefault, false)
+    configure(KotlinFeature.SingletonSupport, false)
+    configure(KotlinFeature.StrictNullChecks, false)
+}).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    .setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)

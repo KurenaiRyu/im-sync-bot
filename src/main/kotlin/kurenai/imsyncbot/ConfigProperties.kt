@@ -1,17 +1,7 @@
 package kurenai.imsyncbot
 
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.descriptors.buildClassSerialDescriptor
-import kotlinx.serialization.descriptors.element
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
-import kotlinx.serialization.json.JsonDecoder
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kurenai.imsyncbot.utils.json
+import kurenai.imsyncbot.utils.yamlMapper
 import net.mamoe.mirai.utils.BotConfiguration
 import java.io.File
 import java.net.Proxy
@@ -19,70 +9,53 @@ import java.net.Proxy
 /**
  * 配置文件 v2
  * @author Kurenai
- * @since 6/22/2022 20:52:40
+ * @since 3/27/2023 20:52:40
  */
 
-@Serializable(with = ConfigPropertiesSerializer::class)
-interface ConfigPropertiesInterface {
-    val version: Int
-}
+@Serializable
+open class ConfigPropertiesVersion(val version: Int? = null)
 
-object ConfigPropertiesSerializer : KSerializer<ConfigPropertiesInterface> {
-    override val descriptor: SerialDescriptor = buildClassSerialDescriptor("kurenai.imsyncbot.ConfigPropertiesInterface") {
-        element<String>("version")
-    }
-
-    override fun deserialize(decoder: Decoder): ConfigPropertiesInterface {
-        decoder as JsonDecoder
-        val version = decoder.decodeJsonElement().jsonObject["version"]?.jsonPrimitive?.intOrNull
-        return if (version == 2) {
-            decoder.decodeSerializableValue(ConfigProperties.serializer())
-        } else {
-            decoder.decodeSerializableValue(ConfigPropertiesV1.serializer())
-        }
-    }
-
-    override fun serialize(encoder: Encoder, value: ConfigPropertiesInterface) {
-        when (value) {
-            is ConfigProperties -> encoder.encodeSerializableValue(ConfigProperties.serializer(), value)
-            is ConfigPropertiesV1 -> encoder.encodeSerializableValue(ConfigPropertiesV1.serializer(), value)
-        }
-    }
-
-}
-
-fun loadConfig(file: File) = when (val config = json.decodeFromString(ConfigPropertiesSerializer, file.readText())) {
-    is ConfigPropertiesV1 -> {
+fun loadConfig(file: File): ConfigProperties? {
+    val text = file.readText()
+    val doV1Backup = { config: ConfigProperties ->
         runCatching {
-            file.copyTo(File("${file.name}.bak"), false)
+            file.copyTo(File("${file.absolutePath}.bak"), false)
         }.recover {
-            file.copyTo(File("${file.name}-${System.currentTimeMillis()}.bak"), false)
+            file.copyTo(File("${file.absolutePath}-${System.currentTimeMillis()}.bak"), false)
         }
-        config.migration().also {
-            file.writeText(json.encodeToString(ConfigProperties.serializer(), it))
-        }
+        yamlMapper.writerWithDefaultPrettyPrinter().writeValue(file, config)
     }
+    val jsonNode = yamlMapper.readTree(text)
+    return when (jsonNode.get("version")?.asInt(0) ?: 0) {
+        2 -> yamlMapper.treeToValue(jsonNode, ConfigProperties::class.java)
+        1, 0 -> runCatching {
+            yamlMapper.treeToValue(jsonNode, ConfigPropertiesV1::class.java).migration().also {
+                doV1Backup(it)
+            }
+        }.onFailure {
+            it.printStackTrace()
+        }.getOrNull()
 
-    is ConfigProperties -> config
-    else -> null
+        else -> null
+    }
 }
 
 private fun ConfigPropertiesV1.migration() = migrationToV2()
 
 private fun ConfigPropertiesV1.migrationToV2() = ConfigProperties(
-    enable = this.enable,
-    redis = this.redis,
+    enable = this@migrationToV2.enable,
+    redis = this@migrationToV2.redis,
     bot = BotProperties(
-        qq = this.bot.qq,
-        telegram = this.bot.telegram,
-        tgMsgFormat = this.handler.tgMsgFormat,
-        qqMsgFormat = this.handler.qqMsgFormat,
-        masterOfTg = this.handler.masterOfTg,
-        masterOfQq = this.handler.masterOfQq,
-        privateChat = this.handler.privateChat,
-        privateChatChannel = this.handler.privateChatChannel,
-        picToFileSize = this.handler.picToFileSize,
-        enableRecall = this.handler.enableRecall,
+        qq = this@migrationToV2.bot.qq,
+        telegram = this@migrationToV2.bot.telegram,
+        tgMsgFormat = this@migrationToV2.handler.tgMsgFormat,
+        qqMsgFormat = this@migrationToV2.handler.qqMsgFormat,
+        masterOfTg = this@migrationToV2.handler.masterOfTg,
+        masterOfQq = this@migrationToV2.handler.masterOfQq,
+        privateChat = this@migrationToV2.handler.privateChat,
+        privateChatChannel = this@migrationToV2.handler.privateChatChannel,
+        picToFileSize = this@migrationToV2.handler.picToFileSize,
+        enableRecall = this@migrationToV2.handler.enableRecall,
     ),
     debug = this.debug
 )
@@ -93,8 +66,7 @@ data class ConfigProperties(
     val redis: RedisProperties = RedisProperties(),
     val bot: BotProperties = BotProperties(),
     val debug: Boolean = false,
-) : ConfigPropertiesInterface {
-    override val version: Int = 2
+) : ConfigPropertiesVersion(2) {
 }
 
 @Serializable
@@ -131,7 +103,7 @@ data class TelegramProperties(
     val token: String = "",
     val username: String = "",
     val baseUrl: String = "https://api.telegram.org",
-    val proxy: ProxyProperties = ProxyProperties()
+    val proxy: ProxyProperties? = null,
 )
 
 @Serializable

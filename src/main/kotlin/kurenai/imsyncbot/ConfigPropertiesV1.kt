@@ -1,8 +1,6 @@
 package kurenai.imsyncbot
 
 import kotlinx.serialization.Serializable
-import net.mamoe.mirai.utils.BotConfiguration
-import java.net.Proxy
 
 /**
  * 配置文件
@@ -17,9 +15,7 @@ data class ConfigPropertiesV1(
     val bot: BotPropertiesV1 = BotPropertiesV1(),
     val handler: HandlerPropertiesV1 = HandlerPropertiesV1(),
     val debug: Boolean = false,
-) : ConfigPropertiesInterface {
-    override val version: Int = 1
-}
+) : ConfigPropertiesVersion(1)
 
 @Serializable
 data class BotPropertiesV1(

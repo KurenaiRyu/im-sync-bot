@@ -56,15 +56,19 @@ class QQMessageHandler(
                     is GroupMessageContext.GifImage -> type.getTelegramMessage().send(tg)
                     is GroupMessageContext.MultiImage -> kotlin.runCatching {
                         type.getTelegramMessage().send(tg)
+                    }.recoverCatching {
+                        type.resolvedHttpUrlInvalidByModifyUrl().send(tg)
                     }.recover {
-                        type.resolvedHttpUrlInvalid().send(tg)
+                        type.resolvedHttpUrlInvalidByLocalDownload().send(tg)
                     }.getOrThrow()
 
                     is GroupMessageContext.XmlMessage -> type.telegramMessage.send(tg)
                     is GroupMessageContext.SingleImage -> kotlin.runCatching {
                         type.getTelegramMessage().send(tg)
+                    }.recoverCatching {
+                        type.resolvedHttpUrlInvalidByModifyUrl().send(tg)
                     }.recover {
-                        type.resolvedHttpUrlInvalid().send(tg)
+                        type.resolvedHttpUrlInvalidByLocalDownload().send(tg)
                     }.getOrThrow()
 
                     is GroupMessageContext.File -> if (type.shouldBeFile) type.getFileMessage().send(tg) else type.getTextMessage().send(tg)

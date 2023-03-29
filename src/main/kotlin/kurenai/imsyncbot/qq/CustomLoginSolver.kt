@@ -36,13 +36,13 @@ class CustomLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
     private suspend fun doSolvePicCaptcha(bot: Bot, data: ByteArray): String? {
         return kotlin.runCatching {
             data.inputStream().use { input ->
-                telegram.client.send(SendPhoto(imSyncBot.configProperties.handler.masterOfTg.toString(), InputFile(input, "captcha.jpg")).apply {
+                telegram.client.send(SendPhoto(imSyncBot.configProperties.bot.masterOfTg.toString(), InputFile(input, "captcha.jpg")).apply {
                     caption = "请输入验证码"
                 })
                 var message: Message? = null
                 while (message == null) {
                     val msg = telegram.client.send(GetUpdates(0, 1, 10, listOf(UpdateTypes.MESSAGE))).first().message!!
-                    if (msg.chat.id == imSyncBot.configProperties.handler.masterOfTg) {
+                    if (msg.chat.id == imSyncBot.configProperties.bot.masterOfTg) {
                         message = msg
                     }
                 }
@@ -62,14 +62,14 @@ class CustomLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
         return kotlin.runCatching {
             telegram.client.send(
                 SendMessage(
-                    imSyncBot.configProperties.handler.masterOfTg.toString(),
+                    imSyncBot.configProperties.bot.masterOfTg.toString(),
                     "需要滑动验证码, 请按照以下链接的步骤完成滑动验证码, 然后输入获取到的 ticket\n$url"
                 )
             )
             var message: Message? = null
             while (message == null) {
                 val msg = telegram.client.send(GetUpdates(0, 1, 10, listOf(UpdateTypes.MESSAGE))).first().message!!
-                if (msg.chat.id == imSyncBot.configProperties.handler.masterOfTg) {
+                if (msg.chat.id == imSyncBot.configProperties.bot.masterOfTg) {
                     message = msg
                 }
             }

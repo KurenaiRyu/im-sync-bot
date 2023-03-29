@@ -142,7 +142,7 @@ class ImSyncBot(
     }
 
     private fun configProxy(): Proxy? {
-        val configProxy = configProperties.bot.telegram.proxy
+        val configProxy = configProperties.bot.telegram.proxy ?: return null
         return if (configProxy.type != Proxy.Type.DIRECT) {
             Proxy(configProxy.type, InetSocketAddress(configProxy.host, configProxy.port))
         } else {

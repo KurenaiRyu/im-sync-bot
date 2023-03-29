@@ -37,11 +37,11 @@ class PrivateChatHandler(
     //TODO: 其他qq事件
     private val log = LogManager.getLogger()
 
-    val privateChat = configProperties.handler.privateChat
-    val privateChatChannel = configProperties.handler.privateChatChannel
+    val privateChat = configProperties.bot.privateChat
+    val privateChatChannel = configProperties.bot.privateChatChannel
     val newChannelLock = ReentrantLock()
     val newChannelCondition = newChannelLock.newCondition()
-    private val picToFileSize = configProperties.handler.picToFileSize * 1024 * 1024
+    private val picToFileSize = configProperties.bot.picToFileSize * 1024 * 1024
 
     private var messageMap = mutableMapOf<String, Message>()
 

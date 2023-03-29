@@ -46,8 +46,8 @@ class TgMessageHandler(
     private var qqMsgFormat = "\$name: \$msg"
 
     init {
-        if (configProperties.handler.tgMsgFormat.contains("\$msg")) tgMsgFormat = configProperties.handler.tgMsgFormat
-        if (configProperties.handler.qqMsgFormat.contains("\$msg")) qqMsgFormat = configProperties.handler.qqMsgFormat
+        if (configProperties.bot.tgMsgFormat.contains("\$msg")) tgMsgFormat = configProperties.bot.tgMsgFormat
+        if (configProperties.bot.qqMsgFormat.contains("\$msg")) qqMsgFormat = configProperties.bot.qqMsgFormat
     }
 
     override suspend fun onEditMessage(message: Message): Int {

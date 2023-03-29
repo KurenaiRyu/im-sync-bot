@@ -16,8 +16,8 @@ class UserConfig(
     configProperties: ConfigProperties
 ) : AbstractConfig<User>() {
 
-    var masterTg: Long = configProperties.handler.masterOfTg
-    var masterQQ: Long = configProperties.handler.masterOfQq
+    var masterTg: Long = configProperties.bot.masterOfTg
+    var masterQQ: Long = configProperties.bot.masterOfQq
     var masterChatId: Long = 0
     var masterUsername: String = ""
 
