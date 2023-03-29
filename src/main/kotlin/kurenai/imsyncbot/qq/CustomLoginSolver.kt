@@ -1,6 +1,9 @@
 package kurenai.imsyncbot.qq
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.ImSyncBot
+import kurenai.imsyncbot.log
 import moe.kurenai.tdlight.model.media.InputFile
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.UpdateTypes
@@ -16,6 +19,8 @@ import net.mamoe.mirai.utils.StandardCharImageLoginSolver
  * @since 2023/3/16 5:20
  */
 
+private val loginSolverLock = Mutex()
+
 class CustomLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
 
     companion object {
@@ -24,13 +29,12 @@ class CustomLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
 
     private val telegram = imSyncBot.tg
 
-    override suspend fun onSolvePicCaptcha(bot: Bot, data: ByteArray): String? {
-        val defaultResult = default.onSolvePicCaptcha(bot, data)
-        return if (defaultResult.isNullOrEmpty()) {
-            doSolvePicCaptcha(bot, data)
-        } else {
-            defaultResult
-        }
+    override suspend fun onSolvePicCaptcha(bot: Bot, data: ByteArray): String? = loginSolverLock.withLock {
+        return kotlin.runCatching {
+            default.onSolvePicCaptcha(bot, data)
+        }.onFailure {
+            log.error("默认图片验证失败", it)
+        }.getOrNull().takeUnless { it.isNullOrBlank() } ?: doSolvePicCaptcha(bot, data)
     }
 
     private suspend fun doSolvePicCaptcha(bot: Bot, data: ByteArray): String? {
@@ -48,14 +52,17 @@ class CustomLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
                 }
                 message.text
             }
+        }.onFailure {
+            log.error("Telegram验证方式失败", it)
         }.getOrNull()
     }
 
-    override suspend fun onSolveSliderCaptcha(bot: Bot, url: String): String? {
-        val defaultResult = default.onSolveSliderCaptcha(bot, url)
-        return defaultResult.ifBlank {
-            doSolveSliderCaptcha(bot, url)
-        }
+    override suspend fun onSolveSliderCaptcha(bot: Bot, url: String): String? = loginSolverLock.withLock {
+        return kotlin.runCatching {
+            default.onSolveSliderCaptcha(bot, url)
+        }.onFailure {
+            log.error("默认滑块验证失败", it)
+        }.getOrNull().takeUnless { it.isNullOrBlank() } ?: doSolveSliderCaptcha(bot, url)
     }
 
     private suspend fun doSolveSliderCaptcha(bot: Bot, url: String): String? {
@@ -74,6 +81,8 @@ class CustomLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
                 }
             }
             message.text
+        }.onFailure {
+            log.error("Telegram验证方式失败", it)
         }.getOrNull()
     }
 }
