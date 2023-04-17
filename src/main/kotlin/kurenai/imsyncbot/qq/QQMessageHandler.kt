@@ -1,4 +1,4 @@
-package kurenai.imsyncbot.handler.qq
+package kurenai.imsyncbot.qq
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper

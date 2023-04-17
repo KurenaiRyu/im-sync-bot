@@ -1,33 +1,49 @@
 package kurenai.imsyncbot.qq
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.newFixedThreadPoolContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.QQProperties
 import kurenai.imsyncbot.exception.BotException
-import kurenai.imsyncbot.handler.qq.GroupMessageContext
+import kurenai.imsyncbot.qq.login.MultipleLoginSolver
 import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
-import kurenai.imsyncbot.utils.FixProtocolVersion
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.message.MessageEntity
 import moe.kurenai.tdlight.model.message.User
 import moe.kurenai.tdlight.request.message.SendMessage
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.BotFactory
+import net.mamoe.mirai.auth.BotAuthorization
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
-import net.mamoe.mirai.event.events.*
+import net.mamoe.mirai.event.events.BotOfflineEvent
+import net.mamoe.mirai.event.events.BotOnlineEvent
+import net.mamoe.mirai.event.events.BotReloginEvent
+import net.mamoe.mirai.event.events.FriendMessageEvent
+import net.mamoe.mirai.event.events.GroupAwareMessageEvent
+import net.mamoe.mirai.event.events.GroupEvent
+import net.mamoe.mirai.event.events.MessageEvent
+import net.mamoe.mirai.event.events.MessageRecallEvent
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageChain.Companion.deserializeJsonToMessageChain
 import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
 import net.mamoe.mirai.message.data.PlainText
+import net.mamoe.mirai.utils.BotConfiguration
 import org.apache.logging.log4j.LogManager
 import java.io.File
 import java.net.ConnectException
@@ -54,25 +70,24 @@ class QQBot(
     private val workerContext = newFixedThreadPoolContext(10, "${qqProperties.account}-worker")
     private val defaultScope = CoroutineScope(parentCoroutineContext + workerContext)
 
-    private fun buildMiraiBot(): Bot {
-        return BotFactory.newBot(qqProperties.account, qqProperties.password) {
+    private fun buildMiraiBot(qrCodeLogin: Boolean = false): Bot {
+        val configuration = BotConfiguration().apply {
             cacheDir = File("./mirai/${qqProperties.account}")
             fileBasedDeviceInfo("${bot.configPath}/device.json") // 使用 device.json 存储设备信息
             protocol = qqProperties.protocol // 切换协议
             highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
             parentCoroutineContext = this@QQBot.parentCoroutineContext
-            loginSolver = CustomLoginSolver(bot)
-//        val file = File(BotConstant.LOG_FILE_PATH)
-//        redirectBotLogToFile(file)
-//        redirectNetworkLogToFile(file)
+            loginSolver = MultipleLoginSolver(bot)
+        }
+        return if (qrCodeLogin || qqProperties.password.isBlank()) {
+            BotFactory.newBot(qqProperties.account, BotAuthorization.byQRCode(), configuration)
+        } else {
+            BotFactory.newBot(qqProperties.account, qqProperties.password, configuration)
         }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun start() {
-        FixProtocolVersion.update()
-        log.info("QQ protocol version: ${FixProtocolVersion.info()[qqProperties.protocol]}")
-
         qqBot = buildMiraiBot()
         log.info("Login qq ${qqProperties.account}...")
 

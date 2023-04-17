@@ -1,4 +1,4 @@
-//package kurenai.imsyncbot.handler.qq
+package kurenai.imsyncbot.qq//package kurenai.imsyncbot.handler.qq
 //
 //import kurenai.imsyncbot.config.GroupConfig
 //import kurenai.imsyncbot.config.GroupConfig.qqTg

@@ -1,4 +1,4 @@
-package kurenai.imsyncbot.handler.qq
+package kurenai.imsyncbot.qq
 
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -59,7 +59,7 @@ data class GroupMessageContext(
 
     val simpleContent: String = messageChain.contentToString()
     val chatId: String = (bot.groupConfig.qqTg[group.id] ?: bot.groupConfig.defaultTgGroup).toString()
-    val replyId: Int? by lazy {
+    val replyId: Long? by lazy {
         messageChain[QuoteReply.Key]?.let {
             runBlocking(bot.coroutineContext) {
                 CacheService.getTgIdByQQ(
@@ -303,6 +303,7 @@ data class GroupMessageContext(
 
         private val inputFiles = mutableListOf<InputFile>()
         private var telegramMessage: SendMediaGroup? = null
+        private lateinit var inputMedias: List<InputMedia>
 
         suspend fun getTelegramMessage(): SendMediaGroup {
             return telegramMessage ?: buildTelegramMessage()
@@ -337,17 +338,40 @@ data class GroupMessageContext(
 
         private suspend fun buildTelegramMessage(): SendMediaGroup {
             inputFiles.clear()
+
+            inputMedias = images.mapNotNull {
+                if (it.imageType == ImageType.GIF) null
+                else if (shouldBeFile)
+                    InputMediaDocument(InputFile(it.queryUrl()).also(inputFiles::add)).apply {
+                        parseMode = ParseMode.MARKDOWN_V2
+                    }
+                else
+                    InputMediaPhoto(InputFile(it.queryUrl()).also(inputFiles::add)).apply {
+                        parseMode = ParseMode.MARKDOWN_V2
+                    }
+            }.also {
+                it[it.lastIndex].caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
+            }
+            inputMedias.windowed(10).forEach { sub ->
+                SendMediaGroup(chatId).apply {
+                    media = inputMedias
+                    replyId?.let { replyToMessageId = replyId }
+                }.also {
+                    telegramMessage = it
+                }
+            }
             return SendMediaGroup(chatId).apply {
                 media = images.mapNotNull {
                     if (it.imageType == ImageType.GIF) null
-                    else if (shouldBeFile)
+                    else if (shouldBeFile) {
                         InputMediaDocument(InputFile(it.queryUrl()).also(inputFiles::add)).apply {
                             parseMode = ParseMode.MARKDOWN_V2
                         }
-                    else
+                    } else {
                         InputMediaPhoto(InputFile(it.queryUrl()).also(inputFiles::add)).apply {
                             parseMode = ParseMode.MARKDOWN_V2
                         }
+                    }
                 }.also {
                     it[it.lastIndex].caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
                 }

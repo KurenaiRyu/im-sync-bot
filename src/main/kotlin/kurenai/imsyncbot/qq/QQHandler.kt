@@ -1,4 +1,4 @@
-package kurenai.imsyncbot.handler.qq
+package kurenai.imsyncbot.qq
 
 import kurenai.imsyncbot.handler.Handler
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
