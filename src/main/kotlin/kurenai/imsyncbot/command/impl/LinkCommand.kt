@@ -46,17 +46,40 @@ class LinkCommand : AbstractTelegramCommand() {
         val bot = getBotOrThrow()
         val qqBot = bot.qq.qqBot
         val replyMsg = message.replyToMessage!!
+        val user = message.from!!
+        val isAdmin = bot.userConfig.superAdmins.contains(user.id)
+        val param = update.message?.text?.param() ?: ""
+        val anotherId = param.toLongOrNull()
+        if (isAdmin && anotherId != null) {
+            val name: String
+            val qq: Long
+            val tg: Long
+            if (replyMsg.from?.id == bot.tg.tgBot.me.id) {
+                val qqMsg = CacheService.getQQByTg(replyMsg) ?: return "找不到该qq信息"
+                qq = qqMsg.source.fromId
+                tg = anotherId
+                name = user.username?.takeIf { it.isNotBlank() } ?: bot.userConfig.qqUsernames[qq] ?: qq.toString()
+                bot.userConfig.link(anotherId, qq, name)
+            } else {
+                qq = anotherId
+                tg = user.id
+                name = user.username?.takeIf { it.isNotBlank() } ?: bot.userConfig.qqUsernames[anotherId] ?: anotherId.toString()
+                bot.userConfig.link(user.id, anotherId, name)
+            }
+            return "绑定qq[$qq]-tg[$tg]成功"
+        }
+
         if (replyMsg.from?.id != bot.tg.tgBot.me.id) return "请引用转发的qq消息"
         val qqMsg = CacheService.getQQByTg(replyMsg) ?: return "找不到该qq信息"
-        val user = message.from!!
-        return if (bot.userConfig.superAdmins.contains(user.id)) {
+        return if (isAdmin) {
+            val name = user.username ?: qqMsg.source.fromId.toString()
             val u = bot.userConfig.links.firstOrNull { it.tg == user.id && it.qq != null }
             if (u != null) {
                 return if (u.status.contains(UserStatus.MASTER)) "master账号无法改变绑定qq"
-                else "qq[${qqMsg.source.fromId}]已绑定@${user.username}"
+                else "qq[${qqMsg.source.fromId}]已绑定@${name}"
             }
 
-            bot.userConfig.link(user.id, qqMsg.source.fromId, user.username!!)
+            bot.userConfig.link(user.id, qqMsg.source.fromId, name)
             "绑定qq[${qqMsg.source.fromId}]成功"
         } else {
             val qqGroup = qqBot.getGroup(qqMsg.source.targetId) ?: return "找不到QQ群信息"
@@ -66,7 +89,7 @@ class LinkCommand : AbstractTelegramCommand() {
                         val tips = SendMessage(message.chatId, "请到qq群回复提示消息`accept`进行确认").apply {
                             replyToMessageId = message.messageId
                             parseMode = ParseMode.MARKDOWN_V2
-                        }.send()
+                        }.send(bot.tg)
                         val msgId = receipt.source.ids[0]
                         linkCache[msgId] = qqMsg.source.fromId to listOf(message, tips)
                     }
