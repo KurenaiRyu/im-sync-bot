@@ -20,6 +20,7 @@ import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.qq.login.MultipleLoginSolver
 import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
+import kurenai.imsyncbot.utils.FixProtocolVersion
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.message.MessageEntity
 import moe.kurenai.tdlight.model.message.User
@@ -71,6 +72,12 @@ class QQBot(
     private val defaultScope = CoroutineScope(parentCoroutineContext + workerContext)
 
     private fun buildMiraiBot(qrCodeLogin: Boolean = false): Bot {
+        log.info("协议版本检查更新...")
+        try {
+            FixProtocolVersion.update()
+        } catch (cause: Throwable) {
+            log.error("协议版本升级失败", cause)
+        }
         val configuration = BotConfiguration().apply {
             cacheDir = File("./mirai/${qqProperties.account}")
             fileBasedDeviceInfo("${bot.configPath}/device.json") // 使用 device.json 存储设备信息
