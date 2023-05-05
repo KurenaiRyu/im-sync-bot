@@ -29,6 +29,10 @@
     </Appenders>
     <Loggers>
         <!-- avoid duplicated logs with additivity=false -->
+        <Logger name="net.mamoe.mirai" level="trace" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="RandomAccessFile"/>
+        </Logger>
         <Logger name="kurenai.imsyncbot" level="info" additivity="false">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="RandomAccessFile"/>

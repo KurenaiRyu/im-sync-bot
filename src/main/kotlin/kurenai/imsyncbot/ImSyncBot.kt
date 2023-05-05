@@ -9,8 +9,8 @@ import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.PrivateChatHandler
-import kurenai.imsyncbot.handler.qq.QQMessageHandler
-import kurenai.imsyncbot.handler.tg.TgMessageHandler
+import kurenai.imsyncbot.qq.QQMessageHandler
+import kurenai.imsyncbot.telegram.TgMessageHandler
 import kurenai.imsyncbot.qq.QQBot
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.TelegramBot
@@ -20,6 +20,7 @@ import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.NormalMember
 import net.mamoe.mirai.contact.getMember
 import net.mamoe.mirai.message.data.source
+import net.mamoe.mirai.utils.LoggerAdapters
 import org.apache.logging.log4j.Level
 import org.apache.logging.log4j.core.config.Configurator
 import org.redisson.Redisson
@@ -69,6 +70,9 @@ class ImSyncBot(
     internal val privateHandle = PrivateChatHandler(configProperties)
 
     init {
+        //mirai使用log4j2
+        LoggerAdapters.useLog4j2()
+
         if (configProperties.debug) {
             Configurator.setLevel("kurenai.imsyncbot", Level.DEBUG)
         }

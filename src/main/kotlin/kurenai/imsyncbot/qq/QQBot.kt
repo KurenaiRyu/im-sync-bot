@@ -25,6 +25,7 @@ import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.message.MessageEntity
 import moe.kurenai.tdlight.model.message.User
 import moe.kurenai.tdlight.request.message.SendMessage
+import moe.kurenai.tdlight.util.getLogger
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.BotFactory
 import net.mamoe.mirai.auth.BotAuthorization
@@ -45,6 +46,7 @@ import net.mamoe.mirai.message.data.MessageChain.Companion.deserializeJsonToMess
 import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
 import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.utils.BotConfiguration
+import net.mamoe.mirai.utils.LoggerAdapters.asMiraiLogger
 import org.apache.logging.log4j.LogManager
 import java.io.File
 import java.net.ConnectException
@@ -56,8 +58,7 @@ class QQBot(
     private val qqProperties: QQProperties,
     private val bot: ImSyncBot,
 ) {
-
-    private val log = LogManager.getLogger()
+    private val log = getLogger()
     val statusChannel = Channel<QQBotStatus>(Channel.BUFFERED)
     private val messageChannel = Channel<MessageEvent>(1000, BufferOverflow.DROP_OLDEST) {
         log.warn("Drop oldest event $it")
