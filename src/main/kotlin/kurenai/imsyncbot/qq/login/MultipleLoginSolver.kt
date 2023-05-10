@@ -41,7 +41,7 @@ class MultipleLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
     override val isSliderCaptchaSupported = sliderCaptchaSupportedSolvers.isNotEmpty()
 
     override fun createQRCodeLoginListener(bot: Bot): QRCodeLoginListener {
-        log.info("输入任意字符以确认控制台输入正常")
+        log.info("输入任意字符以确认控制台输入正常，或者回车以使用Telegram进行扫码登录")
         return readlnOrNull()?.takeUnless { it.isBlank() }?.let {
             default.createQRCodeLoginListener(bot)
         } ?: run {

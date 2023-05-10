@@ -79,7 +79,7 @@ object CacheService {
         getBotOrThrow().cache.put(TG_MSG_CACHE_KEY, message.cacheId(), message, TTL)
     }
 
-    suspend fun cachePrivateChat(friendId: Long, messageId: Int) {
+    suspend fun cachePrivateChat(friendId: Long, messageId: Long) {
         val bot = getBotOrThrow()
         bot.cache.put(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId, friendId)
         bot.cache.put(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId, messageId)
@@ -138,11 +138,13 @@ object CacheService {
         return getQQIdByTg(message.chat.id, message.messageId!!)
     }
 
-    suspend fun getQQIdByTg(chatId: Long, messageId: Int): Pair<Long, Int>? {
-        return getBotOrThrow().cache.get<String, String?>(TG_QQ_MSG_ID_CACHE_KEY, getTgCacheId(chatId, messageId))?.splitCacheId()
+    suspend fun getQQIdByTg(chatId: Long, messageId: Long): Pair<Long, Int>? {
+        return getBotOrThrow().cache.get<String, String?>(TG_QQ_MSG_ID_CACHE_KEY, getTgCacheId(chatId, messageId))?.splitCacheId()?.let {
+            it.first to it.second.toInt()
+        }
     }
 
-    suspend fun getTgIdByQQ(group: Long, id: Int): Pair<Long, Int>? {
+    suspend fun getTgIdByQQ(group: Long, id: Int): Pair<Long, Long>? {
         return getBotOrThrow().cache.get<String, String?>(QQ_TG_MSG_ID_CACHE_KEY, getQQCacheId(group, id))?.splitCacheId()
     }
 
@@ -175,7 +177,7 @@ object CacheService {
         }
     }
 
-    suspend fun getQQByTg(chatId: Long, messageId: Int): MessageChain? {
+    suspend fun getQQByTg(chatId: Long, messageId: Long): MessageChain? {
         val msgId = getQQIdByTg(chatId, messageId)
         return if (msgId == null) {
             log.debug("QQ msg id not found by $msgId")
@@ -189,11 +191,11 @@ object CacheService {
         return getTg(message.chat.id, message.messageId!!)
     }
 
-    suspend fun getTg(chatId: Long, messageId: Int): Message? {
+    suspend fun getTg(chatId: Long, messageId: Long): Message? {
         return getBotOrThrow().cache.get(TG_MSG_CACHE_KEY, getTgCacheId(chatId, messageId)) ?: getOnlineTg(chatId.toString(), messageId)
     }
 
-    suspend fun getOnlineTg(chatId: String?, messageId: Int): Message? {
+    suspend fun getOnlineTg(chatId: String?, messageId: Long): Message? {
         if (chatId == null) return null
         return GetMessageInfo(chatId, messageId).send().also {
             cache(it)
@@ -206,7 +208,7 @@ object CacheService {
         }
     }
 
-    suspend fun getPrivateChannelMessageId(friendId: Long): Int? {
+    suspend fun getPrivateChannelMessageId(friendId: Long): Long? {
         return getBotOrThrow().cache.get(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId)
     }
 
@@ -214,11 +216,11 @@ object CacheService {
         return getBotOrThrow().cache.remove(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId)
     }
 
-    suspend fun getFriendId(messageId: Int): Long? {
+    suspend fun getFriendId(messageId: Long): Long? {
         return getBotOrThrow().cache.get(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId)
     }
 
-    private fun getTgCacheId(chatId: Long, messageId: Int): String {
+    private fun getTgCacheId(chatId: Long, messageId: Long): String {
         return "${chatId}:${messageId}"
     }
 
@@ -250,8 +252,8 @@ object CacheService {
         return this.toEpochSecond(ZoneOffset.MIN) - BEGIN
     }
 
-    private fun String.splitCacheId(): Pair<Long, Int>? {
-        return this.split(":").takeIf { it.size == 2 }?.let { it[0].toLong() to it[1].toInt() }
+    private fun String.splitCacheId(): Pair<Long, Long>? {
+        return this.split(":").takeIf { it.size == 2 }?.let { it[0].toLong() to it[1].toLong() }
     }
 
     private fun String.appendKey(key: String): String {

@@ -90,7 +90,7 @@ public object FixProtocolVersion {
                     ssoVersion = 19
                 }
 
-                impl.id < 537153294 -> impl.change {
+                impl.id < 537153294 -> impl.apply {
                     apkId = "com.tencent.mobileqq"
                     id = 537153294
                     ver = "8.9.35.10440"
@@ -123,7 +123,7 @@ public object FixProtocolVersion {
                     ssoVersion = 19
                 }
 
-                impl.id < 537152242 -> impl.change {
+                impl.id < 537152242 -> impl.apply {
                     apkId = "com.tencent.mobileqq"
                     id = 537152242
                     ver = "8.9.35.10440"
@@ -157,7 +157,7 @@ public object FixProtocolVersion {
                     supportsQRLogin = true
                 }
 
-                impl.id < 537065138 -> impl.change {
+                impl.id < 537065138 -> impl.apply {
                     apkId = "com.tencent.qqlite"
                     id = 537065138
                     ver = "2.0.8"
@@ -190,7 +190,7 @@ public object FixProtocolVersion {
                     ssoVersion = 19
                 }
 
-                impl.id <= 537151363 -> impl.change {
+                impl.id <= 537151363 -> impl.apply {
                     apkId = "com.tencent.minihd.qq"
                     id = 537151363
                     ver = "8.9.33.614"

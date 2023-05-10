@@ -11,10 +11,10 @@ import kurenai.imsyncbot.command.AbstractInlineCommand
 import kurenai.imsyncbot.command.AbstractQQCommand
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.AbstractConfig
-import kurenai.imsyncbot.handler.qq.QQHandler
-import kurenai.imsyncbot.handler.qq.QQMessageHandler
-import kurenai.imsyncbot.handler.tg.TelegramHandler
-import kurenai.imsyncbot.handler.tg.TgMessageHandler
+import kurenai.imsyncbot.qq.QQHandler
+import kurenai.imsyncbot.qq.QQMessageHandler
+import kurenai.imsyncbot.telegram.TelegramHandler
+import kurenai.imsyncbot.telegram.TgMessageHandler
 import kurenai.imsyncbot.utils.humanReadableByteCountBin
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.filefilter.AgeFileFilter

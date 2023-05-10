@@ -1,7 +1,8 @@
-package kurenai.imsyncbot.handler.tg
+package kurenai.imsyncbot.telegram
 
 import kurenai.imsyncbot.handler.Handler
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
+import moe.kurenai.tdlight.model.message.DeletedMessage
 import moe.kurenai.tdlight.model.message.Message
 
 interface TelegramHandler : Handler {
@@ -14,5 +15,8 @@ interface TelegramHandler : Handler {
         return CONTINUE
     }
 
+    suspend fun onDeleteMessage(deletedMessage: DeletedMessage): Int {
+        return CONTINUE
+    }
 
 }

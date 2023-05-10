@@ -45,7 +45,7 @@ class PrivateChatHandler(
 
     private var messageMap = mutableMapOf<String, Message>()
 
-    private val privateChannelMessageIdCache = WeakHashMap<Long, Int>()
+    private val privateChannelMessageIdCache = WeakHashMap<Long, Long>()
 
     suspend fun onFriendEvent(event: FriendEvent): Int {
         when (event) {
@@ -235,7 +235,7 @@ class PrivateChatHandler(
         }
     }
 
-    suspend fun getStartMsg(friend: Friend): Int? {
+    suspend fun getStartMsg(friend: Friend): Long? {
         val bot = getBotOrThrow()
         val qqBot = bot.qq.qqBot
         var messageId = getPrivateChannelMessageIdCache(friend.id)
@@ -287,7 +287,7 @@ class PrivateChatHandler(
         }
     }
 
-    private suspend fun Message.getRootReplyMessageId(): Int {
+    private suspend fun Message.getRootReplyMessageId(): Long {
         return if (this.isReply()) {
             CacheService.getTg(this.chat.id, this.replyToMessage!!.messageId!!)?.getRootReplyMessageId()
                 ?: this.messageId!!
@@ -296,7 +296,7 @@ class PrivateChatHandler(
         }
     }
 
-    private suspend fun getPrivateChannelMessageIdCache(friendId: Long): Int? {
+    private suspend fun getPrivateChannelMessageIdCache(friendId: Long): Long? {
         return privateChannelMessageIdCache[friendId] ?: CacheService.getPrivateChannelMessageId(friendId)
     }
 

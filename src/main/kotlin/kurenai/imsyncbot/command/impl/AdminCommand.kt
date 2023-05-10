@@ -14,8 +14,11 @@ class AdminCommand : AbstractTelegramCommand() {
     override suspend fun execute(update: Update, message: Message): String {
         return if (message.isReply()) {
             val user = message.replyToMessage!!.from!!
-            getBotOrThrow().userConfig.admin(user.id, username = user.username)
-            "添加管理员成功"
+            if (user.isBot) "机器人不能够是管理员"
+            else {
+                getBotOrThrow().userConfig.admin(user.id, username = user.username)
+                "添加管理员成功"
+            }
         } else {
             "需要引用一条消息来找到该用户"
         }

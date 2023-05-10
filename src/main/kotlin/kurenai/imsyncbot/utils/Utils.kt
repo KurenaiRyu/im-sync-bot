@@ -3,7 +3,6 @@ package kurenai.imsyncbot.utils
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
-import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
@@ -15,7 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
-import kurenai.imsyncbot.handler.qq.GroupMessageContext
+import kurenai.imsyncbot.qq.GroupMessageContext
 import moe.kurenai.tdlight.model.message.Update
 import org.reflections.Reflections
 import java.io.File

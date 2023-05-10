@@ -17,10 +17,6 @@ object CommandDispatcher {
 
     private val log = getLogger()
 
-    init {
-        reflections.getSubTypesOf(AbstractQQCommand::class.java)
-    }
-
     suspend fun execute(update: Update, message: Message) {
         val bot = getBotOrThrow()
         val command = message.entities!!

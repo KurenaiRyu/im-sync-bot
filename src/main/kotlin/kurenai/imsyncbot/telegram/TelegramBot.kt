@@ -89,6 +89,7 @@ class TelegramBot(
                 coroutineContext = this@TelegramBot.coroutineContext
             }
             tgBot.start()
+            SendMessage(bot.configProperties.bot.masterOfTg.toString(), "启动成功")
         }
         CoroutineScope(coroutineContext).launch {
             sendMessage()

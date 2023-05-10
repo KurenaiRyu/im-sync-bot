@@ -9,11 +9,11 @@ import moe.kurenai.tdlight.model.message.Update
  * @since 2023/2/14 12:46
  */
 
-class AtCommand : AbstractInlineCommand() {
-
-    override val command = "at"
-
-    override suspend fun execute(update: Update, inlineQuery: InlineQuery, args: List<String>) {
-
-    }
-}
+//class AtCommand : AbstractInlineCommand() {
+//
+//    override val command = "at"
+//
+//    override suspend fun execute(update: Update, inlineQuery: InlineQuery, args: List<String>) {
+//
+//    }
+//}

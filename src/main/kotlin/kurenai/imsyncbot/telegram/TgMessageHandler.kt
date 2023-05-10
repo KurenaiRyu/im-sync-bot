@@ -1,4 +1,4 @@
-package kurenai.imsyncbot.handler.tg
+package kurenai.imsyncbot.telegram
 
 import jodd.util.StringPool
 import kotlinx.coroutines.CoroutineScope
@@ -8,13 +8,13 @@ import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
 import kurenai.imsyncbot.utils.suffix
 import moe.kurenai.tdlight.exception.TelegramApiException
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.media.PhotoSize
+import moe.kurenai.tdlight.model.message.DeletedMessage
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.MessageEntity
 import moe.kurenai.tdlight.request.GetFile
@@ -28,8 +28,6 @@ import net.mamoe.mirai.utils.isFile
 import java.io.IOException
 import java.nio.file.Path
 import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.coroutineContext
 import kotlin.io.path.exists
@@ -48,6 +46,13 @@ class TgMessageHandler(
     init {
         if (configProperties.bot.tgMsgFormat.contains("\$msg")) tgMsgFormat = configProperties.bot.tgMsgFormat
         if (configProperties.bot.qqMsgFormat.contains("\$msg")) qqMsgFormat = configProperties.bot.qqMsgFormat
+    }
+
+    override suspend fun onDeleteMessage(deletedMessage: DeletedMessage): Int {
+        deletedMessage.messageIds.forEach { id ->
+            CacheService.getQQByTg(deletedMessage.chat.id, id)?.recall()
+        }
+        return END
     }
 
     override suspend fun onEditMessage(message: Message): Int {
