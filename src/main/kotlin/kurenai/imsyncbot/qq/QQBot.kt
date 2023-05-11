@@ -5,11 +5,13 @@ import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newFixedThreadPoolContext
 import kotlinx.coroutines.sync.Mutex
@@ -29,6 +31,7 @@ import moe.kurenai.tdlight.util.getLogger
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.BotFactory
 import net.mamoe.mirai.auth.BotAuthorization
+import net.mamoe.mirai.contact.Friend
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
@@ -48,6 +51,7 @@ import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.utils.BotConfiguration
 import net.mamoe.mirai.utils.LoggerAdapters.asMiraiLogger
 import org.apache.logging.log4j.LogManager
+import org.redisson.api.RBlockingQueue
 import java.io.File
 import java.net.ConnectException
 import java.util.concurrent.TimeUnit
@@ -95,13 +99,13 @@ class QQBot(
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    suspend fun start() {
+    suspend fun start(waitForInit: Boolean = false) {
         qqBot = buildMiraiBot()
         log.info("Login qq ${qqProperties.account}...")
 
         statusChannel.send(Initializing)
         qqBot.login()
-        defaultScope.launch {
+        val initBot = suspend {
             // TODO: 获取之前已存在的queue
             // bot.redisson.keys
             statusChannel.send(Initialized)
@@ -165,31 +169,32 @@ class QQBot(
                                                     bot.coroutineContext +
                                                             workerContext.limitedParallelism(1) +
                                                             CoroutineName("${friend.nameCardOrNick}(${friend.id})")
-                                                )
-                                            }.launch {
-                                                while (isActive) {
-                                                    try {
-                                                        val message =
-                                                            queue.pollAsync(10, TimeUnit.MINUTES)
-                                                                .toCompletableFuture()
-                                                                .await()
-                                                        if (message != null) {
-                                                            bot.privateHandle.onFriendMessage(
-                                                                friend,
-                                                                message.deserializeJsonToMessageChain(),
-                                                                friend.id == qqBot.id
-                                                            )
+                                                ).also {
+                                                    it.launch {
+                                                        while (isActive) {
+                                                            try {
+                                                                val message =
+                                                                    queue.pollAsync(10, TimeUnit.MINUTES)
+                                                                        .toCompletableFuture()
+                                                                        .await()
+                                                                if (message != null) {
+                                                                    bot.privateHandle.onFriendMessage(
+                                                                        friend,
+                                                                        message.deserializeJsonToMessageChain(),
+                                                                        friend.id == qqBot.id
+                                                                    )
+                                                                }
+                                                            } catch (e: Exception) {
+                                                                log.error("Handle friend message fail", e)
+                                                            }
                                                         }
-                                                    } catch (e: Exception) {
-                                                        log.error("Handle friend message fail", e)
                                                     }
                                                 }
                                             }
                                         }
+                                        queue.addAsync(json)
                                     }
-                                    queue.addAsync(json)
                                 }
-
                                 is GroupAwareMessageEvent -> {
                                     val id = event.group.id
                                     val queueName = "QUEUE:GROUP:$id"
@@ -203,30 +208,32 @@ class QQBot(
                                                             workerContext.limitedParallelism(1) +
                                                             CoroutineName("${event.group.name}(${event.group.id})")
                                                 )
-                                            }.launch {
-                                                val group = event.group
-                                                while (isActive) {
-                                                    var messageChain: MessageChain? = null
-                                                    try {
-                                                        val message =
-                                                            queue.pollAsync(30, TimeUnit.SECONDS).toCompletableFuture()
-                                                                .await() ?: continue
-                                                        messageChain = message.deserializeJsonToMessageChain()
-                                                        var count = 0
-                                                        while (count < 3) {
-                                                            try {
-                                                                bot.qqMessageHandler.onGroupMessage(GroupMessageContext(bot, group, messageChain))
-                                                                break
-                                                            } catch (e: ConnectException) {
-                                                                log.warn(e.message)
-                                                                count++
-                                                                delay(count * 2000L)
+                                            }.also {
+                                                it.launch {
+                                                    val group = event.group
+                                                    while (isActive) {
+                                                        var messageChain: MessageChain? = null
+                                                        try {
+                                                            val message =
+                                                                queue.pollAsync(30, TimeUnit.SECONDS).toCompletableFuture()
+                                                                    .await() ?: continue
+                                                            messageChain = message.deserializeJsonToMessageChain()
+                                                            var count = 0
+                                                            while (count < 3) {
+                                                                try {
+                                                                    bot.qqMessageHandler.onGroupMessage(GroupMessageContext(bot, group, messageChain))
+                                                                    break
+                                                                } catch (e: ConnectException) {
+                                                                    log.warn(e.message)
+                                                                    count++
+                                                                    delay(count * 2000L)
+                                                                }
                                                             }
+                                                        } catch (e: BotException) {
+                                                            log.warn(e.message)
+                                                        } catch (e: Exception) {
+                                                            reportError(group, messageChain!!, e)
                                                         }
-                                                    } catch (e: BotException) {
-                                                        log.warn(e.message)
-                                                    } catch (e: Exception) {
-                                                        reportError(group, messageChain!!, e)
                                                     }
                                                 }
                                             }
@@ -236,7 +243,7 @@ class QQBot(
                                 }
 
                                 else -> {
-                                    log.trace("未支持事件 ${event.javaClass} 的处理")
+                                    log.trace("未支持事件 {} 的处理", event.javaClass)
                                 }
                             }
                         }
@@ -262,6 +269,9 @@ class QQBot(
             }
             log.info("Started qq-bot ${qqBot.nick}(${qqBot.id})")
         }
+
+        if (waitForInit) initBot.invoke()
+        else defaultScope.launch { initBot.invoke() }
     }
 
     suspend fun restart() {
@@ -269,8 +279,7 @@ class QQBot(
             qqBot.login()
         }.recoverCatching { ex ->
             log.error("Re login failed, try to create a new instance...", ex)
-            qqBot = buildMiraiBot()
-            start()
+            start(true)
         }.getOrThrow()
     }
 
