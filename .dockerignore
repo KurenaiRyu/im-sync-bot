@@ -1,3 +1,4 @@
 *
 !build/libs/*.jar
 !build/libs/lib
+!entrypoint.sh

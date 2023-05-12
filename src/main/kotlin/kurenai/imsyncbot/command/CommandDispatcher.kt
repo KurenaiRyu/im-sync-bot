@@ -33,7 +33,7 @@ object CommandDispatcher {
         var msg: String? = null
         for (handler in tgCommands) {
             if (handler.command.lowercase() == command.lowercase()) {
-                log.debug("Match ${handler.name}")
+                log.info("Match ${handler.name}")
                 val isSupperAdmin = bot.userConfig.superAdmins.contains(message.from?.id)
                 val param = message.text?.replace("/${handler.command}", "")?.trim()
                 msg = if (isSupperAdmin && param == "ban") {
@@ -148,7 +148,7 @@ object CommandDispatcher {
 
     private suspend fun handleHelp(message: Message) {
         val sb = StringBuilder("Command list")
-        for (handler in tgCommands) {
+        for (handler in tgCommands.asSequence().sortedBy { it.command }) {
             sb.append("\n----------------\n")
             sb.append("/${handler.command} ${handler.name}\n")
             sb.append(handler.help)

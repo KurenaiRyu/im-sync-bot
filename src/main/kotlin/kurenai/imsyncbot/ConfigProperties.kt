@@ -17,7 +17,7 @@ open class ConfigPropertiesVersion(val version: Int? = null)
 
 fun loadConfig(file: File): ConfigProperties? {
     val text = file.readText()
-    val doV1Backup = { config: ConfigProperties ->
+    val doBackup = { config: ConfigProperties ->
         runCatching {
             file.copyTo(File("${file.absolutePath}.bak"), false)
         }.recover {
@@ -28,13 +28,21 @@ fun loadConfig(file: File): ConfigProperties? {
     val jsonNode = yamlMapper.readTree(text)
     return when (jsonNode.get("version")?.asInt(0) ?: 0) {
         2 -> yamlMapper.treeToValue(jsonNode, ConfigProperties::class.java)
-        1, 0 -> runCatching {
+        1 -> runCatching {
             yamlMapper.treeToValue(jsonNode, ConfigPropertiesV1::class.java).migration().also {
-                doV1Backup(it)
+                doBackup(it)
             }
         }.onFailure {
             it.printStackTrace()
         }.getOrNull()
+
+        0 -> runCatching {
+            yamlMapper.treeToValue(jsonNode, ConfigProperties::class.java)
+        }.recover {
+            yamlMapper.treeToValue(jsonNode, ConfigPropertiesV1::class.java).migration()
+        }.getOrNull()?.also {
+            doBackup(it)
+        }
 
         else -> null
     }

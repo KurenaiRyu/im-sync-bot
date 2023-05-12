@@ -1,20 +1,22 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.8.10"
+    kotlin("jvm") version "1.8.20"
     application
-    kotlin("plugin.serialization") version "1.8.10"
+    kotlin("plugin.serialization") version "1.8.20"
 }
 
 group = "moe.kurenai.bot"
 version = "0.0.1-SNAPSHOT"
 
 repositories {
+    maven("https://maven.aliyun.com/repository/central/")
     maven { url = uri("https://jitpack.io") }
     mavenCentral()
     mavenLocal {
         content {
             includeGroupByRegex(".*\\.kurenai.*")
+            includeGroup("net.mamoe")
         }
     }
 }
@@ -23,7 +25,8 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
-    val miraiVersion = "2.14.0"
+//    val miraiVersion = "2.15.0-M1"
+    val miraiVersion = "44e9bb11"
 
     //mirai
     implementation("net.mamoe", "mirai-core", miraiVersion)

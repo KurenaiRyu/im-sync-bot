@@ -15,8 +15,8 @@ class BindCommand : AbstractTelegramCommand() {
     override val help: String = "绑定群组或用户名"
     override val onlyAdmin = true
     override val onlySupperAdmin = false
+    override val onlyGroupMessage: Boolean = true
     override val parseMode = ParseMode.MARKDOWN_V2
-
 
     override suspend fun execute(update: Update, message: Message): String? {
         val param = message.text?.param() ?: return "参数错误"
