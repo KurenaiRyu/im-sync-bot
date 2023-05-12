@@ -20,10 +20,16 @@ import moe.kurenai.tdlight.LongPollingCoroutineTelegramBot
 import moe.kurenai.tdlight.client.TDLightCoroutineClient
 import moe.kurenai.tdlight.exception.TelegramApiRequestException
 import moe.kurenai.tdlight.model.ResponseWrapper
+import moe.kurenai.tdlight.model.command.BotCommand
+import moe.kurenai.tdlight.model.command.BotCommandScope
+import moe.kurenai.tdlight.model.command.BotCommandScopeType
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
 import moe.kurenai.tdlight.model.keyboard.InlineKeyboardMarkup
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.Request
+import moe.kurenai.tdlight.request.command.DeleteMyCommands
+import moe.kurenai.tdlight.request.command.GetMyCommands
+import moe.kurenai.tdlight.request.command.SetMyCommands
 import moe.kurenai.tdlight.request.message.*
 import moe.kurenai.tdlight.util.DefaultMapper.MAPPER
 import moe.kurenai.tdlight.util.getLogger
@@ -70,16 +76,17 @@ class TelegramBot(
 
     internal lateinit var tgBot: LongPollingCoroutineTelegramBot
     suspend fun start() {
+        log.debug("Telegram base url: ${telegramProperties.baseUrl}")
+        client = TDLightCoroutineClient(
+            telegramProperties.baseUrl,
+            telegramProperties.token,
+            isUserMode = false,
+            isDebugEnabled = true,
+            updateBaseUrl = telegramProperties.baseUrl
+        )
+        statusChannel.send(Initialized)
+        updateCommand()
         CoroutineScope(coroutineContext).launch {
-            log.debug("Telegram base url: ${telegramProperties.baseUrl}")
-            client = TDLightCoroutineClient(
-                telegramProperties.baseUrl,
-                telegramProperties.token,
-                isUserMode = false,
-                isDebugEnabled = true,
-                updateBaseUrl = telegramProperties.baseUrl
-            )
-            statusChannel.send(Initialized)
             var qqBotStatus = bot.qq.statusChannel.receive()
             while (qqBotStatus !is QQBot.Initialized) {
                 log.debug("QQ bot status: ${qqBotStatus.javaClass.simpleName}")
@@ -97,6 +104,42 @@ class TelegramBot(
         CoroutineScope(coroutineContext).launch {
             handleUpdate()
         }
+    }
+
+    private suspend fun updateCommand() = runCatching {
+        log.info("Updating command...")
+        client.send(DeleteMyCommands())
+        client.send(DeleteMyCommands(BotCommandScope(BotCommandScopeType.ALL_GROUP_CHATS)))
+        client.send(DeleteMyCommands(BotCommandScope(BotCommandScopeType.ALL_PRIVATE_CHATS)))
+        if (!client.send(
+                SetMyCommands(
+                    tgCommands.filter { !it.onlyUserMessage }.map { BotCommand(it.command.lowercase(), it.help) },
+                    BotCommandScope(BotCommandScopeType.ALL_GROUP_CHATS)
+                )
+            )
+        ) {
+            log.warn("Update all group chats command fail!")
+        }
+        if (!client.send(
+                SetMyCommands(
+                    tgCommands.filter { !it.onlyGroupMessage }.map { BotCommand(it.command.lowercase(), it.help) },
+                    BotCommandScope(BotCommandScopeType.ALL_PRIVATE_CHATS)
+                )
+            )
+        ) {
+            log.warn("Update all private chats command fail!")
+        }
+        log.info("Update command finish.")
+        if (log.isDebugEnabled) {
+            client.send(GetMyCommands(scope = BotCommandScope(BotCommandScopeType.ALL_GROUP_CHATS))).forEach {
+                log.debug("{}({}) - {}", it.command, BotCommandScopeType.ALL_GROUP_CHATS, it.description)
+            }
+            client.send(GetMyCommands(scope = BotCommandScope(BotCommandScopeType.ALL_PRIVATE_CHATS))).forEach {
+                log.debug("{}({}) - {}", it.command, BotCommandScopeType.ALL_PRIVATE_CHATS, it.description)
+            }
+        }
+    }.onFailure {
+        log.error(it.message, it)
     }
 
     @Suppress("UNCHECKED_CAST")
