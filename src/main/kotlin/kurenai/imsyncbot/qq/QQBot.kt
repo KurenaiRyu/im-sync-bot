@@ -68,6 +68,7 @@ class QQBot(
         log.warn("Drop oldest event $it")
     }
     private val scopeMap = HashMap<String, CoroutineScope>()
+    private val loginLock = Mutex()
     lateinit var qqBot: Bot
 
     val mapLock: Mutex = Mutex()
@@ -99,16 +100,20 @@ class QQBot(
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    suspend fun start(waitForInit: Boolean = false) {
+    suspend fun start(waitForInit: Boolean = false) = loginLock.withLock {
+        if (this::qqBot.isInitialized) {
+            if (qqBot.isOnline) return@withLock
+            if (qqBot.isActive) qqBot.close()
+        }
         qqBot = buildMiraiBot()
         log.info("Login qq ${qqProperties.account}...")
 
         statusChannel.send(Initializing)
         qqBot.login()
+        statusChannel.send(Initialized)
         val initBot = suspend {
             // TODO: 获取之前已存在的queue
             // bot.redisson.keys
-            statusChannel.send(Initialized)
             var telegramBotStatus = bot.tg.statusChannel.receive()
             while (telegramBotStatus !is TelegramBot.Initialized) {
                 log.debug("Telegram bot status: ${telegramBotStatus.javaClass.simpleName}")
