@@ -1,10 +1,9 @@
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre-focal
 
-RUN apk add --no-cache ffmpeg libwebp libwebp-tools bash
-
+RUN apt update && apt install tzdata ffmpeg libwebp libwebp-tools -y
+ENV TZ="Asia/Shanghai"
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en'
 
-# We make four distinct layers so if there are application changes the library layers can be re-used
 COPY --chown=185 build/libs/lib/* /deployments/lib/
 COPY --chown=185 build/libs/*.jar /deployments/
 COPY --chown=185 entrypoint.sh /deployments/
