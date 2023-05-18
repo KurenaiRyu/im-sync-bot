@@ -185,7 +185,12 @@ class QQBot(
                                                         }
                                                     }
                                                     log.info("Queue {} job is stopped", queueName)
-                                                    jobs.remove(queueName)
+                                                    jobLock.withLock {
+                                                        val j = jobs[queueName]
+                                                        if (j?.isActive == false) {
+                                                            jobs.remove(queueName)
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -233,7 +238,12 @@ class QQBot(
                                                         }
                                                     }
                                                     log.info("Queue {} job is stopped", queueName)
-                                                    jobs.remove(queueName)
+                                                    jobLock.withLock {
+                                                        val j = jobs[queueName]
+                                                        if (j?.isActive == false) {
+                                                            jobs.remove(queueName)
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
