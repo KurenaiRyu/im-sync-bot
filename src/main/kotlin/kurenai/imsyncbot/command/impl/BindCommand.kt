@@ -7,7 +7,10 @@ import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
 import moe.kurenai.tdlight.model.ParseMode
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
+import moe.kurenai.tdlight.util.getLogger
 import net.mamoe.mirai.message.data.source
+
+private val log = getLogger()
 
 class BindCommand : AbstractTelegramCommand() {
 
@@ -82,6 +85,7 @@ class UnbindCommand : AbstractTelegramCommand() {
                 bot.groupConfig.remove(param.toLong())
                 "解绑Q群成功"
             } catch (e: Exception) {
+                log.error("参数错误", e)
                 "参数错误"
             }
         } else {
