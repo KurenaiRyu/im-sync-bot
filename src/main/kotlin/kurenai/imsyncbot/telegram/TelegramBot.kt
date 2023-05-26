@@ -10,6 +10,7 @@ import kurenai.imsyncbot.*
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.command.CommandDispatcher
 import kurenai.imsyncbot.exception.BotException
+import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.qq.QQBot
 import kurenai.imsyncbot.service.CacheService
@@ -33,7 +34,9 @@ import moe.kurenai.tdlight.request.command.SetMyCommands
 import moe.kurenai.tdlight.request.message.*
 import moe.kurenai.tdlight.util.DefaultMapper.MAPPER
 import moe.kurenai.tdlight.util.getLogger
+import net.mamoe.mirai.Bot
 import java.nio.file.Files
+import java.time.LocalTime
 import java.util.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration.Companion.seconds
@@ -66,13 +69,18 @@ class TelegramBot(
     @OptIn(DelicateCoroutinesApi::class)
     private val workerContext = newFixedThreadPoolContext(10, "${telegramProperties.username}-worker")
     private val handlerContext = coroutineContext + workerContext.limitedParallelism(9)
+
+    private val updateContext =
+        coroutineContext + workerContext.limitedParallelism(1) + CoroutineName("TelegramHandleUpdate")
+    private val sendMessageContext =
+        coroutineContext + workerContext.limitedParallelism(1) + CoroutineName("TelegramSendMessage")
+
     val statusChannel = Channel<TelegramBotStatus>(Channel.BUFFERED)
     val username: String = telegramProperties.username
     val token: String = telegramProperties.token
     lateinit var client: TDLightCoroutineClient
 
-    private val updateContext = coroutineContext + workerContext.limitedParallelism(1) + CoroutineName("TelegramHandleUpdate")
-    private val sendMessageContext = coroutineContext + workerContext.limitedParallelism(1) + CoroutineName("TelegramSendMessage")
+    val disposableHandlers = LinkedList<TelegramDisposableHandler>()
 
     internal lateinit var tgBot: LongPollingCoroutineTelegramBot
     suspend fun start() {
@@ -87,11 +95,6 @@ class TelegramBot(
         statusChannel.send(Initialized)
         updateCommand()
         CoroutineScope(coroutineContext).launch {
-            var qqBotStatus = bot.qq.statusChannel.receive()
-            while (qqBotStatus !is QQBot.Initialized) {
-                log.debug("QQ bot status: ${qqBotStatus.javaClass.simpleName}")
-                qqBotStatus = bot.qq.statusChannel.receive()
-            }
             tgBot = LongPollingCoroutineTelegramBot(listOf(this@TelegramBot), client).apply {
                 coroutineContext = this@TelegramBot.coroutineContext
             }
@@ -215,7 +218,18 @@ class TelegramBot(
             val update = updateMessageChannel.receive()
             CoroutineScope(updateContext).launch {
                 try {
-                    doHandleUpdate(update)
+                    disposableHandlers.firstOrNull {
+                        if (it.timeout.plusMinutes(20).isBefore(LocalTime.now())) {
+                            disposableHandlers.remove(it)
+                            false
+                        } else {
+                            it.handle(bot, update)
+                        }
+                    }?.also {
+                        disposableHandlers.remove(it)
+                    } ?: run {
+                        doHandleUpdate(update)
+                    }
                 } catch (e: Exception) {
                     reportError(
                         update,
@@ -243,7 +257,12 @@ class TelegramBot(
     override fun onSubscribe0() {}
 
     suspend fun doHandleUpdate(update: Update) {
-        log.info("${update.chatInfoString()}: {}", MAPPER.writeValueAsString(update))
+        log.debug("${update.chatInfoString()}: {}", MAPPER.writeValueAsString(update))
+        val qqStatus = bot.qq.status.value
+        if (qqStatus != QQBot.Initialized || qqStatus != QQBot.Online) {
+            log.warn("QQ bot is not initialized or online, don't handle update.")
+            return
+        }
         val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message
         if (message == null) {
             log.debug("No message")
@@ -340,6 +359,7 @@ class TelegramBot(
         val baseUrl: String? = null
     )
 }
+
 
 suspend fun <T> Request<ResponseWrapper<T>>.sendCatching(bot: TelegramBot? = null, baseUrl: String? = null): Result<T> {
     val tg = bot ?: getBotOrThrow().tg
