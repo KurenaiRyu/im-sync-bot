@@ -1,8 +1,14 @@
 package kurenai.imsyncbot.qq
 
+import kotlinx.atomicfu.AtomicRef
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.update
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -49,7 +55,8 @@ class QQBot(
     private val bot: ImSyncBot,
 ) {
     private val log = getLogger()
-    val statusChannel = Channel<QQBotStatus>(Channel.BUFFERED)
+    val status: AtomicRef<QQBotStatus> = atomic(Initializing)
+
     private val messageChannel = Channel<MessageEvent>(1000, BufferOverflow.DROP_OLDEST) {
         log.warn("Drop oldest event $it")
     }
@@ -94,9 +101,8 @@ class QQBot(
         qqBot = buildMiraiBot()
         log.info("Login qq ${qqProperties.account}...")
 
-        statusChannel.send(Initializing)
         qqBot.login()
-        statusChannel.send(Initialized)
+        status.compareAndSet(Initializing, Initialized)
         val initBot = suspend {
             // TODO: 获取之前已存在的queue
             // bot.redisson.keys
@@ -130,13 +136,13 @@ class QQBot(
                         }
 
                         is BotOfflineEvent.Force, is BotOfflineEvent.Dropped -> {
-                            statusChannel.send(Offline)
+                            status.update { Offline }
                             log.warn("QQ bot offline.")
                             false
                         }
 
                         is BotReloginEvent, is BotOnlineEvent -> {
-                            statusChannel.send(Online)
+                            status.update { Online }
                             false
                         }
 

@@ -1,14 +1,13 @@
 package kurenai.imsyncbot.qq.login
 
-import jodd.net.MimeTypes
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
 import kurenai.imsyncbot.ImSyncBot
+import kurenai.imsyncbot.telegram.TelegramDisposableHandler
 import moe.kurenai.tdlight.model.media.InputFile
-import moe.kurenai.tdlight.model.message.Message
-import moe.kurenai.tdlight.model.message.UpdateType
-import moe.kurenai.tdlight.request.chat.GetUpdates
 import moe.kurenai.tdlight.request.message.SendMessage
 import moe.kurenai.tdlight.request.message.SendPhoto
 import moe.kurenai.tdlight.util.getLogger
@@ -18,8 +17,7 @@ import net.mamoe.mirai.utils.DeviceVerificationRequests
 import net.mamoe.mirai.utils.DeviceVerificationResult
 import net.mamoe.mirai.utils.LoginSolver
 import net.mamoe.mirai.utils.currentTimeSeconds
-import java.io.File
-import javax.imageio.ImageIO
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * @author Kurenai
@@ -74,7 +72,7 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
                 val messageId = telegram.client.send(SendPhoto(imSyncBot.configProperties.bot.masterOfTg.toString(), InputFile(input, "captcha.jpg")).apply {
                     caption = "请输入验证码"
                 }).messageId
-                getInput(messageId!!)
+                getInput()
             }
         }.onFailure {
             log.error("Telegram验证方式失败", it)
@@ -89,7 +87,7 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
                     "需要滑动验证码, 请按照以下链接的步骤完成滑动验证码, 然后输入获取到的 ticket\n$url"
                 )
             ).messageId!!
-            getInput(messageId)
+            getInput()
         }.onFailure {
             log.error("Telegram验证方式失败", it)
         }.getOrNull()
@@ -126,7 +124,7 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
 
     private suspend fun sendAndGet(message: String): String {
         val messageId = send(message).messageId!!
-        return getInput(messageId)
+        return getInput()
     }
 
     private suspend fun send(message: String) = telegram.client.send(
@@ -136,20 +134,27 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
         )
     )
 
-    private suspend fun getInput(messageId: Long): String {
-        var message: Message? = null
-        var offset = -1L
-        while (message == null) {
-            val update = telegram.client.send(GetUpdates(offset, 1, 10, listOf(UpdateType.MESSAGE))).firstOrNull() ?: continue
+    private suspend fun getInput(): String {
+        val deferred = CompletableDeferred<String>()
+
+        val handler = TelegramDisposableHandler { _, update ->
             val msg = update.message!!
             log.info("Telegram input: (${msg.messageId}) ${msg.text}")
-            if (msg.chat.id == imSyncBot.configProperties.bot.masterOfTg && msg.messageId!! > messageId && msg.text?.isNotBlank() == true && msg.text!!.length > 3) {
-                message = msg
+            if (msg.chat.id == imSyncBot.configProperties.bot.masterOfTg && msg.text?.isNotBlank() == true && msg.text!!.length > 3) {
+                deferred.complete(msg.text!!)
+                true
             } else {
-                offset = update.updateId + 1
+                false
             }
         }
-        return message.text!!
+        telegram.disposableHandlers.add(handler)
+        return runCatching {
+            withTimeout(5.minutes) {
+                deferred.await()
+            }
+        }.onFailure {
+            telegram.disposableHandlers.remove(handler)
+        }.getOrThrow()
     }
 
 
