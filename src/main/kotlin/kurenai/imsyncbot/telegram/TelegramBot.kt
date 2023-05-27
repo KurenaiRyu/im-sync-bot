@@ -1,16 +1,11 @@
 package kurenai.imsyncbot.telegram
 
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.util.reflect.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kurenai.imsyncbot.*
 import kurenai.imsyncbot.callback.Callback
 import kurenai.imsyncbot.command.CommandDispatcher
 import kurenai.imsyncbot.exception.BotException
-import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.handler.Handler.Companion.END
 import kurenai.imsyncbot.qq.QQBot
 import kurenai.imsyncbot.service.CacheService
@@ -34,7 +29,6 @@ import moe.kurenai.tdlight.request.command.SetMyCommands
 import moe.kurenai.tdlight.request.message.*
 import moe.kurenai.tdlight.util.DefaultMapper.MAPPER
 import moe.kurenai.tdlight.util.getLogger
-import net.mamoe.mirai.Bot
 import java.nio.file.Files
 import java.time.LocalTime
 import java.util.*
@@ -293,8 +287,8 @@ class TelegramBot(
                     CommandDispatcher.handleInlineQuery(update, update.inlineQuery!!)
                 }
             }
-        } else if (message.chat.id == bot.privateHandle.privateChat) {
-            bot.privateHandle.onPrivateChat(update)
+        } else if (bot.userConfig.chatIdFriends.containsKey(message.chat.id)) {
+            bot.tgMessageHandler.onFriendMessage(message)
         } else if ((message.isGroupMessage() || message.isSuperGroupMessage())) {
             var handled = false
             if (update.hasMessage()) {

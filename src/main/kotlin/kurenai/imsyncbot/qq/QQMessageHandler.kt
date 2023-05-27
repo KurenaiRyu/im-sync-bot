@@ -8,7 +8,6 @@ import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.MarkdownUtil.format2Markdown
-import kurenai.imsyncbot.utils.groupInfoString
 import moe.kurenai.tdlight.exception.TelegramApiException
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.ParseMode
@@ -71,7 +70,9 @@ class QQMessageHandler(
                         type.resolvedHttpUrlInvalidByLocalDownload().send(tg)
                     }.getOrThrow()
 
-                    is GroupMessageContext.File -> if (type.shouldBeFile) type.getFileMessage().send(tg) else type.getTextMessage().send(tg)
+                    is GroupMessageContext.File -> if (type.shouldBeFile) type.getFileMessage()
+                        .send(tg) else type.getTextMessage().send(tg)
+
                     is GroupMessageContext.Video -> type.getTelegramMessage().send(tg)
                     is GroupMessageContext.Normal -> type.telegramMessage.send(tg)
                     else -> null
@@ -79,7 +80,55 @@ class QQMessageHandler(
             }.recoverCatching {
                 resolvedContext.normalType.telegramMessage.send(tg)
             }.getOrThrow()?.also { message ->
-                log.debug("${context.groupInfoString()} Sent ${mapper.writeValueAsString(message)}")
+                log.debug("${context.infoString} Sent ${mapper.writeValueAsString(message)}")
+                if (message is Message) {
+                    CacheService.cache(context.messageChain, message)
+                } else {
+                    message as List<Message>
+                    CacheService.cache(context.messageChain, message.first())
+                }
+            }
+        }
+        return CONTINUE
+    }
+
+    @Throws(Exception::class)
+    @Suppress("UNCHECKED_CAST")
+    override suspend fun onFriendMessage(context: PrivateMessageContext): Int {
+
+        val messageType = context.getType()
+        val list = if (messageType is PrivateMessageContext.Forward) messageType.contextList else listOf(context)
+        for (resolvedContext in list) {
+            val type = resolvedContext.getType()
+            val tg = bot.tg
+            kotlin.runCatching {
+                when (type) {
+                    is PrivateMessageContext.JsonMessage -> type.telegramMessage.send(tg)
+                    is PrivateMessageContext.GifImage -> type.getTelegramMessage().send(tg)
+                    is PrivateMessageContext.MultiImage -> kotlin.runCatching {
+                        type.getTelegramMessage().send(tg)
+                    }.recoverCatching {
+                        type.resolvedHttpUrlInvalidByModifyUrl().send(tg)
+                    }.recover {
+                        type.resolvedHttpUrlInvalidByLocalDownload().send(tg)
+                    }.getOrThrow()
+
+                    is PrivateMessageContext.XmlMessage -> type.telegramMessage.send(tg)
+                    is PrivateMessageContext.SingleImage -> kotlin.runCatching {
+                        type.getTelegramMessage().send(tg)
+                    }.recoverCatching {
+                        type.resolvedHttpUrlInvalidByModifyUrl().send(tg)
+                    }.recover {
+                        type.resolvedHttpUrlInvalidByLocalDownload().send(tg)
+                    }.getOrThrow()
+
+                    is PrivateMessageContext.Normal -> type.telegramMessage.send(tg)
+                    else -> null
+                }
+            }.recoverCatching {
+                resolvedContext.normalType.telegramMessage.send(tg)
+            }.getOrThrow()?.also { message ->
+                log.debug("${context.infoString} Sent ${mapper.writeValueAsString(message)}")
                 if (message is Message) {
                     CacheService.cache(context.messageChain, message)
                 } else {

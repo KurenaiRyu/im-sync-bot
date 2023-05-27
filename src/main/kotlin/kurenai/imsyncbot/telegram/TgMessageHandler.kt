@@ -19,18 +19,19 @@ import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.MessageEntity
 import moe.kurenai.tdlight.request.GetFile
 import moe.kurenai.tdlight.util.getLogger
+import net.mamoe.mirai.contact.Contact
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import net.mamoe.mirai.utils.isFile
 import java.io.IOException
 import java.nio.file.Path
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.coroutineContext
 import kotlin.io.path.exists
+import kotlin.io.path.isDirectory
 import moe.kurenai.tdlight.model.media.File as TelegramFile
 
 class TgMessageHandler(
@@ -205,8 +206,117 @@ class TgMessageHandler(
 
             message.hasText() -> {
                 val builder = MessageChainBuilder()
-                formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, message.entities, message.text, builder)
+                formatMsgAndQuote(
+                    quoteMsgChain,
+                    isMaster,
+                    senderId,
+                    senderName,
+                    message.entities,
+                    message.text,
+                    builder
+                )
                 CacheService.cache(group.sendMessage(builder.build()), message)
+            }
+        }
+        return CONTINUE
+    }
+
+    @Throws(Exception::class)
+    override suspend fun onFriendMessage(message: Message): Int {
+        if (message.isCommand()) {
+            log.info("ignore command")
+            return CONTINUE
+        }
+
+        val quoteMsgChain =
+            message.replyToMessage?.let {
+                CacheService.getQQByTg(it)
+            }
+        val friendId = quoteMsgChain?.source?.targetId ?: bot.userConfig.chatIdFriends.getOrDefault(message.chat.id, 0)
+        if (friendId == 0L) return CONTINUE
+        val friend = bot.qq.qqBot.getFriend(friendId)
+        if (null == friend) {
+            log.error("QQ friend[$friendId] not found.")
+            return CONTINUE
+        }
+        val senderId = message.from!!.id
+        val isMaster = bot.userConfig.masterTg == senderId
+        val senderName = getSenderName(message)
+        val caption = message.caption ?: ""
+
+        if ((message.from?.username == "GroupAnonymousBot" || isMaster) && (caption.contains("#nfwd") || message.text?.contains(
+                "#nfwd"
+            ) == true)
+        ) {
+            log.debug("No forward message.")
+            return END
+        }
+
+        when {
+            message.hasSticker() -> {
+                val sticker = message.sticker!!
+                val builder = MessageChainBuilder()
+                if (sticker.isVideo) {
+                    BotUtil.mp42gif(sticker.width, getTgFile(sticker.fileId, sticker.fileUniqueId)).let { gifFile ->
+                        gifFile.toFile().toExternalResource().use {
+                            builder.add(friend.uploadImage(it))
+                            formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
+                            CacheService.cache(friend.sendMessage(builder.build()), message)
+                        }
+                    }
+                } else {
+                    if (sticker.isAnimated) {
+                        formatMsgAndQuote(
+                            quoteMsgChain,
+                            isMaster,
+                            senderId,
+                            senderName,
+                            sticker.emoji ?: "NaN",
+                            builder
+                        )
+                    } else {
+                        getImage(friend, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
+                        formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
+                    }
+                    friend.sendMessage(builder.build()).let {
+                        CacheService.cache(it, message)
+                    }
+                }
+            }
+
+            message.hasPhoto() -> {
+                val builder = MessageChainBuilder()
+                message.photo!!.groupBy { it.fileId.substring(0, 40) }
+                    .mapNotNull { (_: String, photoSizes: List<PhotoSize>) ->
+                        photoSizes.maxByOrNull {
+                            it.fileSize ?: 0
+                        }
+                    }
+                    .mapNotNull { getImage(friend, it.fileId, it.fileUniqueId) }.forEach(builder::add)
+                formatMsgAndQuote(
+                    quoteMsgChain,
+                    isMaster,
+                    senderId,
+                    senderName,
+                    message.captionEntities,
+                    message.caption,
+                    builder
+                )
+                CacheService.cache(friend.sendMessage(builder.build()), message)
+            }
+
+            message.hasText() -> {
+                val builder = MessageChainBuilder()
+                formatMsgAndQuote(
+                    quoteMsgChain,
+                    isMaster,
+                    senderId,
+                    senderName,
+                    message.entities,
+                    message.text,
+                    builder
+                )
+                CacheService.cache(friend.sendMessage(builder.build()), message)
             }
         }
         return CONTINUE
@@ -218,9 +328,9 @@ class TgMessageHandler(
         fileName: String = "${file.fileUniqueId}.${file.filePath.suffix()}",
     ) {
         var cacheFile = Path.of(file.filePath!!)
-        if (!cacheFile.exists() || !cacheFile.isFile) {
+        if (!cacheFile.exists() || cacheFile.isDirectory()) {
             cacheFile = Path.of(BotUtil.getDocumentPath(fileName))
-            if (!cacheFile.exists() || !cacheFile.isFile) {
+            if (!cacheFile.exists() || cacheFile.isDirectory()) {
                 HttpUtil.download(file, cacheFile)
             }
         }
@@ -288,18 +398,21 @@ class TgMessageHandler(
     }
 
     @Throws(TelegramApiException::class, IOException::class)
-    private suspend fun getImage(group: Group, fileId: String, fileUniqueId: String): Image? {
+    private suspend fun getImage(contact: Contact, fileId: String, fileUniqueId: String): Image? {
         val tgFile = getTgFile(fileId, fileUniqueId)
         val image = if (tgFile.filePath?.endsWith("webp", true) == true) {
             BotUtil.webp2png(tgFile)
         } else {
-            tgFile.filePath?.let { Path.of(it) }?.takeIf { it.exists() } ?: HttpUtil.download(tgFile, Path.of(BotUtil.getImagePath("$fileId.${tgFile.filePath.suffix()}")))
+            tgFile.filePath?.let { Path.of(it) }?.takeIf { it.exists() } ?: HttpUtil.download(
+                tgFile,
+                Path.of(BotUtil.getImagePath("$fileId.${tgFile.filePath.suffix()}"))
+            )
         }
 
         var ret: Image? = null
         try {
             image.toFile().toExternalResource().use {
-                ret = group.uploadImage(it)
+                ret = contact.uploadImage(it)
             }
         } catch (e: IOException) {
             log.error(e.message, e)

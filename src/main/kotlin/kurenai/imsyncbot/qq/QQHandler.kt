@@ -10,6 +10,10 @@ interface QQHandler : Handler {
         return CONTINUE
     }
 
+    suspend fun onFriendMessage(context: PrivateMessageContext): Int {
+        return CONTINUE
+    }
+
     suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {
         return CONTINUE
     }

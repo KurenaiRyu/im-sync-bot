@@ -19,4 +19,6 @@ interface TelegramHandler : Handler {
         return CONTINUE
     }
 
+    @Throws(Exception::class)
+    suspend fun onFriendMessage(message: Message): Int
 }

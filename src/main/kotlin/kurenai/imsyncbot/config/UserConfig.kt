@@ -21,6 +21,10 @@ class UserConfig(
     var masterChatId: Long = 0
     var masterUsername: String = ""
 
+    var defaultChatId = configProperties.bot.privateChat
+
+    var friendChatIds = emptyMap<Long, Long>()
+    var chatIdFriends = emptyMap<Long, Long>()
     var idBindings = emptyMap<Long, String>()
     var usernameBindings = emptyMap<String, String>()
     var qqUsernames = emptyMap<Long, String>()
@@ -61,6 +65,26 @@ class UserConfig(
         items.filter { c -> id == c.tg }.forEach {
             it.status.remove(UserStatus.SUPER_ADMIN)
             it.status.remove(UserStatus.ADMIN)
+        }
+        afterUpdate()
+    }
+
+    fun unbindChat(chatId: Long) {
+        if (chatId == masterTg) return
+        items.filter {
+            it.chatId == chatId
+        }.forEach {
+            it.chatId = null
+        }
+        afterUpdate()
+    }
+
+    fun bindChat(qq: Long, chatId: Long) {
+        if (qq == masterQQ) return
+        items.filter {
+            it.qq == qq
+        }.forEach {
+            it.chatId = chatId
         }
         afterUpdate()
     }
@@ -183,6 +207,8 @@ class UserConfig(
         val picBannedIds = ArrayList<Long>()
         val admins = ArrayList<Long>()
         val superAdmins = ArrayList<Long>()
+        val friendChats = HashMap<Long, Long>()
+        val chatFriends = HashMap<Long, Long>()
 
         for (config in items) {
             if (config.tg != null && config.qq != null) links.add(config)
@@ -228,6 +254,14 @@ class UserConfig(
                     }
                 }
             }
+
+            config.qq?.let { qq ->
+                config.chatId?.let { chatId ->
+                    friendChats[qq] = chatId
+                    chatFriends[chatId] = qq
+                }
+            }
+
         }
 
         admins.add(masterTg)
@@ -243,6 +277,8 @@ class UserConfig(
         this.picBannedIds = picBannedIds.toList()
         this.admins = admins.toList()
         this.superAdmins = superAdmins.toList()
+        this.friendChatIds = friendChats.toMap()
+        this.chatIdFriends = chatFriends.toMap()
     }
 
     override fun getConfigName(): String {

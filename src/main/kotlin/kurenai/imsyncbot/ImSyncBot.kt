@@ -8,7 +8,6 @@ import kotlinx.coroutines.*
 import kurenai.imsyncbot.config.GroupConfig
 import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.exception.BotException
-import kurenai.imsyncbot.handler.PrivateChatHandler
 import kurenai.imsyncbot.qq.QQMessageHandler
 import kurenai.imsyncbot.telegram.TgMessageHandler
 import kurenai.imsyncbot.qq.QQBot
@@ -67,7 +66,7 @@ class ImSyncBot(
     var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
     internal val qq: QQBot = QQBot(coroutineContext, configProperties.bot.qq, this)
     internal val tg: TelegramBot = TelegramBot(coroutineContext, configProperties.bot.telegram, this)
-    internal val privateHandle = PrivateChatHandler(configProperties)
+//    internal val privateHandle = PrivateChatHandler(configProperties)
 
     init {
         //mirai使用log4j2

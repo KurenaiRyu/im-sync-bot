@@ -1,7 +1,5 @@
 package kurenai.imsyncbot.qq
 
-import io.ktor.client.*
-import io.ktor.client.request.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -38,25 +36,83 @@ import org.jsoup.parser.Parser
  * @author Kurenai
  * @since 9/2/2022 15:12:44
  */
-sealed interface MessageContext
+sealed class MessageContext(
+    val bot: ImSyncBot
+) {
+
+    protected var tgMsgFormat =
+        if (bot.configProperties.bot.tgMsgFormat.contains("\$msg")) bot.configProperties.bot.tgMsgFormat else "\$name: \$msg"
+
+    /**
+     * 格式化消息
+     *
+     * 字符串应经过markdown格式化，返回值已markdown格式化
+     *
+     * @param senderId
+     * @param senderName
+     * @return
+     */
+    protected fun String.formatMsg(senderId: Long, senderName: String? = null): String {
+        return tgMsgFormat.fm2md().replace(BotUtil.NEWLINE_PATTERN.fm2md(), "\n", true)
+            .replace(BotUtil.ID_PATTERN.fm2md(), senderId.toString(), true)
+            .let {
+                if (senderName?.isNotBlank() == true)
+                    it.replace(BotUtil.NAME_PATTERN.fm2md(), senderName.fm2md(), true)
+                else
+                    it.replace(BotUtil.NAME_PATTERN.fm2md(), "", true)
+            }.replace(BotUtil.MSG_PATTERN.fm2md(), this, true)
+    }
+
+    protected fun String.handleUrl(): String {
+        return if (this.contains("b23.tv")) {
+            this.replace("b23.tv", "b23.wtf")
+        } else this
+    }
+
+    protected fun Image.shouldBeFile(): Boolean {
+        val maxSide = maxOf(this.width, this.height)
+        val minSide = minOf(this.width, this.height)
+        val ratio: Float = maxSide / minSide.toFloat()
+        return !this.isEmoji &&
+                !((maxSide <= 1280 && ratio <= 20) || ratio <= MAX_IMAGE_RATIO)
+    }
+}
 
 private val log = LogManager.getLogger()
 
-data class GroupMessageContext(
-    val bot: ImSyncBot,
+private val json = Json {
+    encodeDefaults = false
+    ignoreUnknownKeys = true
+    isLenient = true
+    prettyPrint = true
+}
+
+@OptIn(ExperimentalXmlUtilApi::class)
+private val xml = XML {
+    encodeDefault = XmlSerializationPolicy.XmlEncodeDefault.NEVER
+    unknownChildHandler = UnknownChildHandler { input, inputKind, descriptor, name, candidates ->
+        emptyList()
+    }
+}
+
+private const val MAX_IMAGE_RATIO = 2.7
+
+class GroupMessageContext(
+    bot: ImSyncBot,
     val group: Group,
     val messageChain: MessageChain,
     val senderId: Long = messageChain.source.fromId,
     val sender: NormalMember? = group[senderId],
     val senderName: String? =
         senderId
-            .let { bot.userConfig.idBindings[it] ?: bot.qq.qqBot.getFriend(it)?.remarkOrNick } ?: sender?.remarkOrNameCardOrNick
-            ?.formatUsername()
-) : MessageContext {
+            .let { bot.userConfig.idBindings[it] ?: bot.qq.qqBot.getFriend(it)?.remarkOrNick }
+            ?: sender?.remarkOrNameCardOrNick
+                ?.formatUsername()
+) : MessageContext(bot) {
 
-    private var tgMsgFormat = if (bot.configProperties.bot.tgMsgFormat.contains("\$msg")) bot.configProperties.bot.tgMsgFormat else "\$name: \$msg"
     private var type: MessageType? = null
 
+    val infoString by lazy { "[${group.name}(${this.group.id})]" }
     val simpleContent: String = messageChain.contentToString()
     val chatId: String = (bot.groupConfig.qqTg[group.id] ?: bot.groupConfig.defaultTgGroup).toString()
     val replyId: Long? by lazy {
@@ -148,60 +204,6 @@ data class GroupMessageContext(
         }
         return if (content.startsWith("\n")) content.substring(1)
         else content
-    }
-
-    /**
-     * 格式化消息
-     *
-     * 字符串应经过markdown格式化，返回值已markdown格式化
-     *
-     * @param senderId
-     * @param senderName
-     * @return
-     */
-    private fun String.formatMsg(senderId: Long, senderName: String? = null): String {
-        return tgMsgFormat.fm2md().replace(BotUtil.NEWLINE_PATTERN.fm2md(), "\n", true)
-            .replace(BotUtil.ID_PATTERN.fm2md(), senderId.toString(), true)
-            .let {
-                if (senderName?.isNotBlank() == true)
-                    it.replace(BotUtil.NAME_PATTERN.fm2md(), senderName.fm2md(), true)
-                else
-                    it.replace(BotUtil.NAME_PATTERN.fm2md(), "", true)
-            }.replace(BotUtil.MSG_PATTERN.fm2md(), this, true)
-    }
-
-    fun String.handleUrl(): String {
-        return if (this.contains("b23.tv")) {
-            this.replace("b23.tv", "b23.wtf")
-        } else this
-    }
-
-    private fun Image.shouldBeFile(): Boolean {
-        val maxSide = maxOf(this.width, this.height)
-        val minSide = minOf(this.width, this.height)
-        val ratio: Float = maxSide / minSide.toFloat()
-        return !this.isEmoji &&
-                !((maxSide <= 1280 && ratio <= 20) || ratio <= MAX_IMAGE_RATIO)
-    }
-
-    companion object {
-
-        private val json = Json {
-            encodeDefaults = false
-            ignoreUnknownKeys = true
-            isLenient = true
-            prettyPrint = true
-        }
-
-        @OptIn(ExperimentalXmlUtilApi::class)
-        private val xml = XML {
-            encodeDefault = XmlSerializationPolicy.XmlEncodeDefault.NEVER
-            unknownChildHandler = UnknownChildHandler { input, inputKind, descriptor, name, candidates ->
-                emptyList()
-            }
-        }
-
-        private const val MAX_IMAGE_RATIO = 2.7
     }
 
     sealed interface MessageType
@@ -443,14 +445,306 @@ data class GroupMessageContext(
     }
 
     inner class Forward(val msg: ForwardMessage) : MessageType {
-        val contextList = msg.nodeList.map { GroupMessageContext(bot, group, it.messageChain, senderId, senderName = "$senderName forward from ${it.senderName}") }
+        val contextList = msg.nodeList.map {
+            GroupMessageContext(
+                bot,
+                group,
+                it.messageChain,
+                senderId,
+                senderName = "$senderName forward from ${it.senderName}"
+            )
+        }
     }
 
     inner class Normal : MessageType {
-        val telegramMessage: SendMessage = SendMessage(chatId, getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)).apply {
+        val telegramMessage: SendMessage =
+            SendMessage(chatId, getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)).apply {
+                parseMode = ParseMode.MARKDOWN_V2
+                replyId?.let { replyToMessageId = replyId }
+            }
+    }
+}
+
+class PrivateMessageContext(
+    bot: ImSyncBot,
+    val messageChain: MessageChain,
+    val chat: User,
+    val senderId: Long = chat.id,
+    val senderName: String = chat.remarkOrNick
+) : MessageContext(bot) {
+
+    private var type: MessageType? = null
+    val infoString: String by lazy { "[${this.chat.remarkOrNick}(${this.chat.id})]" }
+    val simpleContent: String = messageChain.contentToString()
+    val chatId: String = (bot.userConfig.friendChatIds[chat.id] ?: bot.userConfig.defaultChatId).toString()
+    val replyId: Long? by lazy {
+        messageChain[QuoteReply.Key]?.let {
+            runBlocking(bot.coroutineContext) {
+                CacheService.getTgIdByQQ(
+                    it.source.targetId,
+                    it.source.ids[0]
+                )
+            }
+        }?.second
+    }
+    val hasReply: Boolean by lazy { replyId != null }
+    val normalType: Normal = Normal()
+
+    fun getType() = type ?: handleType(messageChain).also { type = it }
+
+    @OptIn(MiraiExperimentalApi::class)
+    private fun handleType(messageChain: MessageChain): MessageType {
+        return if (messageChain.contains(RichMessage.Key)) {
+            val content = messageChain[RichMessage.Key]!!.content
+            kotlin.runCatching {
+                JsonMessage(json.decodeFromString(JsonMessageContent.serializer(), content))
+            }.recoverCatching {
+                val document = Jsoup.parse(content, Parser.xmlParser())
+                val uuid = document.selectXpath("//image").attr("uuid")
+                if (uuid.isNotBlank()) {
+                    SingleImage(Image(uuid), true)
+                } else {
+                    XmlMessage(xml.decodeFromString(XmlMessageContent.serializer(), content))
+                }
+            }.recover { Normal() }.getOrThrow()
+        } else if (messageChain.contains(Image.Key)) {
+            val images = messageChain.filterIsInstance<Image>()
+            if (images.size == 1) {
+                val image = images.first()
+                if (image.imageType == ImageType.GIF || image.imageType == ImageType.APNG)
+                    GifImage(image)
+                else
+                    SingleImage(image)
+            } else
+                MultiImage(images)
+        } else {
+            Normal()
+        }
+    }
+
+    private fun getContentWithAtAndWithoutImage(): String {
+        var content = ""
+        for (msg in messageChain) {
+            if (msg !is Image) {
+                content += msg.contentToString().fm2md()
+            }
+        }
+        return if (content.startsWith("\n")) content.substring(1)
+        else content
+    }
+
+    sealed interface MessageType
+
+    inner class XmlMessage(val msg: XmlMessageContent) : MessageType {
+        val url: String? = msg.url?.handleUrl()
+        val telegramMessage: SendMessage = SendMessage(
+            chatId,
+            (url?.fm2md() ?: simpleContent).formatMsg(senderId, senderName)
+        ).apply {
             parseMode = ParseMode.MARKDOWN_V2
             replyId?.let { replyToMessageId = replyId }
         }
+    }
+
+    inner class JsonMessage(val msg: JsonMessageContent) : MessageType {
+        val url: String? = (msg.meta.news?.jumpUrl ?: msg.meta.detail1.qqdocurl)?.handleUrl()
+        val telegramMessage: SendMessage = SendMessage(
+            chatId,
+            (url?.fm2md() ?: simpleContent).formatMsg(senderId, senderName)
+        ).apply {
+            parseMode = ParseMode.MARKDOWN_V2
+            replyId?.let { replyToMessageId = replyId }
+        }
+    }
+
+    inner class SingleImage(private val image: Image, private val onlyImage: Boolean = false) : MessageType {
+
+        private val shouldBeFile: Boolean = image.shouldBeFile()
+        private var inputFile: InputFile? = null
+        private var telegramMessage: Request<ResponseWrapper<Message>>? = null
+
+        suspend fun getTelegramMessage(): Request<ResponseWrapper<Message>> {
+            return telegramMessage ?: buildMessage()
+        }
+
+        suspend fun resolvedHttpUrlInvalidByModifyUrl(): Request<ResponseWrapper<Message>> {
+            val message = getTelegramMessage()
+            inputFile!!.attachName = inputFile!!.attachName.substringBefore("?")
+            return message
+        }
+
+        suspend fun resolvedHttpUrlInvalidByLocalDownload(): Request<ResponseWrapper<Message>> {
+            val message = getTelegramMessage()
+            val path = kotlin.runCatching {
+                BotUtil.downloadImg(inputFile!!.fileName!!, inputFile!!.attachName)
+            }.recover {
+                val url = if (inputFile!!.attachName.endsWith("?term=2")) {
+                    inputFile!!.attachName.substringBefore("?")
+                } else {
+                    inputFile!!.attachName + "?term=2"
+                }
+                BotUtil.downloadImg(inputFile!!.fileName!!, url)
+            }.getOrThrow()
+            inputFile!!.file = path.toFile()
+            inputFile!!.attachName = "attach://${path.fileName}"
+            return message
+        }
+
+        private suspend fun buildMessage(): Request<ResponseWrapper<Message>> {
+            return if (shouldBeFile) {
+                SendDocument(
+                    chatId,
+                    InputFile(image.queryUrl()).apply { fileName = image.imageId }.also { inputFile = it }).apply {
+                    parseMode = ParseMode.MARKDOWN_V2
+                    caption = if (onlyImage) {
+                        "".formatMsg(senderId, senderName)
+                    } else {
+                        getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
+                    }
+                    replyId?.let { replyToMessageId = replyId }
+                }
+            } else {
+                SendPhoto(
+                    chatId,
+                    InputFile(image.queryUrl()).apply { fileName = image.imageId }.also { inputFile = it }).apply {
+                    parseMode = ParseMode.MARKDOWN_V2
+                    caption = if (onlyImage) {
+                        "".formatMsg(senderId, senderName)
+                    } else {
+                        getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
+                    }
+                    replyId?.let { replyToMessageId = replyId }
+                }
+            }.also {
+                telegramMessage = it
+            }
+        }
+
+
+    }
+
+    inner class MultiImage(val images: List<Image>) : MessageType {
+        val shouldBeFile: Boolean = images.any {
+            if (it.imageType == ImageType.GIF ||
+                it.imageType == ImageType.APNG ||
+                it.imageType == ImageType.UNKNOWN && !it.isEmoji
+            )
+                true
+            else
+                it.shouldBeFile()
+        }
+
+        private val inputFiles = mutableListOf<InputFile>()
+        private var telegramMessage: SendMediaGroup? = null
+        private lateinit var inputMedias: List<InputMedia>
+
+        suspend fun getTelegramMessage(): SendMediaGroup {
+            return telegramMessage ?: buildTelegramMessage()
+        }
+
+        suspend fun resolvedHttpUrlInvalidByModifyUrl(): SendMediaGroup {
+            val message = getTelegramMessage()
+            inputFiles.forEach {
+                it.attachName = it.attachName.substringBefore("?")
+            }
+            return message
+        }
+
+        suspend fun resolvedHttpUrlInvalidByLocalDownload(): SendMediaGroup {
+            val message = getTelegramMessage()
+            inputFiles.forEach { inputFile ->
+                val path = kotlin.runCatching {
+                    BotUtil.downloadImg(inputFile.fileName!!, inputFile.attachName)
+                }.recover {
+                    val url = if (inputFile.attachName.endsWith("?term=2")) {
+                        inputFile.attachName.substringBefore("?")
+                    } else {
+                        inputFile.attachName + "?term=2"
+                    }
+                    BotUtil.downloadImg(inputFile.fileName!!, url)
+                }.getOrThrow()
+                inputFile.file = path.toFile()
+                inputFile.attachName = "attach://${path.fileName}"
+            }
+            return message
+        }
+
+        private suspend fun buildTelegramMessage(): SendMediaGroup {
+            inputFiles.clear()
+
+            inputMedias = images.mapNotNull {
+                if (it.imageType == ImageType.GIF) null
+                else if (shouldBeFile)
+                    InputMediaDocument(InputFile(it.queryUrl()).also(inputFiles::add)).apply {
+                        parseMode = ParseMode.MARKDOWN_V2
+                    }
+                else
+                    InputMediaPhoto(InputFile(it.queryUrl()).also(inputFiles::add)).apply {
+                        parseMode = ParseMode.MARKDOWN_V2
+                    }
+            }.also {
+                it[it.lastIndex].caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
+            }
+            inputMedias.windowed(10).forEach { sub ->
+                SendMediaGroup(chatId).apply {
+                    media = inputMedias
+                    replyId?.let { replyToMessageId = replyId }
+                }.also {
+                    telegramMessage = it
+                }
+            }
+            return SendMediaGroup(chatId).apply {
+                media = images.mapNotNull {
+                    if (it.imageType == ImageType.GIF) null
+                    else if (shouldBeFile) {
+                        InputMediaDocument(InputFile(it.queryUrl()).also(inputFiles::add)).apply {
+                            parseMode = ParseMode.MARKDOWN_V2
+                        }
+                    } else {
+                        InputMediaPhoto(InputFile(it.queryUrl()).also(inputFiles::add)).apply {
+                            parseMode = ParseMode.MARKDOWN_V2
+                        }
+                    }
+                }.also {
+                    it[it.lastIndex].caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
+                }
+                replyId?.let { replyToMessageId = replyId }
+            }.also {
+                telegramMessage = it
+            }
+        }
+    }
+
+    inner class GifImage(
+        val image: Image,
+    ) : MessageType {
+        suspend fun getTelegramMessage(): SendAnimation {
+            return SendAnimation(chatId, InputFile(image.queryUrl()).apply { fileName = image.imageId }).apply {
+                caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
+                parseMode = ParseMode.MARKDOWN_V2
+                replyId?.let { replyToMessageId = replyId }
+            }
+        }
+    }
+
+    inner class Forward(val msg: ForwardMessage) : MessageType {
+        val contextList = msg.nodeList.map {
+            PrivateMessageContext(
+                bot,
+                it.messageChain,
+                chat,
+                it.senderId,
+                "$senderName forward from ${it.senderName}"
+            )
+        }
+    }
+
+    inner class Normal : MessageType {
+        val telegramMessage: SendMessage =
+            SendMessage(chatId, getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)).apply {
+                parseMode = ParseMode.MARKDOWN_V2
+                replyId?.let { replyToMessageId = replyId }
+            }
     }
 }
 

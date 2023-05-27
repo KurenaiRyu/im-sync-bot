@@ -6,9 +6,6 @@ import kotlinx.atomicfu.update
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -18,7 +15,6 @@ import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.qq.login.MultipleLoginSolver
 import kurenai.imsyncbot.telegram.TelegramBot
 import kurenai.imsyncbot.telegram.send
-import kurenai.imsyncbot.utils.FixProtocolVersion
 import moe.kurenai.tdlight.model.MessageEntityType
 import moe.kurenai.tdlight.model.message.MessageEntity
 import moe.kurenai.tdlight.model.message.User
@@ -43,6 +39,7 @@ import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageChain.Companion.deserializeJsonToMessageChain
 import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
 import net.mamoe.mirai.message.data.PlainText
+import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.utils.BotConfiguration
 import java.io.File
 import java.net.ConnectException
@@ -71,12 +68,12 @@ class QQBot(
     private val defaultScope = CoroutineScope(parentCoroutineContext + workerContext)
 
     private fun buildMiraiBot(qrCodeLogin: Boolean = false): Bot {
-        log.info("协议版本检查更新...")
-        try {
-            FixProtocolVersion.update()
-        } catch (cause: Throwable) {
-            log.error("协议版本升级失败", cause)
-        }
+//        log.info("协议版本检查更新...")
+//        try {
+//            FixProtocolVersion.update()
+//        } catch (cause: Throwable) {
+//            log.error("协议版本升级失败", cause)
+//        }
         val configuration = BotConfiguration().apply {
             cacheDir = File("./mirai/${qqProperties.account}")
             fileBasedDeviceInfo("${bot.configPath}/device.json") // 使用 device.json 存储设备信息
@@ -180,10 +177,26 @@ class QQBot(
                                                                     .toCompletableFuture()
                                                                     .await()
                                                             if (message != null) {
-                                                                bot.privateHandle.onFriendMessage(
-                                                                    friend,
-                                                                    message.deserializeJsonToMessageChain(),
-                                                                    friend.id == qqBot.id
+                                                                val messageChain =
+                                                                    message.deserializeJsonToMessageChain()
+                                                                bot.qqMessageHandler.onFriendMessage(
+                                                                    if (friend.id == qqBot.id) {
+                                                                        PrivateMessageContext(
+                                                                            bot,
+                                                                            messageChain,
+                                                                            qqBot.getFriend(messageChain.source.targetId)
+                                                                                ?: qqBot.getStrangerOrFail(messageChain.source.targetId),
+                                                                            friend.id,
+                                                                            friend.nameCardOrNick
+                                                                        )
+                                                                    } else {
+                                                                        PrivateMessageContext(
+                                                                            bot,
+                                                                            messageChain,
+                                                                            qqBot.getFriend(messageChain.source.targetId)
+                                                                                ?: qqBot.getStrangerOrFail(messageChain.source.targetId),
+                                                                        )
+                                                                    }
                                                                 )
                                                             }
                                                         } catch (e: Exception) {
