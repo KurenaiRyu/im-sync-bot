@@ -20,7 +20,6 @@ class BindFriendCommand : AbstractTelegramCommand() {
     override val onlyAdmin = false
     override val onlySupperAdmin = true
     override val onlyGroupMessage: Boolean = true
-    override val parseMode = ParseMode.MARKDOWN_V2
 
     override suspend fun execute(update: Update, message: Message): String {
         val param = message.text?.param()?.toLongOrNull() ?: return "参数错误"
