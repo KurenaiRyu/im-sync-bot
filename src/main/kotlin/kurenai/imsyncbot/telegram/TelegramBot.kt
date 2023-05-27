@@ -253,7 +253,7 @@ class TelegramBot(
     suspend fun doHandleUpdate(update: Update) {
         log.debug("${update.chatInfoString()}: {}", MAPPER.writeValueAsString(update))
         val qqStatus = bot.qq.status.value
-        if (qqStatus != QQBot.Initialized || qqStatus != QQBot.Online) {
+        if (qqStatus != QQBot.Initialized && qqStatus != QQBot.Online) {
             log.warn("QQ bot is not initialized or online, don't handle update.")
             return
         }
