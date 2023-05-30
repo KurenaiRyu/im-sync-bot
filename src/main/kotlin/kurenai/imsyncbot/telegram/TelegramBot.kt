@@ -1,5 +1,7 @@
 package kurenai.imsyncbot.telegram
 
+import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.update
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kurenai.imsyncbot.*
@@ -69,7 +71,7 @@ class TelegramBot(
     private val sendMessageContext =
         coroutineContext + workerContext.limitedParallelism(1) + CoroutineName("TelegramSendMessage")
 
-    val statusChannel = Channel<TelegramBotStatus>(Channel.BUFFERED)
+    val status = atomic<TelegramBotStatus>(Initializing)
     val username: String = telegramProperties.username
     val token: String = telegramProperties.token
     lateinit var client: TDLightCoroutineClient
@@ -86,7 +88,7 @@ class TelegramBot(
             isDebugEnabled = true,
             updateBaseUrl = telegramProperties.baseUrl
         )
-        statusChannel.send(Initialized)
+        status.update { Initialized }
         updateCommand()
         CoroutineScope(coroutineContext).launch {
             tgBot = LongPollingCoroutineTelegramBot(listOf(this@TelegramBot), client).apply {
@@ -225,9 +227,13 @@ class TelegramBot(
                         doHandleUpdate(update)
                     }
                 } catch (e: Exception) {
+                    val ex = if (e is BotException) e else BotException(
+                        "处理消息失败: ${e.message ?: e::class.java.simpleName}",
+                        e
+                    )
                     reportError(
                         update,
-                        BotException("Error on update received: ${e.message ?: e::class.java.simpleName}", e)
+                        ex
                     )
                 }
             }
@@ -252,11 +258,6 @@ class TelegramBot(
 
     suspend fun doHandleUpdate(update: Update) {
         log.debug("${update.chatInfoString()}: {}", MAPPER.writeValueAsString(update))
-        val qqStatus = bot.qq.status.value
-        if (qqStatus != QQBot.Initialized && qqStatus != QQBot.Online) {
-            log.warn("QQ bot is not initialized or online, don't handle update.")
-            return
-        }
         val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message
         if (message == null) {
             log.debug("No message")
@@ -287,28 +288,38 @@ class TelegramBot(
                     CommandDispatcher.handleInlineQuery(update, update.inlineQuery!!)
                 }
             }
-        } else if (bot.userConfig.chatIdFriends.containsKey(message.chat.id)) {
-            bot.tgMessageHandler.onFriendMessage(message)
-        } else if ((message.isGroupMessage() || message.isSuperGroupMessage())) {
-            var handled = false
-            if (update.hasMessage()) {
-                for (handler in tgHandlers) {
-                    if (handler.onMessage(message) == END) {
-                        handled = true
-                        break
+        } else if (checkQQBotStatus()) {
+            if (bot.userConfig.chatIdFriends.containsKey(message.chat.id)) {
+                bot.tgMessageHandler.onFriendMessage(message)
+            } else if ((message.isGroupMessage() || message.isSuperGroupMessage())) {
+                var handled = false
+                if (update.hasMessage()) {
+                    for (handler in tgHandlers) {
+                        if (handler.onMessage(message) == END) {
+                            handled = true
+                            break
+                        }
                     }
-                }
-                if (!handled) bot.tgMessageHandler.onMessage(message)
-            } else if (update.hasEditedMessage()) {
-                for (handler in tgHandlers) {
-                    if (handler.onEditMessage(update.editedMessage!!) == END) {
-                        handled = true
-                        break
+                    if (!handled) bot.tgMessageHandler.onMessage(message)
+                } else if (update.hasEditedMessage()) {
+                    for (handler in tgHandlers) {
+                        if (handler.onEditMessage(update.editedMessage!!) == END) {
+                            handled = true
+                            break
+                        }
                     }
+                    if (!handled) bot.tgMessageHandler.onEditMessage(update.editedMessage!!)
                 }
-                if (!handled) bot.tgMessageHandler.onEditMessage(update.editedMessage!!)
             }
         }
+    }
+
+    fun checkQQBotStatus(): Boolean {
+        val qqStatus = bot.qq.status.value
+        return if (qqStatus != QQBot.Initialized && qqStatus != QQBot.Online) {
+            log.warn("QQ bot is not initialized or online, don't handle update.")
+            false
+        } else true
     }
 
     suspend fun reportError(update: Update, throwable: Throwable, topic: String = "转发失败") {

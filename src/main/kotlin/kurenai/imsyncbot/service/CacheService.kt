@@ -1,6 +1,8 @@
 package kurenai.imsyncbot.service
 
+import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.domain.FileCache
+import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.message.Message
@@ -49,19 +51,16 @@ object CacheService {
      * @param messageChain
      * @param message
      */
-    suspend fun cache(messageChain: MessageChain, message: Message) {
-        val bot = getBotOrThrow()
-        try {
-            val qqMsgId: String = messageChain.cacheId()
-            val tgMsgId: String = message.cacheId()
+    @Suppress("NAME_SHADOWING")
+    suspend fun cache(messageChain: MessageChain, message: Message, bot: ImSyncBot? = null) {
+        val bot = bot ?: getBotOrThrow()
+        val qqMsgId: String = messageChain.cacheId()
+        val tgMsgId: String = message.cacheId()
 
-            bot.cache.put(QQ_TG_MSG_ID_CACHE_KEY, qqMsgId, tgMsgId, TTL)
-            bot.cache.put(TG_QQ_MSG_ID_CACHE_KEY, tgMsgId, qqMsgId, TTL)
-            bot.cache.put(QQ_MSG_CACHE_KEY, qqMsgId, messageChain.serializeToJsonString(), TTL)
-            cache(message)
-        } catch (e: Exception) {
-            log.warn("缓存信息失败", e)
-        }
+        bot.cache.put(QQ_TG_MSG_ID_CACHE_KEY, qqMsgId, tgMsgId, TTL)
+        bot.cache.put(TG_QQ_MSG_ID_CACHE_KEY, tgMsgId, qqMsgId, TTL)
+        bot.cache.put(QQ_MSG_CACHE_KEY, qqMsgId, messageChain.serializeToJsonString(), TTL)
+        cache(message)
     }
 
     /**
@@ -187,10 +186,6 @@ object CacheService {
         }
     }
 
-    suspend fun getTg(message: Message): Message? {
-        return getTg(message.chat.id, message.messageId!!)
-    }
-
     suspend fun getTg(chatId: Long, messageId: Long): Message? {
         return getBotOrThrow().cache.get(TG_MSG_CACHE_KEY, getTgCacheId(chatId, messageId)) ?: getOnlineTg(chatId.toString(), messageId)
     }
@@ -208,18 +203,6 @@ object CacheService {
         }
     }
 
-    suspend fun getPrivateChannelMessageId(friendId: Long): Long? {
-        return getBotOrThrow().cache.get(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId)
-    }
-
-    suspend fun removePrivateChannelMessageId(friendId: Long): Boolean {
-        return getBotOrThrow().cache.remove(QQ_TG_PRIVATE_MSG_ID_CACHE_KEY, friendId)
-    }
-
-    suspend fun getFriendId(messageId: Long): Long? {
-        return getBotOrThrow().cache.get(TG_QQ_PRIVATE_MSG_ID_CACHE_KEY, messageId)
-    }
-
     private fun getTgCacheId(chatId: Long, messageId: Long): String {
         return "${chatId}:${messageId}"
     }
@@ -233,15 +216,10 @@ object CacheService {
     }
 
     private fun MessageChain.cacheId(): String {
-        return getQQCacheId(source.targetId, ids[0])
-    }
-
-    private fun MessageSource.cacheId(): String {
-        return getQQCacheId(targetId, ids[0])
-    }
-
-    private fun Double.isExist(): Boolean {
-        return this - getNowSeconds() > 0
+        return getQQCacheId(
+            source.targetId,
+            ids.firstOrNull() ?: throw BotException("回执消息ids为空，消息可能没有发出，也许是风控了。")
+        )
     }
 
     private fun getNowSeconds(): Long {
