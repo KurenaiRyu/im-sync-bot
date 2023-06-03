@@ -99,14 +99,17 @@ class QQBot(
         log.info("Login qq ${qqProperties.account}...")
 
         qqBot.login()
-        status.compareAndSet(Initializing, Initialized)
+        status.update { Initialized }
         val initBot = suspend {
             // TODO: 获取之前已存在的queue
             // bot.redisson.keys
-            var telegramBotStatus = bot.tg.statusChannel.receive()
+            var telegramBotStatus = bot.tg.status.value
+            var count = 0
             while (telegramBotStatus !is TelegramBot.Initialized) {
                 log.debug("Telegram bot status: ${telegramBotStatus.javaClass.simpleName}")
-                telegramBotStatus = bot.tg.statusChannel.receive()
+                delay((1000 + count * 1000L).coerceAtMost(10000))
+                telegramBotStatus = bot.tg.status.value
+                count++
             }
             qqBot.eventChannel.filter { event ->
                 return@filter kotlin.runCatching {
@@ -242,7 +245,14 @@ class QQBot(
                                                             var count = 0
                                                             while (count < 3) {
                                                                 try {
-                                                                    bot.qqMessageHandler.onGroupMessage(GroupMessageContext(bot, group, messageChain))
+                                                                    bot.qqMessageHandler.onGroupMessage(
+                                                                        GroupMessageContext(
+                                                                            bot,
+                                                                            event,
+                                                                            group,
+                                                                            messageChain
+                                                                        )
+                                                                    )
                                                                     break
                                                                 } catch (e: ConnectException) {
                                                                     log.warn(e.message)

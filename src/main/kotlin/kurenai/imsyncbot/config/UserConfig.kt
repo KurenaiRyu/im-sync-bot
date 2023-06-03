@@ -81,10 +81,11 @@ class UserConfig(
 
     fun bindChat(qq: Long, chatId: Long) {
         if (qq == masterQQ) return
-        items.filter {
-            it.qq == qq
-        }.forEach {
-            it.chatId = chatId
+        val list = items.filter { it.qq == qq }
+        if (list.isEmpty()) {
+            add0(User(qq = qq, chatId = chatId))
+        } else {
+            list.forEach { it.chatId = chatId }
         }
         afterUpdate()
     }

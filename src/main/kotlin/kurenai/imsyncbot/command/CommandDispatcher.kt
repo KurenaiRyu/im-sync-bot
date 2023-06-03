@@ -35,7 +35,7 @@ object CommandDispatcher {
             if (handler.command.lowercase() == command.lowercase()) {
                 log.info("Match ${handler.name}")
                 val isSupperAdmin = bot.userConfig.superAdmins.contains(message.from?.id)
-                val param = message.text?.replace("/${handler.command}", "")?.trim()
+                val param = message.text?.lowercase()?.replace(handler.command.lowercase(), "")?.trim()
                 msg = if (isSupperAdmin && param == "ban") {
                     handleBan(bot, message.chat.id, handler)
                     "Banned command: ${handler.command}"

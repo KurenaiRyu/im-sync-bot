@@ -4,15 +4,12 @@ import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.telegram.send
 import moe.kurenai.tdlight.model.media.InputFile
-import moe.kurenai.tdlight.model.media.Video
 import moe.kurenai.tdlight.model.message.Message
 import moe.kurenai.tdlight.model.message.Update
 import moe.kurenai.tdlight.request.message.InputMediaDocument
 import moe.kurenai.tdlight.request.message.SendDocument
 import moe.kurenai.tdlight.request.message.SendMediaGroup
 import moe.kurenai.tdlight.request.message.SendMessage
-import net.mamoe.mirai.internal.deps.io.ktor.http.ContentType
-import net.mamoe.mirai.message.data.FileMessage
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 

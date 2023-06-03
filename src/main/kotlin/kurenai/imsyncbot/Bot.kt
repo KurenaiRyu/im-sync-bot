@@ -144,6 +144,7 @@ private val largeDirSize = 100 * 1024 * 1024L
 private const val cachePath = "./cache"
 private val clearCacheTimer = Timer("ClearCache", true)
 
+@Suppress("UNCHECKED_CAST")
 private fun setUpTimer() {
     clearCacheTimer.scheduleAtFixedRate(timerTask {
         val cacheDir = File(cachePath)

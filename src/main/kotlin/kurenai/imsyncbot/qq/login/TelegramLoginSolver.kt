@@ -16,7 +16,6 @@ import net.mamoe.mirai.auth.QRCodeLoginListener
 import net.mamoe.mirai.utils.DeviceVerificationRequests
 import net.mamoe.mirai.utils.DeviceVerificationResult
 import net.mamoe.mirai.utils.LoginSolver
-import net.mamoe.mirai.utils.currentTimeSeconds
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -42,7 +41,7 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
                     data.inputStream().use { input ->
                         telegram.client.send(SendPhoto(
                             imSyncBot.configProperties.bot.masterOfTg.toString(),
-                            InputFile(input, "qrcode-${currentTimeSeconds()}.png")
+                            InputFile(input, "qrcode-${System.currentTimeMillis()}.png")
                         ).apply {
                             caption = "请在手机 QQ 使用账号 ${bot.id} 扫码"
                         })

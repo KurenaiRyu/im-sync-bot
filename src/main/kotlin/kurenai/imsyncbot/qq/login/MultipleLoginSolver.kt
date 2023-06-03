@@ -10,13 +10,7 @@ import net.mamoe.mirai.auth.QRCodeLoginListener
 import net.mamoe.mirai.utils.DeviceVerificationRequests
 import net.mamoe.mirai.utils.DeviceVerificationResult
 import net.mamoe.mirai.utils.LoginSolver
-import net.mamoe.mirai.utils.MiraiLogger
 import net.mamoe.mirai.utils.StandardCharImageLoginSolver
-import net.mamoe.mirai.utils.currentTimeSeconds
-import net.mamoe.mirai.utils.info
-import net.mamoe.mirai.utils.warning
-import java.io.File
-import javax.imageio.ImageIO
 
 /**
  * @author Kurenai

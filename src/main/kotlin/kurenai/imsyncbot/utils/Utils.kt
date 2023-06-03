@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
-import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
@@ -16,7 +15,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
-import kurenai.imsyncbot.qq.GroupMessageContext
 import moe.kurenai.tdlight.model.message.Update
 import org.reflections.Reflections
 import java.io.File
@@ -122,8 +120,6 @@ fun Long.humanReadableByteCountBin(): String {
 }
 
 fun Update.chatInfoString() = this.message?.chat?.let { "[${it.title ?: it.username}(${it.id})]" } ?: ""
-
-fun GroupMessageContext.groupInfoString() = "[${this.group.name}(${this.group.id})]"
 
 fun String?.suffix(): String {
     return this?.substring(this.lastIndexOf('.').plus(1)) ?: ""

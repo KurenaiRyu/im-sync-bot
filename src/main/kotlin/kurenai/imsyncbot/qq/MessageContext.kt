@@ -19,6 +19,8 @@ import moe.kurenai.tdlight.request.Request
 import moe.kurenai.tdlight.request.message.*
 import moe.kurenai.tdlight.util.MarkdownUtil.fm2md
 import net.mamoe.mirai.contact.*
+import net.mamoe.mirai.event.events.GroupAwareMessageEvent
+import net.mamoe.mirai.event.events.GroupTempMessageEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.ForwardMessage
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
@@ -99,6 +101,7 @@ private const val MAX_IMAGE_RATIO = 2.7
 
 class GroupMessageContext(
     bot: ImSyncBot,
+    val event: GroupAwareMessageEvent,
     val group: Group,
     val messageChain: MessageChain,
     val senderId: Long = messageChain.source.fromId,
@@ -111,10 +114,14 @@ class GroupMessageContext(
 ) : MessageContext(bot) {
 
     private var type: MessageType? = null
-
+    val isTempMessage = event is GroupTempMessageEvent
     val infoString by lazy { "[${group.name}(${this.group.id})]" }
     val simpleContent: String = messageChain.contentToString()
-    val chatId: String = (bot.groupConfig.qqTg[group.id] ?: bot.groupConfig.defaultTgGroup).toString()
+    val chatId: String = if (isTempMessage) {
+        bot.userConfig.defaultChatId.toString()
+    } else {
+        (bot.groupConfig.qqTg[group.id] ?: bot.groupConfig.defaultTgGroup).toString()
+    }
     val replyId: Long? by lazy {
         messageChain[QuoteReply.Key]?.let {
             runBlocking(bot.coroutineContext) {
@@ -448,6 +455,7 @@ class GroupMessageContext(
         val contextList = msg.nodeList.map {
             GroupMessageContext(
                 bot,
+                event,
                 group,
                 it.messageChain,
                 senderId,
