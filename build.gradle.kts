@@ -11,7 +11,7 @@ version = "0.0.1-SNAPSHOT"
 
 repositories {
     maven("https://maven.aliyun.com/repository/central/")
-    maven { url = uri("https://jitpack.io") }
+    maven("https://jitpack.io")
     mavenCentral()
     mavenLocal {
         content {
@@ -26,12 +26,15 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
 //    val miraiVersion = "2.15.0-M1"
-    val miraiVersion = "44e9bb11"
+    val miraiVersion = "2.99.0-local"
 
     //mirai
-    implementation("net.mamoe", "mirai-core", miraiVersion)
-    implementation("net.mamoe", "mirai-core-api", miraiVersion)
-    implementation("net.mamoe", "mirai-core-utils", miraiVersion)
+    api(platform("net.mamoe:mirai-bom:${miraiVersion}"))
+    api("net.mamoe:mirai-core-api")
+    runtimeOnly("net.mamoe:mirai-core")
+//    implementation("net.mamoe", "mirai-core", miraiVersion)
+//    implementation("net.mamoe", "mirai-core-api", miraiVersion)
+//    implementation("net.mamoe", "mirai-core-utils", miraiVersion)
 
     //telegram
     implementation("moe.kurenai.tdlight", "td-light-sdk", "0.1.0-SNAPSHOT")
@@ -79,6 +82,14 @@ application {
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+}
+
+kotlin {
+    sourceSets.all {
+        languageSettings {
+            languageVersion = "2.0"
+        }
+    }
 }
 
 tasks.withType<KotlinCompile> {
