@@ -113,10 +113,6 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
         }.getOrThrow()
     }
 
-    override suspend fun onSolveUnsafeDeviceLoginVerify(bot: Bot, url: String): String = loginSolverLock.withLock {
-        solveFallback(url)
-    }
-
     private suspend fun solveFallback(url: String): String {
         return sendAndGet("当前登录环境不安全，服务器要求账户认证。请在 QQ 浏览器打开 $url 并完成验证后输入任意字符。")
     }

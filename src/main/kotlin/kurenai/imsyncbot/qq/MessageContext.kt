@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.callback.impl.GetFileUrlCallback.Companion.METHOD
+import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.service.CacheService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.BotUtil.formatUsername
@@ -39,6 +40,7 @@ import org.jsoup.parser.Parser
  * @since 9/2/2022 15:12:44
  */
 sealed class MessageContext(
+    val entity: QQMessage?,
     val bot: ImSyncBot
 ) {
 
@@ -100,6 +102,7 @@ private val xml = XML {
 private const val MAX_IMAGE_RATIO = 2.7
 
 class GroupMessageContext(
+    entity: QQMessage?,
     bot: ImSyncBot,
     val event: GroupAwareMessageEvent,
     val group: Group,
@@ -111,7 +114,7 @@ class GroupMessageContext(
             .let { bot.userConfig.idBindings[it] ?: bot.qq.qqBot.getFriend(it)?.remarkOrNick }
             ?: sender?.remarkOrNameCardOrNick
                 ?.formatUsername()
-) : MessageContext(bot) {
+) : MessageContext(entity, bot) {
 
     private var type: MessageType? = null
     val isTempMessage = event is GroupTempMessageEvent
@@ -454,6 +457,7 @@ class GroupMessageContext(
     inner class Forward(val msg: ForwardMessage) : MessageType {
         val contextList = msg.nodeList.map {
             GroupMessageContext(
+                null,
                 bot,
                 event,
                 group,
@@ -474,12 +478,13 @@ class GroupMessageContext(
 }
 
 class PrivateMessageContext(
+    entity: QQMessage?,
     bot: ImSyncBot,
     val messageChain: MessageChain,
     val chat: User,
     val senderId: Long = chat.id,
     val senderName: String = chat.remarkOrNick
-) : MessageContext(bot) {
+) : MessageContext(entity, bot) {
 
     private var type: MessageType? = null
     val infoString: String by lazy { "[${this.chat.remarkOrNick}(${this.chat.id})]" }
@@ -738,6 +743,7 @@ class PrivateMessageContext(
     inner class Forward(val msg: ForwardMessage) : MessageType {
         val contextList = msg.nodeList.map {
             PrivateMessageContext(
+                null,
                 bot,
                 it.messageChain,
                 chat,

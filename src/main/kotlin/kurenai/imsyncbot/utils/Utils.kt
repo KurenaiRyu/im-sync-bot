@@ -8,10 +8,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.kotlinModule
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
@@ -20,6 +17,9 @@ import org.reflections.Reflections
 import java.io.File
 import java.text.CharacterIterator
 import java.text.StringCharacterIterator
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.abs
@@ -124,6 +124,12 @@ fun Update.chatInfoString() = this.message?.chat?.let { "[${it.title ?: it.usern
 fun String?.suffix(): String {
     return this?.substring(this.lastIndexOf('.').plus(1)) ?: ""
 }
+
+fun Long.toLocalDateTime(): LocalDateTime {
+    return LocalDateTime.ofInstant(Instant.ofEpochMilli(this), ZoneId.systemDefault())
+}
+
+suspend fun <R> runIO(block: suspend () -> R) = Dispatchers.IO.run { block.invoke() }
 
 val json = Json {
     encodeDefaults = true

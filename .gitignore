@@ -43,5 +43,4 @@ logs
 
 ## config ##
 config/
-src/main/resources/application*
 *.db

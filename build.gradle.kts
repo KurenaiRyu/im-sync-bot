@@ -1,9 +1,15 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
-    kotlin("jvm") version "1.8.20"
-    application
-    kotlin("plugin.serialization") version "1.8.20"
+    id("org.springframework.boot") version "3.1.0"
+    id("io.spring.dependency-management") version "1.1.0"
+    kotlin("jvm") version "1.8.21"
+    kotlin("plugin.spring") version "1.8.21"
+    kotlin("plugin.serialization") version "1.8.21"
+    kotlin("plugin.allopen") version "1.8.21"
+    kotlin("plugin.noarg") version "1.8.21"
+    kotlin("plugin.jpa") version "1.8.21"
 }
 
 group = "moe.kurenai.bot"
@@ -21,9 +27,22 @@ repositories {
     }
 }
 
+configurations {
+    all {
+        exclude("org.springframework.boot", "spring-boot-starter-logging")
+    }
+}
+
 dependencies {
+
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
+
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+
+    //db
+    runtimeOnly("com.h2database:h2")
 
 //    val miraiVersion = "2.15.0-M1"
     val miraiVersion = "2.99.0-local"
@@ -72,24 +91,24 @@ dependencies {
 
     implementation("org.reflections", "reflections", "0.10.2")
 
-    testApi(kotlin("test"))
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
-application {
-    applicationDefaultJvmArgs = listOf("-Dkotlinx.coroutines.debug", "-Duser.timezone=GMT+08")
+//application {
+//    applicationDefaultJvmArgs = listOf("-Dkotlinx.coroutines.debug", "-Duser.timezone=GMT+08")
+//}
+
+allOpen {
+    annotation("javax.persistence.Entity")
+}
+
+noArg {
+    annotation("javax.persistence.Entity")
 }
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
-}
-
-kotlin {
-    sourceSets.all {
-        languageSettings {
-            languageVersion = "2.0"
-        }
-    }
 }
 
 tasks.withType<KotlinCompile> {
@@ -114,19 +133,25 @@ tasks.register<Copy>("copyLib") {
     into("$buildDir/libs/lib")
 }
 
-tasks.jar {
-    dependsOn("clearLib")
-    dependsOn("copyLib")
-    exclude("**/*.jar")
-    manifest {
-        attributes["Manifest-Version"] = "1.0"
-        attributes["Multi-Release"] = "true"
-        attributes["Main-Class"] = "kurenai.imsyncbot.BotKt"
-        attributes["Class-Path"] =
-            configurations.runtimeClasspath.get().files.joinToString(" ") { "lib/${it.name}" }
-    }
+tasks.bootJar {
+    enabled = true
     archiveFileName.set("${rootProject.name}.jar")
 }
+
+//tasks.jar {
+//    enabled = false
+//    dependsOn("clearLib")
+//    dependsOn("copyLib")
+//    exclude("**/*.jar")
+//    manifest {
+//        attributes["Manifest-Version"] = "1.0"
+//        attributes["Multi-Release"] = "true"
+//        attributes["Main-Class"] = "kurenai.imsyncbot.ImSyncBotApplicationKt"
+//        attributes["Class-Path"] =
+//            configurations.runtimeClasspath.get().files.joinToString(" ") { "lib/${it.name}" }
+//    }
+//    archiveFileName.set("${rootProject.name}.jar")
+//}
 
 tasks.withType<Test> {
     useJUnitPlatform()

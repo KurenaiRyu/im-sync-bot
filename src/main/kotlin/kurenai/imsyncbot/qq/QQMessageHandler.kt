@@ -81,11 +81,12 @@ class QQMessageHandler(
                 resolvedContext.normalType.telegramMessage.send(tg)
             }.getOrThrow()?.also { message ->
                 log.debug("${context.infoString} Sent ${mapper.writeValueAsString(message)}")
+                if (context.entity == null) return@also
                 if (message is Message) {
-                    CacheService.cache(context.messageChain, message)
+                    CacheService.cache(context.entity, context.messageChain, message)
                 } else {
                     message as List<Message>
-                    CacheService.cache(context.messageChain, message.first())
+                    CacheService.cache(context.entity, context.messageChain, message.first())
                 }
             }
         }
@@ -129,11 +130,12 @@ class QQMessageHandler(
                 resolvedContext.normalType.telegramMessage.send(tg)
             }.getOrThrow()?.also { message ->
                 log.debug("${context.infoString} Sent ${mapper.writeValueAsString(message)}")
+                if (context.entity == null) return@also
                 if (message is Message) {
-                    CacheService.cache(context.messageChain, message)
+                    CacheService.cache(context.entity, context.messageChain, message)
                 } else {
                     message as List<Message>
-                    CacheService.cache(context.messageChain, message.first())
+                    CacheService.cache(context.entity, context.messageChain, message.first())
                 }
             }
         }

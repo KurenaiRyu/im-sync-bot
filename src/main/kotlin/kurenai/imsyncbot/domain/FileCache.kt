@@ -1,14 +1,17 @@
 package kurenai.imsyncbot.domain
 
-class FileCache {
+import jakarta.persistence.Entity
+import jakarta.persistence.Id
+import jakarta.persistence.Table
 
-    lateinit var fileId: String
-    var fileSize = 0L
-
-    constructor(fileId: String, fileSize: Long) {
-        this.fileId = fileId
-        this.fileSize = fileSize
+@Entity
+@Table(name = "FILE_CACHE")
+class FileCache(
+    @Id var md5: String,
+    var fileId: String,
+    var fileType: FileType
+) {
+    enum class FileType {
+        IMAGE, DOCUMENT
     }
-
-    constructor()
 }

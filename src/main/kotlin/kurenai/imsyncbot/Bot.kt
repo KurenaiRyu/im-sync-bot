@@ -15,6 +15,7 @@ import kurenai.imsyncbot.qq.QQHandler
 import kurenai.imsyncbot.qq.QQMessageHandler
 import kurenai.imsyncbot.telegram.TelegramHandler
 import kurenai.imsyncbot.telegram.TgMessageHandler
+import kurenai.imsyncbot.utils.SnowFlake
 import kurenai.imsyncbot.utils.humanReadableByteCountBin
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.filefilter.AgeFileFilter
@@ -46,7 +47,7 @@ internal val mapper: ObjectMapper = jacksonObjectMapper()
         BasicPolymorphicTypeValidator.builder().allowIfBaseType(Any::class.java).build(),
         ObjectMapper.DefaultTyping.EVERYTHING
     )
-
+internal val snowFlake = SnowFlake(1)
 internal val reflections = Reflections("kurenai.imsyncbot")
 internal val dfs: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
@@ -60,7 +61,14 @@ internal val tgHandlers = ArrayList<TelegramHandler>()
 
 internal lateinit var instants: MutableList<ImSyncBot>
 
-suspend fun main() {
+//suspend fun main() {
+//    instants = loadInstants()
+//    configs.first()
+//    commonInit()
+//    instants.forEach { it.start() }
+//}
+
+suspend fun start() {
     instants = loadInstants()
     configs.first()
     commonInit()
