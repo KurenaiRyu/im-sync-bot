@@ -3,15 +3,11 @@ package kurenai.imsyncbot.domain
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import kurenai.imsyncbot.snowFlake
 
 @Entity
 @Table(name = "FILE_CACHE")
 class FileCache(
-    @Id var md5: String,
-    var fileId: String,
-    var fileType: FileType
-) {
-    enum class FileType {
-        IMAGE, DOCUMENT
-    }
-}
+    @Id var id: String,
+    var fileId: String
+)

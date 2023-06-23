@@ -8,7 +8,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.getBotOrThrow
-import moe.kurenai.tdlight.util.getLogger
 import java.io.InputStream
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -17,7 +16,6 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.fileSize
 import kotlin.io.path.outputStream
-import moe.kurenai.tdlight.model.media.File as TelegramFile
 
 object HttpUtil {
 
@@ -25,11 +23,12 @@ object HttpUtil {
 
     private val client = HttpClient()
 
-    suspend fun download(tgFile: TelegramFile, path: Path): Path {
-        return download(path, tgFile.getFileUrl(getBotOrThrow().tg.token), true)
-    }
+//    suspend fun download(tgFile: TelegramFile, path: Path): Path {
+//        return download(path, tgFile.getFileUrl(getBotOrThrow().tg.token), true, false)
+//    }
 
-    suspend fun download(path: Path, url: String, enableProxy: Boolean = false) = if (path.exists()) path else doDownload(path, url, enableProxy)
+    suspend fun download(path: Path, url: String, enableProxy: Boolean = false, overwrite: Boolean) =
+        if (!overwrite && path.exists()) path else doDownload(path, url, enableProxy)
 
     private suspend fun doDownload(path: Path, url: String, enableProxy: Boolean = false): Path {
         val start = System.nanoTime()
@@ -39,7 +38,7 @@ object HttpUtil {
             withContext(Dispatchers.IO) {
                 path.parent.createDirectories()
                 client.get(url).body<InputStream>().buffered().use { input ->
-                    path.outputStream(StandardOpenOption.CREATE).buffered().use {
+                    path.outputStream(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING).buffered().use {
                         input.copyTo(it)
                     }
                 }

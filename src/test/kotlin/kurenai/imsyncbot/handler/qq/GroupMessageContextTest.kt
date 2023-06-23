@@ -1,7 +1,7 @@
 package kurenai.imsyncbot.handler.qq
 
 import kotlinx.serialization.json.Json
-import kurenai.imsyncbot.qq.JsonMessageContent
+import kurenai.imsyncbot.bot.qq.JsonMessageContent
 import org.junit.jupiter.api.Test
 
 /**

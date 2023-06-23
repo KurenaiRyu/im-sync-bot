@@ -89,6 +89,7 @@ data class RedisProperties(
 data class BotProperties(
     val qq: QQProperties = QQProperties(),
     val telegram: TelegramProperties = TelegramProperties(),
+    val discord: DiscordProperties = DiscordProperties(),
     val tgMsgFormat: String = "\$name: \$msg",
     val qqMsgFormat: String = "\$name: \$msg",
     val masterOfTg: Long = 0L,
@@ -112,6 +113,13 @@ data class TelegramProperties(
     val username: String = "",
     val baseUrl: String = "https://api.telegram.org",
     val proxy: ProxyProperties? = null,
+    val apiId: Int? = null,
+    val apiHash: String? = null,
+)
+
+@Serializable
+data class DiscordProperties(
+    val token: String? = null
 )
 
 @Serializable

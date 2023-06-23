@@ -1,10 +1,13 @@
 package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
-import moe.kurenai.tdlight.model.message.Message
+import it.tdlight.jni.TdApi.Message
+import kurenai.imsyncbot.ImSyncBot
 import java.nio.file.Path
 
+//TODO: Migrate to DB
 class GroupConfig(
+    val bot: ImSyncBot,
     configPath: String,
 ) : AbstractConfig<Group>() {
 
@@ -66,20 +69,32 @@ class GroupConfig(
         afterUpdate()
     }
 
-    fun default(message: Message) {
+    /**
+     * Set group which from message as default group
+     *
+     * @param message
+     * @return True if set group as default group, otherwise revoke group as default group
+     */
+    suspend fun default(message: Message): Boolean {
         val defaultGroup = items.firstOrNull { it.status.contains(GroupStatus.DEFAULT.name) }
+        val chat = bot.tg.getChat(message.chatId)
         if (defaultGroup != null) {
-            add(Group(message.chat.id, tgQQ[message.chat.id] ?: defaultGroup.qq, message.chat.title!!, defaultGroup.status))
+            defaultGroup.status.remove(GroupStatus.DEFAULT.name)
+            if (message.chatId == defaultGroup.tg) return false
+            else {
+                add(Group(message.chatId, tgQQ[message.chatId] ?: defaultGroup.qq, chat.title, defaultGroup.status))
+            }
         } else {
             add(
                 Group(
-                    message.chat.id,
-                    tgQQ[message.chat.id] ?: 0L,
-                    message.chat.title!!,
+                    message.chatId,
+                    tgQQ[message.chatId] ?: 0L,
+                    chat.title,
                     hashSetOf(GroupStatus.DEFAULT.name)
                 )
             )
         }
+        return true
     }
 
     override fun refresh() {
@@ -100,10 +115,12 @@ class GroupConfig(
                         bannedGroups.add(config.tg)
                         banned = true
                     }
+
                     GroupStatus.PIC_BANNED.name -> {
                         picBannedGroups.add(config.qq)
                         picBannedGroups.add(config.tg)
                     }
+
                     GroupStatus.DEFAULT.name -> {
                         defaultQQGroup = config.qq
                         defaultTgGroup = config.tg

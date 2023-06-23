@@ -45,6 +45,10 @@
             <AppenderRef ref="Console"/>
             <AppenderRef ref="RandomAccessFile"/>
         </Root>
+        <Logger name="it.tdlight" level="warn" additivity="false" includeLocation="true">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="RandomAccessFile"/>
+        </Logger>
         <!--        <asyncRoot level="debug" includeLocation="false">-->
         <!--            <AppenderRef ref="Console"/>-->
         <!--            <AppenderRef ref="RandomAccessFile"/>-->

@@ -1,5 +1,4 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import org.springframework.boot.gradle.tasks.bundling.BootJar
 
 plugins {
     id("org.springframework.boot") version "3.1.0"
@@ -16,15 +15,9 @@ group = "moe.kurenai.bot"
 version = "0.0.1-SNAPSHOT"
 
 repositories {
-    maven("https://maven.aliyun.com/repository/central/")
-    maven("https://jitpack.io")
     mavenCentral()
-    mavenLocal {
-        content {
-            includeGroupByRegex(".*\\.kurenai.*")
-            includeGroup("net.mamoe")
-        }
-    }
+    maven("https://jitpack.io")
+    maven("https://mvn.mchv.eu/repository/mchv/")
 }
 
 configurations {
@@ -33,6 +26,15 @@ configurations {
     }
 }
 
+object Versions {
+    const val vertxVersion = "4.2.3"
+    const val log4j = "2.20.0"
+    const val ktor = "2.3.0"
+    const val tdlight = "3.0.11+td.1.8.14"
+    const val mirai = "2.15.0-RC"
+    const val kord = "0.9.0"
+    const val coroutineTest = "1.7.1"
+}
 dependencies {
 
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
@@ -40,15 +42,22 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
+    implementation("org.jetbrains.kotlinx:atomicfu:0.20.0")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.21")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.2")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2")
+
+    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
 
     //db
     runtimeOnly("com.h2database:h2")
 
-//    val miraiVersion = "2.15.0-M1"
-    val miraiVersion = "2.99.0-local"
+    //discord
+    implementation("dev.kord:kord-core:${Versions.kord}")
 
     //mirai
-    api(platform("net.mamoe:mirai-bom:${miraiVersion}"))
+    api(platform("net.mamoe:mirai-bom:${Versions.mirai}"))
     api("net.mamoe:mirai-core-api")
     runtimeOnly("net.mamoe:mirai-core")
 //    implementation("net.mamoe", "mirai-core", miraiVersion)
@@ -56,17 +65,29 @@ dependencies {
 //    implementation("net.mamoe", "mirai-core-utils", miraiVersion)
 
     //telegram
-    implementation("moe.kurenai.tdlight", "td-light-sdk", "0.1.0-SNAPSHOT")
+//    implementation("moe.kurenai.tdlight", "td-light-sdk", "0.1.0-SNAPSHOT")
+    //tdlib
+    implementation(platform("it.tdlight:tdlight-java-bom:${Versions.tdlight}"))
+    implementation("it.tdlight:tdlight-java")
+    val hostOs = System.getProperty("os.name")
+    val isWin = hostOs.startsWith("Windows")
+    val classifier = when {
+        hostOs == "Linux" -> "linux_amd64"
+        isWin -> "windows_amd64"
+        else -> throw GradleException("[$hostOs] is not support!")
+    }
+    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
 
-    val ktor = "2.1.3"
-    implementation("io.ktor:ktor-client-core:${ktor}")
-    implementation("io.ktor:ktor-client-okhttp:${ktor}")
+    implementation("io.ktor:ktor-client-core:${Versions.ktor}")
+    implementation("io.ktor:ktor-client-okhttp:${Versions.ktor}")
 
-    val log4j = "2.20.0"
+    //cache
+    implementation("com.sksamuel.aedile:aedile-core:1.2.0")
+
     //logging
-    implementation("org.apache.logging.log4j:log4j-core:$log4j")
-    implementation("org.apache.logging.log4j:log4j-api:$log4j")
-    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:$log4j")
+    implementation("org.apache.logging.log4j:log4j-core:${Versions.log4j}")
+    implementation("org.apache.logging.log4j:log4j-api:${Versions.log4j}")
+    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:${Versions.log4j}")
     implementation("com.lmax:disruptor:3.4.4")
 
     //xml
@@ -81,17 +102,14 @@ dependencies {
 
     //tool kit
     implementation("com.google.guava:guava:31.1-jre")
-    implementation("org.apache.commons", "commons-lang3")
-    implementation("org.apache.commons:commons-io:1.3.2")
-    implementation("com.esotericsoftware", "kryo", "5.1.1")
     implementation("org.jsoup:jsoup:1.15.3")
-    implementation("io.github.kurenairyu", "simple-cache", "1.2.0-SNAPSHOT")
 
     implementation("org.redisson:redisson:3.19.1")
 
     implementation("org.reflections", "reflections", "0.10.2")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.coroutineTest}")
 }
 
 //application {
@@ -113,7 +131,11 @@ java {
 
 tasks.withType<KotlinCompile> {
     kotlinOptions {
-        freeCompilerArgs = listOf("-Xjsr305=strict")
+        freeCompilerArgs = listOf(
+            "-Xjsr305=strict",
+            "-opt-in=kotlin.contracts.ExperimentalContracts",
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
+        )
         jvmTarget = JavaVersion.VERSION_17.toString()
         javaParameters = true
     }

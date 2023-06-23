@@ -6,29 +6,27 @@ import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import kurenai.imsyncbot.callback.Callback
+import it.tdlight.Init
 import kurenai.imsyncbot.command.AbstractInlineCommand
 import kurenai.imsyncbot.command.AbstractQQCommand
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.AbstractConfig
-import kurenai.imsyncbot.qq.QQHandler
-import kurenai.imsyncbot.qq.QQMessageHandler
-import kurenai.imsyncbot.telegram.TelegramHandler
-import kurenai.imsyncbot.telegram.TgMessageHandler
+import kurenai.imsyncbot.bot.qq.QQHandler
+import kurenai.imsyncbot.bot.qq.QQMessageHandler
 import kurenai.imsyncbot.utils.SnowFlake
 import kurenai.imsyncbot.utils.humanReadableByteCountBin
-import org.apache.commons.io.FileUtils
-import org.apache.commons.io.filefilter.AgeFileFilter
-import org.apache.commons.io.filefilter.SizeFileFilter
-import org.apache.commons.lang3.time.DateUtils
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import org.reflections.Reflections
 import java.io.File
+import java.nio.file.Files
+import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.timerTask
+import kotlin.io.path.fileSize
 
 /**
  * @author Kurenai
@@ -52,12 +50,12 @@ internal val reflections = Reflections("kurenai.imsyncbot")
 internal val dfs: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
 internal val configs = ArrayList<AbstractConfig<*>>()
-internal val callbacks = reflections.getSubTypesOf(Callback::class.java).map { it.getConstructor().newInstance() }
+
+//internal val callbacks = reflections.getSubTypesOf(Callback::class.java).map { it.getConstructor().newInstance() }
 internal val tgCommands = ArrayList<AbstractTelegramCommand>()
 internal val qqCommands = ArrayList<AbstractQQCommand>()
 internal val inlineCommands = HashMap<String, AbstractInlineCommand>()
 internal val qqHandlers = ArrayList<QQHandler>()
-internal val tgHandlers = ArrayList<TelegramHandler>()
 
 internal lateinit var instants: MutableList<ImSyncBot>
 
@@ -69,6 +67,7 @@ internal lateinit var instants: MutableList<ImSyncBot>
 //}
 
 suspend fun start() {
+    Init.init()
     instants = loadInstants()
     configs.first()
     commonInit()
@@ -91,19 +90,8 @@ fun commonInit() {
     registerQQCommand()
     //TODO: 设置 inline 命令
 //    registerInlineCommand()
-    registerTgHandler()
     registerQQHandler()
     setUpTimer()
-}
-
-fun registerTgHandler() {
-    reflections.getSubTypesOf(TelegramHandler::class.java)
-        .filter { it != TgMessageHandler::class.java }
-        .map { it.getDeclaredConstructor().newInstance() }
-        .forEach {
-            tgHandlers.add(it)
-            log.info("Registered telegram handler:  ${it.handleName()}(${it::class.java.simpleName})")
-        }
 }
 
 fun registerQQHandler() {
@@ -152,7 +140,6 @@ private val largeDirSize = 100 * 1024 * 1024L
 private const val cachePath = "./cache"
 private val clearCacheTimer = Timer("ClearCache", true)
 
-@Suppress("UNCHECKED_CAST")
 private fun setUpTimer() {
     clearCacheTimer.scheduleAtFixedRate(timerTask {
         val cacheDir = File(cachePath)
@@ -164,33 +151,26 @@ private fun setUpTimer() {
                     continue
                 }
 
-                val sizeOfDir = FileUtils.sizeOfDirectory(dirFile)
+                val sizeOfDir = dirFile.listFiles()?.sumOf { Files.size(it.toPath()) } ?: 0L
                 log.info("Cache folder [${dirFile.name}] size: ${sizeOfDir.humanReadableByteCountBin()}")
                 val filesToDelete = ArrayList<File>()
 
-                val oldestAllowedFileDate = DateUtils.addMinutes(Date(), -60)
+                val oldestAllowedFileDate =
+                    LocalDateTime.now().minusHours(1).atZone(ZoneId.systemDefault()).toEpochSecond()
                 if (sizeOfDir > largeDirSize) {
-                    filesToDelete.addAll(
-                        FileUtils.listFiles(
-                            dirFile,
-                            SizeFileFilter(largeFileSize),
-                            null
-                        ) as Collection<File>
-                    )
-                    filesToDelete.addAll(
-                        FileUtils.listFiles(
-                            dirFile,
-                            AgeFileFilter(oldestAllowedFileDate),
-                            null
-                        ) as Collection<File>
-                    )
+                    dirFile.listFiles { f ->
+                        f.toPath().fileSize() > largeFileSize
+                    }?.let(filesToDelete::addAll)
+                    dirFile.listFiles { f ->
+                        f.lastModified() < oldestAllowedFileDate
+                    }?.let(filesToDelete::addAll)
                 }
                 doDeleteCacheFile(filesToDelete)
             } catch (e: Exception) {
                 log.error(e.message, e)
             }
         }
-    }, 5000L, TimeUnit.MINUTES.toMillis(60))
+    }, 5000L, TimeUnit.HOURS.toMillis(1))
 }
 
 private fun doDeleteCacheFile(filesToDelete: List<File>) {

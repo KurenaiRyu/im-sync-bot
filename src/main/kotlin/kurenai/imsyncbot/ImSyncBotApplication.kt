@@ -1,10 +1,8 @@
 package kurenai.imsyncbot
 
-import kurenai.imsyncbot.repository.QQMessageRepository
-import kurenai.imsyncbot.repository.QQTgRepository
+import kurenai.imsyncbot.repository.*
 import org.springframework.boot.Banner
 import org.springframework.boot.autoconfigure.SpringBootApplication
-import org.springframework.boot.autoconfigure.service.connection.ConnectionDetailsFactories
 import org.springframework.boot.runApplication
 import org.springframework.context.ApplicationContext
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
@@ -21,6 +19,9 @@ class ImSyncBotApplication
 
 lateinit var qqMessageRepository: QQMessageRepository
 lateinit var qqTgRepository: QQTgRepository
+lateinit var fileCacheRepository: FileCacheRepository
+lateinit var groupConfigRepository: GroupConfigRepository
+lateinit var qqDiscordRepository: QqDiscordRepository
 lateinit var applicationContext: ApplicationContext
 
 suspend fun main(args: Array<String>) {
@@ -29,5 +30,8 @@ suspend fun main(args: Array<String>) {
     }
     qqMessageRepository = applicationContext.getBean(QQMessageRepository::class.java)
     qqTgRepository = applicationContext.getBean(QQTgRepository::class.java)
+    fileCacheRepository = applicationContext.getBean(FileCacheRepository::class.java)
+    groupConfigRepository = applicationContext.getBean(GroupConfigRepository::class.java)
+    qqDiscordRepository = applicationContext.getBean(QqDiscordRepository::class.java)
     start()
 }

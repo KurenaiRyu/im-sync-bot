@@ -1,7 +1,6 @@
 package kurenai.imsyncbot.utils
 
 import kotlinx.coroutines.delay
-import moe.kurenai.tdlight.util.getLogger
 
 
 object RetryUtil {

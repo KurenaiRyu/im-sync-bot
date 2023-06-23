@@ -1,68 +1,72 @@
 package kurenai.imsyncbot.command
 
 import com.google.common.base.CaseFormat
-import kurenai.imsyncbot.*
+import it.tdlight.jni.TdApi.*
+import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.exception.BotException
-import kurenai.imsyncbot.telegram.send
-import kurenai.imsyncbot.utils.reflections
-import moe.kurenai.tdlight.model.MessageEntityType
-import moe.kurenai.tdlight.model.inline.InlineQuery
-import moe.kurenai.tdlight.model.message.Message
-import moe.kurenai.tdlight.model.message.Update
-import moe.kurenai.tdlight.request.message.SendMessage
-import moe.kurenai.tdlight.util.getLogger
+import kurenai.imsyncbot.getBotOrThrow
+import kurenai.imsyncbot.qqCommands
+import kurenai.imsyncbot.tgCommands
+import kurenai.imsyncbot.utils.ParseMode
+import kurenai.imsyncbot.utils.TelegramUtil.text
+import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.event.events.MessageEvent
 
 object CommandDispatcher {
 
     private val log = getLogger()
 
-    suspend fun execute(update: Update, message: Message) {
-        val bot = getBotOrThrow()
-        val command = message.entities!!
-            .first { it.type == MessageEntityType.BOT_COMMAND }
-            .text!!
-            .replace("/", "")
-            .replace("@${bot.tg.username}", "")
-        if (command == "help") {
-            handleHelp(message)
-            return
-        }
+    suspend fun execute(bot: ImSyncBot, message: Message, commandEntity: TextEntity) {
+        val content = message.content
+        val sender = message.senderId
+        if (content !is MessageText || sender !is MessageSenderUser) return
+
+        val commandText = commandEntity.text(content.text.text)
+        val index = commandText.indexOf("@")
+        val chat = bot.tg.send { GetChat(message.chatId) }
+
+        if (chat.type !is ChatTypePrivate && commandText.substring(index + 1) != bot.tg.getUsername()) return
+
+        val command = if (index == -1) commandText.substring(1) else commandText.substring(1, index)
+
         var reply = true
-        var parseMode: String? = null
-        var msg: String? = null
-        for (handler in tgCommands) {
-            if (handler.command.lowercase() == command.lowercase()) {
-                log.info("Match ${handler.name}")
-                val isSupperAdmin = bot.userConfig.superAdmins.contains(message.from?.id)
-                val param = message.text?.lowercase()?.replace(handler.command.lowercase(), "")?.trim()
-                msg = if (isSupperAdmin && param == "ban") {
-                    handleBan(bot, message.chat.id, handler)
-                    "Banned command: ${handler.command}"
-                } else if (isSupperAdmin && param == "unban") {
-                    handleUnban(bot, message.chat.id, handler)
-                    "Unbanned command: ${handler.command}"
-                } else if (bot.groupConfig.statusContain(message.chat.id, handler.getCommandBannedStatus())) {
-                    log.debug("Command was banned for group[${message.chat.title}(${message.chat.id})].")
+        var parseMode: ParseMode = ParseMode.TEXT
+
+        val typeConstructor = chat.type.constructor
+
+        var responseMsg: String? = null
+        for (cmd in tgCommands) {
+            if (cmd.command.lowercase() == command.lowercase()) {
+                log.info("Match ${cmd.name}")
+                val isSupperAdmin = bot.userConfig.superAdmins.contains(sender.userId)
+                val input = content.text.text.substring(commandEntity.length).trim()
+                responseMsg = if (isSupperAdmin && input == "ban") {
+                    handleBan(bot, message.chatId, cmd)
+                    "Banned command: ${cmd.command}"
+                } else if (isSupperAdmin && input == "unban") {
+                    handleUnban(bot, message.chatId, cmd)
+                    "Unbanned command: ${cmd.command}"
+                } else if (bot.groupConfig.statusContain(message.chatId, cmd.getCommandBannedStatus())) {
+                    log.debug("Command was banned for group[${message.chatId}(${message.chatId})].")
                     return
                 } else {
-                    if (handler.onlyMaster && bot.userConfig.masterTg != message.from?.id) {
+                    if (cmd.onlyMaster && bot.userConfig.masterTg != sender.userId) {
                         "该命令只允许主人执行"
-                    } else if (handler.onlySupperAdmin && !isSupperAdmin) {
+                    } else if (cmd.onlySupperAdmin && !isSupperAdmin) {
                         "该命令只允许超级管理员执行"
-                    } else if (handler.onlyAdmin && !bot.userConfig.admins.contains(message.from?.id)) {
+                    } else if (cmd.onlyAdmin && !bot.userConfig.admins.contains(sender.userId)) {
                         "该命令只允许管理员执行"
-                    } else if (handler.onlyUserMessage && !message.isUserMessage()) {
+                    } else if (cmd.onlyUserMessage && typeConstructor != ChatTypePrivate.CONSTRUCTOR) {
                         "该命令只允许私聊执行"
-                    } else if (handler.onlyGroupMessage && !(message.isSuperGroupMessage() || message.isGroupMessage())) {
+                    } else if (cmd.onlyGroupMessage && !(typeConstructor == ChatTypeBasicGroup.CONSTRUCTOR || typeConstructor == ChatTypeSupergroup.CONSTRUCTOR)) {
                         "该命令只允许群组执行"
-                    } else if (handler.onlyReply && !(message.isReply())) {
+                    } else if (cmd.onlyReply && message.replyToMessageId != 0L) {
                         "需要引用一条消息"
                     } else {
                         try {
-                            handler.execute(update, message)?.also {
-                                reply = handler.reply
-                                parseMode = handler.parseMode
+                            cmd.execute(bot, message, sender, input)?.also {
+                                reply = cmd.reply
+                                parseMode = cmd.parseMode
                             }
                         } catch (e: BotException) {
                             e.message
@@ -72,11 +76,9 @@ object CommandDispatcher {
                 break
             }
         }
-        msg?.let {
-            SendMessage(message.chatId, msg).apply {
-                parseMode?.let { this.parseMode = it }
-                if (reply) this.replyToMessageId = message.messageId
-            }.send()
+
+        responseMsg?.takeIf { it.isNotBlank() }?.let {
+            bot.tg.sendMessageText(it, chat.id, parseMode, replayToMessageId = if (reply) message.id else null)
         }
     }
 
@@ -103,36 +105,6 @@ object CommandDispatcher {
         }_BANNED"
     }
 
-    suspend fun handleInlineQuery(update: Update, inlineQuery: InlineQuery) {
-        if (inlineCommands.isEmpty()) return
-
-        if (inlineQuery.query.isBlank()) return
-        val query = inlineQuery.query.trim()
-        val offset = inlineQuery.offset.takeIf { it.isNotBlank() }?.toInt() ?: 0
-        if (offset < 0) return
-        try {
-            val args = query.split(' ', limit = 2)
-            log.info("Match command ${javaClass.name}")
-            when (args.size) {
-                0 -> return
-                1 -> {
-                    inlineCommands[query]?.run {
-                        execute(update, inlineQuery, emptyList())
-                    }
-                }
-
-                2 -> {
-                    inlineCommands[args[0]]?.run {
-                        execute(update, inlineQuery, args[1].split(' '))
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            log.error(e.message, e)
-//            BangumiBot.tdClient.sendSync(emptyAnswer(inlineQuery.id))
-        }
-    }
-
     suspend fun execute(event: MessageEvent): Int {
         val bot = getBotOrThrow()
         var matched = false
@@ -144,16 +116,6 @@ object CommandDispatcher {
                 }
         }
         return if (matched) 1 else 0
-    }
-
-    private suspend fun handleHelp(message: Message) {
-        val sb = StringBuilder("Command list")
-        for (handler in tgCommands.asSequence().sortedBy { it.command }) {
-            sb.append("\n----------------\n")
-            sb.append("/${handler.command} ${handler.name}\n")
-            sb.append(handler.help)
-        }
-        SendMessage(message.chatId, sb.toString()).send()
     }
 
 

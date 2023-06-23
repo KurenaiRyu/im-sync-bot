@@ -2,7 +2,6 @@ package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
 import kurenai.imsyncbot.ConfigProperties
-import moe.kurenai.tdlight.model.message.Message
 import java.nio.file.Path
 
 /**
@@ -183,21 +182,22 @@ class UserConfig(
         afterUpdate()
     }
 
-    fun setMaster(message: Message) {
-        val master = items.firstOrNull { it.status.contains(UserStatus.ADMIN) }
-        if (master == null) {
-            items.add(User(masterTg, masterQQ, message.from?.firstName, chatId = message.chat.id, status = hashSetOf(UserStatus.MASTER)))
-        } else {
-            message.from?.firstName?.let {
-                if (master.username == null) {
-                    master.username = it
-                    masterUsername = it
-                }
-            }
-            masterChatId = message.chat.id
-            master.chatId = message.chat.id
-        }
-    }
+//    fun setMaster(message: Message) {
+//        val master = items.firstOrNull { it.status.contains(UserStatus.ADMIN) }
+//        if (master == null) {
+//            items.add(User(masterTg, masterQQ, message.from?.firstName, chatId = message.chat.id, status = hashSetOf(UserStatus.MASTER)))
+//        } else {
+//
+//            message.userSender()?.userId?.firstName?.let {
+//                if (master.username == null) {
+//                    master.username = it
+//                    masterUsername = it
+//                }
+//            }
+//            masterChatId = message.chat.id
+//            master.chatId = message.chat.id
+//        }
+//    }
 
     override fun refresh() {
         val ids = HashMap<Long, String>()

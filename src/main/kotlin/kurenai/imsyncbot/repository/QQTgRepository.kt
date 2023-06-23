@@ -1,5 +1,6 @@
 package kurenai.imsyncbot.repository
 
+import kotlinx.coroutines.flow.Flow
 import kurenai.imsyncbot.domain.QQTg
 import org.springframework.data.jpa.repository.JpaRepository
 
@@ -10,6 +11,10 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface QQTgRepository : JpaRepository<QQTg, Long> {
 
-    fun findByTgMsgIdAndTgGrpId(tgMsgId: Long, tgGroupId: Long): QQTg?
+    fun findByTgGrpIdAndTgMsgId(tgGrpId: Long, tgMsgId: Long): QQTg?
+
+    fun findByTgGrpIdAndTgMsgIdIn(tgGrpId: Long, tgMsgId: Collection<Long>): List<QQTg>
+
+    fun findByQqId(qqId: Long): QQTg?
 
 }

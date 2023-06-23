@@ -1,21 +1,26 @@
-package kurenai.imsyncbot.qq.login
+package kurenai.imsyncbot.bot.qq.login
 
+import it.tdlight.jni.TdApi
+import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kurenai.imsyncbot.ImSyncBot
-import kurenai.imsyncbot.telegram.TelegramDisposableHandler
-import moe.kurenai.tdlight.model.media.InputFile
-import moe.kurenai.tdlight.request.message.SendMessage
-import moe.kurenai.tdlight.request.message.SendPhoto
-import moe.kurenai.tdlight.util.getLogger
+import kurenai.imsyncbot.bot.telegram.TelegramDisposableHandler
+import kurenai.imsyncbot.utils.BotUtil
+import kurenai.imsyncbot.utils.TelegramUtil.asFmtText
+import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.auth.QRCodeLoginListener
 import net.mamoe.mirai.utils.DeviceVerificationRequests
 import net.mamoe.mirai.utils.DeviceVerificationResult
 import net.mamoe.mirai.utils.LoginSolver
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import kotlin.io.path.pathString
+import kotlin.io.path.writeBytes
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -38,13 +43,17 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
 
             override fun onFetchQRCode(bot: Bot, data: ByteArray) {
                 runBlocking {
-                    data.inputStream().use { input ->
-                        telegram.client.send(SendPhoto(
-                            imSyncBot.configProperties.bot.masterOfTg.toString(),
-                            InputFile(input, "qrcode-${System.currentTimeMillis()}.png")
-                        ).apply {
-                            caption = "请在手机 QQ 使用账号 ${bot.id} 扫码"
-                        })
+                    telegram.send {
+                        val filename = "qrcode-${System.currentTimeMillis()}.png"
+                        val path = Path.of(BotUtil.getImagePath(filename))
+                        path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+                        TdApi.SendMessage().apply {
+                            this.chatId = imSyncBot.userConfig.masterTg
+                            this.inputMessageContent = InputMessagePhoto().apply {
+                                this.caption = "请在手机 QQ 使用账号 ${bot.id} 扫码".asFmtText()
+                                this.photo = InputFileLocal(path.pathString)
+                            }
+                        }
                     }
                 }
             }
@@ -67,12 +76,19 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
 
     override suspend fun onSolvePicCaptcha(bot: Bot, data: ByteArray): String? = loginSolverLock.withLock {
         runCatching {
-            data.inputStream().use { input ->
-                val messageId = telegram.client.send(SendPhoto(imSyncBot.configProperties.bot.masterOfTg.toString(), InputFile(input, "captcha.jpg")).apply {
-                    caption = "请输入验证码"
-                }).messageId
-                getInput()
+            telegram.send {
+                val filename = "captcha-${System.currentTimeMillis()}.png"
+                val path = Path.of(BotUtil.getImagePath(filename))
+                path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+                TdApi.SendMessage().apply {
+                    this.chatId = imSyncBot.userConfig.masterTg
+                    this.inputMessageContent = InputMessagePhoto().apply {
+                        this.caption = "请输入验证码".asFmtText()
+                        this.photo = InputFileLocal(path.pathString)
+                    }
+                }
             }
+            getInput()
         }.onFailure {
             log.error("Telegram验证方式失败", it)
         }.getOrNull()
@@ -80,12 +96,10 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
 
     override suspend fun onSolveSliderCaptcha(bot: Bot, url: String): String? = loginSolverLock.withLock {
         runCatching {
-            val messageId = telegram.client.send(
-                SendMessage(
-                    imSyncBot.configProperties.bot.masterOfTg.toString(),
-                    "需要滑动验证码, 请按照以下链接的步骤完成滑动验证码, 然后输入获取到的 ticket\n$url"
-                )
-            ).messageId!!
+            telegram.sendMessageText(
+                "需要滑动验证码, 请按照以下链接的步骤完成滑动验证码, 然后输入获取到的 ticket\n$url",
+                imSyncBot.userConfig.masterTg
+            )
             getInput()
         }.onFailure {
             log.error("Telegram验证方式失败", it)
@@ -118,25 +132,20 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
     }
 
     private suspend fun sendAndGet(message: String): String {
-        val messageId = send(message).messageId!!
+        send(message)
         return getInput()
     }
 
-    private suspend fun send(message: String) = telegram.client.send(
-        SendMessage(
-            imSyncBot.configProperties.bot.masterOfTg.toString(),
-            message
-        )
-    )
+    private suspend fun send(message: String) = telegram.sendMessageText(message, imSyncBot.userConfig.masterTg)
 
     private suspend fun getInput(): String {
         val deferred = CompletableDeferred<String>()
 
-        val handler = TelegramDisposableHandler { _, update ->
-            val msg = update.message!!
-            log.info("Telegram input: (${msg.messageId}) ${msg.text}")
-            if (msg.chat.id == imSyncBot.configProperties.bot.masterOfTg && msg.text?.isNotBlank() == true && msg.text!!.length > 3) {
-                deferred.complete(msg.text!!)
+        val handler = TelegramDisposableHandler { _, msg ->
+            val text = (msg.content as? MessageText)?.text?.text
+            log.info("Telegram input: (${msg.id}) $text")
+            if (msg.chatId == imSyncBot.configProperties.bot.masterOfTg && text?.isNotBlank() == true && text.length > 3) {
+                deferred.complete(text)
                 true
             } else {
                 false

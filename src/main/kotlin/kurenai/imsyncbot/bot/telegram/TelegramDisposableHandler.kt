@@ -1,8 +1,7 @@
-package kurenai.imsyncbot.telegram
+package kurenai.imsyncbot.bot.telegram
 
+import it.tdlight.jni.TdApi
 import kurenai.imsyncbot.ImSyncBot
-import kurenai.imsyncbot.handler.Handler
-import moe.kurenai.tdlight.model.message.Update
 import java.time.LocalTime
 
 /**
@@ -24,9 +23,9 @@ fun interface TelegramDisposableHandler {
      * 一般不匹配直接返回 CONTINUE
      *
      * @param bot
-     * @param update
+     * @param message
      * @return
      */
-    fun handle(bot: ImSyncBot, update: Update): Boolean
+    fun handle(bot: ImSyncBot, message: TdApi.Message): Boolean
 
 }

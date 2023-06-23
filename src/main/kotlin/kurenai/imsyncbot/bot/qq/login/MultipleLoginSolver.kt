@@ -1,4 +1,4 @@
-package kurenai.imsyncbot.qq.login
+package kurenai.imsyncbot.bot.qq.login
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

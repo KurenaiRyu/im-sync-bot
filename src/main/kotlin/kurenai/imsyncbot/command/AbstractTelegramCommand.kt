@@ -1,8 +1,9 @@
 package kurenai.imsyncbot.command
 
-import moe.kurenai.tdlight.model.message.Message
-import moe.kurenai.tdlight.model.message.Update
-
+import it.tdlight.jni.TdApi.Message
+import it.tdlight.jni.TdApi.MessageSenderUser
+import kurenai.imsyncbot.ImSyncBot
+import kurenai.imsyncbot.utils.ParseMode
 
 abstract class AbstractTelegramCommand {
 
@@ -15,10 +16,10 @@ abstract class AbstractTelegramCommand {
     open val onlyAdmin: Boolean = false
     open val onlySupperAdmin: Boolean = true
     open val onlyReply: Boolean = false
-    open val parseMode: String? = null
+    open val parseMode: ParseMode = ParseMode.TEXT
     open val reply: Boolean = false
 
-    abstract suspend fun execute(update: Update, message: Message): String?
+    abstract suspend fun execute(bot: ImSyncBot, message: Message, sender: MessageSenderUser, input: String): String?
 
     fun String.param(): String {
         return this.substringAfter(' ').trim()
