@@ -25,8 +25,7 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
 
-//    val miraiVersion = "2.15.0-M1"
-    val miraiVersion = "44e9bb11"
+    val miraiVersion = "2.15.0-RC"
 
     //mirai
     implementation("net.mamoe", "mirai-core", miraiVersion)
