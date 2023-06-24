@@ -1,17 +1,18 @@
 bot:
+  qq:
+    account: 12354547  # qq账号
+    password: your-qq-password # qq密码，ANDROID_WATCH 协议下
+    protocol: ANDROID_PAD #ANDROID_PAD | ANDROID_PHONE | ANDROID_WATCH
   telegram:
     token: 1234567:adgcgasdfadf # tg机器人token
     username: your_bot_name  # tg机器人用户名
-  #    base-url: http://api:8081  # 本地api
-  qq:
-    account: 12354547  # qq账号
-    password: your-qq-password # qq密码
-    protocol: ANDROID_PAD #ANDROID_PAD | ANDROID_PHONE | ANDROID_WATCH
-handler:
-  forward:
-    master-of-tg: 12345678 #主人 tg id
-    master-of-qq: 87654321 #主人 qq 账号
-    tgMsgFormat: "$name$newline$newline$msg"  #tg消息格式化
-    qqMsgFormat: "$name: $msg" # qq消息格式化
+  tg-msg-format: "#$name #id$id $newline$newline$msg" #tg消息格式化: $name: 发送者名称；$id: 发送者id；$newline: 换行；$msg: 消息体
+  qq-msg-format: "#$name: $msg" # qq消息格式化
+  master-of-tg: 12345678 # 主人 tg id
+  master-of-qq: 87654321 # 主人 qq 账号
+  pic-to-file-size: 2   # 图片大约多少M则转为文件发送
+  enable-recall: false  # true 则删掉转发的tg消息，否则会修改成划线消息以表示撤销
 redis:
-  host: redis #默认用容器内redis，不需要修改
+  host: redis # redis ip ；若是使用docker-compose构建环境则不需要修改
+  port: 6379  # redis 端口，一般默认就这个端口；若是使用docker-compose构建环境则不需要修改
+  database: 10 # redis数据库id，一般不需要修改，只有多个程序共用时为了避免问题而分开不同数据库
