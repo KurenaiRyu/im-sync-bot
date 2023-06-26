@@ -1,23 +1,17 @@
 package kurenai.imsyncbot
 
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.databind.*
-import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import it.tdlight.Init
+import kurenai.imsyncbot.bot.qq.QQHandler
+import kurenai.imsyncbot.bot.qq.QQMessageHandler
 import kurenai.imsyncbot.command.AbstractInlineCommand
 import kurenai.imsyncbot.command.AbstractQQCommand
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.config.AbstractConfig
-import kurenai.imsyncbot.bot.qq.QQHandler
-import kurenai.imsyncbot.bot.qq.QQMessageHandler
 import kurenai.imsyncbot.utils.SnowFlake
+import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.humanReadableByteCountBin
-import org.apache.logging.log4j.LogManager
-import org.apache.logging.log4j.Logger
 import org.reflections.Reflections
+import org.slf4j.Logger
 import java.io.File
 import java.nio.file.Files
 import java.time.LocalDateTime
@@ -33,18 +27,7 @@ import kotlin.io.path.fileSize
  * @since 7/1/2022 09:31:04
  */
 
-internal val log: Logger = LogManager.getLogger()
-internal val mapper: ObjectMapper = jacksonObjectMapper()
-    .registerModules(Jdk8Module(), JavaTimeModule())
-    .enable(SerializationFeature.WRITE_ENUMS_USING_TO_STRING)
-    .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
-    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-    .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
-    .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
-    .activateDefaultTyping(
-        BasicPolymorphicTypeValidator.builder().allowIfBaseType(Any::class.java).build(),
-        ObjectMapper.DefaultTyping.EVERYTHING
-    )
+internal val log: Logger = getLogger()
 internal val snowFlake = SnowFlake(1)
 internal val reflections = Reflections("kurenai.imsyncbot")
 internal val dfs: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
