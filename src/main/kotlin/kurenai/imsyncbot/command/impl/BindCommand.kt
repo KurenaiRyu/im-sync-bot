@@ -25,7 +25,7 @@ class BindCommand : AbstractTelegramCommand() {
     override val parseMode: ParseMode = ParseMode.MARKDOWN_V2
 
     override suspend fun execute(bot: ImSyncBot, message: Message, sender: MessageSenderUser, input: String): String? {
-        val param = message.content.textOrCaption()?.text ?: return "参数错误"
+        val param = message.content.textOrCaption()?.text?.substringAfter(' ') ?: return "参数错误"
         val qqBot = bot.qq.qqBot
         val tg = bot.tg
         val chat = tg.getChat(message.chatId)

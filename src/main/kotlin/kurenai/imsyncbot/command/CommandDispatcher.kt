@@ -25,7 +25,7 @@ object CommandDispatcher {
         val index = commandText.indexOf("@")
         val chat = bot.tg.send { GetChat(message.chatId) }
 
-        if (chat.type !is ChatTypePrivate && commandText.substring(index + 1) != bot.tg.getUsername()) return
+        if (chat.type !is ChatTypePrivate && (index != -1 && commandText.substring(index + 1) != bot.tg.getUsername())) return
 
         val command = if (index == -1) commandText.substring(1) else commandText.substring(1, index)
 
