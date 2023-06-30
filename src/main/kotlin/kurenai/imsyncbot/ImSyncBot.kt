@@ -50,7 +50,6 @@ class ImSyncBot(
             }
         }
 
-    //    internal val redisson: RedissonClient = configRedisson()
     internal val proxy: Proxy? = configProxy()
     internal val userConfig: UserConfig = UserConfig(configPath, configProperties)
     internal val groupConfig: GroupConfig = GroupConfig(this, configPath)
@@ -80,37 +79,6 @@ class ImSyncBot(
             discord.start()
         }
     }
-
-//    suspend fun getMemberFromMessage(message: Message): NormalMember {
-//        val tgId = message.from?.id ?: throw BotException("未找到该消息发送用户id")
-//        val group = getGroupFromMessage(message)
-//        val qq = if (tgId == tg.tgBot.me.id) { //bot id
-//            MessageService.getQQByTg(message)?.source?.fromId ?: throw BotException("未找到该用户qq")
-//        } else {
-//            userConfig.links.firstOrNull { it.tg == tgId }?.qq ?: throw BotException("该用户未绑定qq")
-//        }
-//        return group.getMember(qq) ?: throw BotException("未找到该成员")
-//    }
-//
-//    suspend fun getMemberFromMessageReply(message: Message) = getMemberFromMessage(message.replyToMessage ?: throw BotException("未找到该消息的引用"))
-
-//    fun getGroupFromMessage(message: Message): Group {
-//        val groupId = groupConfig.tgQQ[message.chat.id] ?: throw BotException("未找到该qq群id")
-//        return qq.qqBot.getGroup(groupId) ?: throw BotException("未找到该qq群")
-//    }
-
-//    private fun configRedisson(): RedissonClient {
-//        val redissonConfig = Config()
-//        redissonConfig.codec = JsonJacksonCodec(mapper)
-//        val server = redissonConfig.useSingleServer()
-//        configProperties.redis.url?.let {
-//            server.address = it
-//        } ?: kotlin.run {
-//            server.address = "redis://${configProperties.redis.host}:${configProperties.redis.port}"
-//            server.database = configProperties.redis.database
-//        }
-//        return Redisson.create(redissonConfig)
-//    }
 
     private fun configProxy(): Proxy? {
         val configProxy = configProperties.bot.telegram.proxy ?: return null

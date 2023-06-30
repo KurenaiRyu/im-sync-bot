@@ -31,9 +31,7 @@ import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
-import net.mamoe.mirai.event.events.GroupAwareMessageEvent
-import net.mamoe.mirai.event.events.GroupMessageEvent
-import net.mamoe.mirai.event.events.GroupMessageSyncEvent
+import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import java.util.WeakHashMap
@@ -159,6 +157,18 @@ class DiscordBot(
                             }
                         }
                     }
+                }
+            }
+        }
+
+        bot.qq.qqBot.eventChannel.subscribeAlways<BotActiveEvent> { event ->
+            when (event) {
+                is GroupMessagePostSendEvent -> {
+                    event.receipt?.source?.let { syncMessageChannel.trySend(it) }
+                }
+
+                is GroupTempMessagePostSendEvent -> {
+                    event.receipt?.source?.let { syncMessageChannel.trySend(it) }
                 }
             }
         }

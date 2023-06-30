@@ -315,6 +315,8 @@ class TelegramBot(
     }
 
     private suspend fun updateCommand() = runCatching {
+        send { DeleteCommands().apply { this.scope = BotCommandScopeAllPrivateChats() } }
+        send { DeleteCommands().apply { this.scope = BotCommandScopeAllGroupChats() } }
         send {
             SetCommands().apply {
                 this.scope = BotCommandScopeAllPrivateChats()
