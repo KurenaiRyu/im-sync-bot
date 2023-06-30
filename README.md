@@ -16,7 +16,7 @@ im同步机器人，现主要同步（转发）tg跟qq群。
       bot:
         qq:
           account: 12354547  # qq账号
-          password: your-qq-password # qq密码，ANDROID_WATCH 协议下
+          password: your-qq-password # qq密码，ANDROID_WATCH 协议下应该为空串或者注释掉这一行，来进行二维码登录
           protocol: ANDROID_PAD #ANDROID_PAD | ANDROID_PHONE | ANDROID_WATCH
         telegram:
           token: 1234567:adgcgasdfadf # tg机器人token
@@ -34,7 +34,8 @@ im同步机器人，现主要同步（转发）tg跟qq群。
     ```
 - jar包运行方式  
   单独jar包运行需要自己搭建环境，要求要安装java 17、redis、ffmpeg、dwebp。  
-  java，redis是必须，但版本号可以稍低，其他两个则不一定需要但是会报错误。  
+  java，redis是必须，但版本号可以稍低。  
+  ffmpeg、dwebp则不一定需要但是会报错误，windows用户可以下载对应exe文件放入jar目录下即可。
   上述软件具体安装这里不做赘述。
     1. 准备好环境后，在[Release](https://github.com/KurenaiRyu/im-sync-bot/releases)
        下载最新版本zip，解压后，直接运行`java -jar im-sync-bot.jar`
