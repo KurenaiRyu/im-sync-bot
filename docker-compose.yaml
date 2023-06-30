@@ -1,8 +1,8 @@
 version: '3.5'
 services:
   bot:
-#    build: .  #自行打包镜像则去除该注释
-    image: kurenai9/im-sync-bot:1.2.1
+    build: .  #自行打包镜像则去除该注释
+    image: kurenai9/im-sync-bot:1.2.2
     container_name: bot
     restart: always
     logging:

@@ -1,6 +1,6 @@
 FROM eclipse-temurin:17-jre-focal
 
-RUN apt update && apt install tzdata ffmpeg libwebp libwebp-tools -y
+RUN apt-get update && apt-get install -y tzdata ffmpeg webp && apt-get clean --dry-run && rm -rf  /var/lib/apt/lists/*
 ENV TZ="Asia/Shanghai"
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en'
 
