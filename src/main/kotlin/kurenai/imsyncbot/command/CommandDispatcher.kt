@@ -2,6 +2,7 @@ package kurenai.imsyncbot.command
 
 import com.google.common.base.CaseFormat
 import kurenai.imsyncbot.*
+import kurenai.imsyncbot.config.Permission
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.telegram.send
 import kurenai.imsyncbot.utils.reflections
@@ -34,23 +35,24 @@ object CommandDispatcher {
         for (handler in tgCommands) {
             if (handler.command.lowercase() == command.lowercase()) {
                 log.info("Match ${handler.name}")
-                val isSupperAdmin = bot.userConfig.superAdmins.contains(message.from?.id)
+                val permission = bot.userConfig.getPermission(message.from)
+                val permissionLevel = permission.level
                 val param = message.text?.lowercase()?.replace(handler.command.lowercase(), "")?.trim()
-                msg = if (isSupperAdmin && param == "ban") {
+                msg = if (permissionLevel <= Permission.SUPPER_ADMIN.level && param == "ban") {
                     handleBan(bot, message.chat.id, handler)
                     "Banned command: ${handler.command}"
-                } else if (isSupperAdmin && param == "unban") {
+                } else if (permissionLevel <= Permission.SUPPER_ADMIN.level && param == "unban") {
                     handleUnban(bot, message.chat.id, handler)
                     "Unbanned command: ${handler.command}"
                 } else if (bot.groupConfig.statusContain(message.chat.id, handler.getCommandBannedStatus())) {
                     log.debug("Command was banned for group[${message.chat.title}(${message.chat.id})].")
                     return
                 } else {
-                    if (handler.onlyMaster && bot.userConfig.masterTg != message.from?.id) {
+                    if (handler.onlyMaster && permission != Permission.MASTER) {
                         "该命令只允许主人执行"
-                    } else if (handler.onlySupperAdmin && !isSupperAdmin) {
+                    } else if (handler.onlySupperAdmin && permissionLevel > Permission.SUPPER_ADMIN.level) {
                         "该命令只允许超级管理员执行"
-                    } else if (handler.onlyAdmin && !bot.userConfig.admins.contains(message.from?.id)) {
+                    } else if (handler.onlyAdmin && permissionLevel > Permission.ADMIN.level) {
                         "该命令只允许管理员执行"
                     } else if (handler.onlyUserMessage && !message.isUserMessage()) {
                         "该命令只允许私聊执行"

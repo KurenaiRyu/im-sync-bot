@@ -29,7 +29,7 @@ abstract class AbstractConfig<T> {
             path.parent.createDirectories()
             path.createFile()
         }
-        mapper.writeValue(path.toFile(), items)
+        mapper.writerWithDefaultPrettyPrinter().writeValue(path.toFile(), items)
         refresh()
     }
 
