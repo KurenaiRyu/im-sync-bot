@@ -14,6 +14,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
+import okio.ByteString.Companion.decodeHex
 import org.reflections.Reflections
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -154,9 +155,13 @@ fun Path.md5(): String {
     return md.digest().toHex()
 }
 
-fun ByteArray.toHex() = HexFormat.of().formatHex(this)
+fun ByteArray.toHex(): String = HexFormat.of().formatHex(this)
+
+fun String.parseHex(): ByteArray = HexFormat.of().parseHex(this)
 
 suspend fun <R> withIO(block: suspend () -> R) = withContext(Dispatchers.IO) { block.invoke() }
+
+fun <R> runIO(block: suspend () -> R) = CoroutineScope(Dispatchers.IO).launch { block.invoke() }
 
 val httpClient = HttpClient()
 

@@ -12,9 +12,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
+import kurenai.imsyncbot.bot.qq.login.qsign.UnidbgFetchQSignFactory
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.domain.getLocalDateTime
 import kurenai.imsyncbot.bot.telegram.TelegramBot
+import kurenai.imsyncbot.utils.FixProtocolVersion
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.BotFactory
@@ -22,11 +24,13 @@ import net.mamoe.mirai.auth.BotAuthorization
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
+import net.mamoe.mirai.internal.spi.EncryptService
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
 import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.message.data.ids
 import net.mamoe.mirai.utils.BotConfiguration
+import net.mamoe.mirai.utils.Services
 import java.io.File
 import kotlin.coroutines.CoroutineContext
 
@@ -52,14 +56,6 @@ class QQBot(
     private val defaultScope = CoroutineScope(parentCoroutineContext + workerContext)
 
     private fun buildMiraiBot(qrCodeLogin: Boolean = false): Bot {
-//        log.info("协议版本检查更新...")
-//        try {
-//            FixProtocolVersion.update()
-//            FixProtocolVersion.sync(BotConfiguration.MiraiProtocol.ANDROID_PAD)
-//            log.info("当前协议\n{}", FixProtocolVersion.info())
-//        } catch (cause: Throwable) {
-//            log.error("协议版本升级失败", cause)
-//        }
         val configuration = BotConfiguration().apply {
             cacheDir = File("./mirai/${qqProperties.account}")
             fileBasedDeviceInfo("${bot.configPath}/device.json") // 使用 device.json 存储设备信息
@@ -67,6 +63,14 @@ class QQBot(
             highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
             parentCoroutineContext = this@QQBot.parentCoroutineContext
 //            loginSolver = MultipleLoginSolver(bot)
+        }
+        log.info("协议版本检查更新...")
+        try {
+            FixProtocolVersion.update()
+            FixProtocolVersion.sync(configuration.protocol)
+            log.info("当前协议\n{}", FixProtocolVersion.info())
+        } catch (cause: Throwable) {
+            log.error("协议版本升级失败", cause)
         }
         return if (qrCodeLogin || qqProperties.password.isBlank()) {
             BotFactory.newBot(qqProperties.account, BotAuthorization.byQRCode(), configuration)

@@ -31,7 +31,7 @@ object Versions {
     const val log4j = "2.20.0"
     const val ktor = "2.3.0"
     const val tdlight = "3.0.11+td.1.8.14"
-    const val mirai = "2.15.0-RC"
+    const val mirai = "2.15.0"
     const val kord = "0.9.0"
     const val coroutineTest = "1.7.1"
 }
@@ -48,7 +48,8 @@ dependencies {
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.2")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2")
 
-    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
+//    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
+    implementation(files("libs/unidbg-fix.jar"))
 
     //db
     runtimeOnly("com.h2database:h2")
@@ -57,9 +58,9 @@ dependencies {
     implementation("dev.kord:kord-core:${Versions.kord}")
 
     //mirai
-    api(platform("net.mamoe:mirai-bom:${Versions.mirai}"))
-    api("net.mamoe:mirai-core-api")
-    runtimeOnly("net.mamoe:mirai-core")
+    implementation(platform("net.mamoe:mirai-bom:${Versions.mirai}"))
+    compileOnly("net.mamoe:mirai-core")
+    compileOnly("net.mamoe:mirai-core-utils")
 //    implementation("net.mamoe", "mirai-core", miraiVersion)
 //    implementation("net.mamoe", "mirai-core-api", miraiVersion)
 //    implementation("net.mamoe", "mirai-core-utils", miraiVersion)
@@ -96,6 +97,9 @@ dependencies {
 
     //json
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.4.1")
+
+    //protobuf
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.4.1")
 
     //cache
     implementation("com.sksamuel.aedile:aedile-core:1.2.0")

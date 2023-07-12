@@ -7,14 +7,17 @@ import kurenai.imsyncbot.bot.discord.DiscordBot
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.bot.qq.QQMessageHandler
+import kurenai.imsyncbot.bot.qq.login.qsign.UnidbgFetchQSignFactory
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.utils.childScopeContext
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.NormalMember
 import net.mamoe.mirai.contact.getMember
+import net.mamoe.mirai.internal.spi.EncryptService
 import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.utils.LoggerAdapters
+import net.mamoe.mirai.utils.Services
 import org.apache.logging.log4j.Level
 import org.apache.logging.log4j.core.config.Configurator
 import org.redisson.api.RedissonClient
@@ -60,6 +63,11 @@ class ImSyncBot(
 //    internal val privateHandle = PrivateChatHandler(configProperties)
 
     init {
+        Services.register(
+            EncryptService.Factory::class.qualifiedName!!,
+            UnidbgFetchQSignFactory::class.qualifiedName!!,
+            ::UnidbgFetchQSignFactory
+        )
         //mirai使用log4j2
         LoggerAdapters.useLog4j2()
 
