@@ -1,23 +1,13 @@
 package kurenai.imsyncbot
 
 import kotlinx.coroutines.*
-import kurenai.imsyncbot.config.GroupConfig
-import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.bot.discord.DiscordBot
-import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.bot.qq.QQMessageHandler
-import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.bot.telegram.TelegramBot
+import kurenai.imsyncbot.config.GroupConfig
+import kurenai.imsyncbot.config.UserConfig
 import kurenai.imsyncbot.utils.childScopeContext
-import net.mamoe.mirai.contact.Group
-import net.mamoe.mirai.contact.NormalMember
-import net.mamoe.mirai.contact.getMember
-import net.mamoe.mirai.message.data.source
-import net.mamoe.mirai.utils.LoggerAdapters
-import org.apache.logging.log4j.Level
-import org.apache.logging.log4j.core.config.Configurator
-import org.redisson.api.RedissonClient
 import java.io.File
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -61,11 +51,11 @@ class ImSyncBot(
 
     init {
         //mirai使用log4j2
-        LoggerAdapters.useLog4j2()
-
-        if (configProperties.debug) {
-            Configurator.setLevel("kurenai.imsyncbot", Level.DEBUG)
-        }
+//        LoggerAdapters.useLog4j2()
+//
+//        if (configProperties.debug) {
+//            Configurator.setLevel("kurenai.imsyncbot", Level.DEBUG)
+//        }
         configProxy()
     }
 

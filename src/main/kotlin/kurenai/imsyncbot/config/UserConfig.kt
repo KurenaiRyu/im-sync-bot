@@ -1,6 +1,9 @@
 package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kurenai.imsyncbot.ConfigProperties
 import java.nio.file.Path
 
@@ -33,8 +36,8 @@ class UserConfig(
     var admins = emptyList<Long>()
     var superAdmins = emptyList<Long>()
     override val items = ArrayList<User>()
-    override val path = Path.of(configPath, "user.json")
-    override val typeRef = object : TypeReference<ArrayList<User>>() {}
+    override val serializer: KSerializer<List<User>> = ListSerializer(User.serializer())
+    override val path: Path = Path.of(configPath, "user.json")
 
     init {
         Runtime.getRuntime().addShutdownHook(Thread {
@@ -313,6 +316,7 @@ class UserConfig(
 
 }
 
+@Serializable
 data class User(
     val tg: Long? = null,
     val qq: Long? = null,
@@ -322,6 +326,7 @@ data class User(
     var status: HashSet<UserStatus> = HashSet(),
 )
 
+@Serializable
 enum class UserStatus {
     ADMIN,
     SUPER_ADMIN,

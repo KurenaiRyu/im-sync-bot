@@ -1,18 +1,11 @@
 package kurenai.imsyncbot.bot.qq
 
 import it.tdlight.jni.TdApi
-import it.tdlight.jni.TdApi.InputFileLocal
-import it.tdlight.jni.TdApi.InputMessageAnimation
-import it.tdlight.jni.TdApi.InputMessageContent
-import it.tdlight.jni.TdApi.InputMessageDocument
-import it.tdlight.jni.TdApi.InputMessagePhoto
-import it.tdlight.jni.TdApi.InputMessageVideo
-import it.tdlight.jni.TdApi.SendMessageAlbum
+import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -25,20 +18,18 @@ import kurenai.imsyncbot.utils.BotUtil.formatUsername
 import kurenai.imsyncbot.utils.TelegramUtil.asFmtText
 import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
 import kurenai.imsyncbot.utils.TelegramUtil.fmt
+import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.md5
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.contact.*
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.GroupTempMessageEvent
 import net.mamoe.mirai.message.data.*
-import net.mamoe.mirai.message.data.ForwardMessage
-import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.utils.MiraiExperimentalApi
 import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
 import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
 import nl.adaptivity.xmlutil.serialization.XML
 import nl.adaptivity.xmlutil.serialization.XmlSerializationPolicy
-import org.apache.logging.log4j.LogManager
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 import java.nio.file.Path
@@ -92,7 +83,7 @@ sealed class MessageContext(
     }
 }
 
-private val log = LogManager.getLogger()
+private val log = getLogger()
 
 private val json = Json {
     encodeDefaults = false

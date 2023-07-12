@@ -1,22 +1,16 @@
 package kurenai.imsyncbot.bot.qq
 
 import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import it.tdlight.jni.TdApi.EditMessageCaption
-import it.tdlight.jni.TdApi.EditMessageText
-import it.tdlight.jni.TdApi.InputMessageText
-import it.tdlight.jni.TdApi.MessageText
-import it.tdlight.jni.TdApi.TextEntity
-import it.tdlight.jni.TdApi.TextEntityTypeStrikethrough
+import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.TelegramUtil.textOrCaption
 import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
 import kurenai.imsyncbot.utils.TelegramUtil.fmt
+import kurenai.imsyncbot.utils.TelegramUtil.textOrCaption
 import kurenai.imsyncbot.utils.TelegramUtil.userSender
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.contact.remarkOrNameCardOrNick
@@ -32,8 +26,6 @@ class QQMessageHandler(
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
     private var enableRecall = configProperties.bot.enableRecall
-    private val mapper = jacksonObjectMapper()
-        .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
 
     init {
         if (configProperties.bot.tgMsgFormat.contains("\$msg")) tgMsgFormat = configProperties.bot.tgMsgFormat
@@ -52,7 +44,7 @@ class QQMessageHandler(
             }.recoverCatching {
                 resolvedContext.normalType.send()
             }.getOrThrow().also { messages ->
-                log.debug("${context.infoString} Sent ${mapper.writeValueAsString(messages)}")
+                log.debug("{} Sent {}", context.infoString, messages)
                 if (context.entity == null) return@also
                 CoroutineScope(bot.coroutineContext).launch {
                     MessageService.cache(context.entity, context.messageChain, messages)

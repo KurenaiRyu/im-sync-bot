@@ -1,7 +1,11 @@
 package kurenai.imsyncbot
 
+import com.charleskorn.kaml.YamlNode
+import com.charleskorn.kaml.yamlMap
+import com.charleskorn.kaml.yamlScalar
 import kotlinx.serialization.Serializable
-import kurenai.imsyncbot.utils.yamlMapper
+import kotlinx.serialization.encodeToString
+import kurenai.imsyncbot.utils.yaml
 import net.mamoe.mirai.utils.BotConfiguration
 import java.io.File
 import java.net.Proxy
@@ -23,13 +27,14 @@ fun loadConfig(file: File): ConfigProperties? {
         }.recover {
             file.copyTo(File("${file.absolutePath}-${System.currentTimeMillis()}.bak"), false)
         }
-        yamlMapper.writerWithDefaultPrettyPrinter().writeValue(file, config)
+        file.writeText(yaml.encodeToString(config))
     }
-    val jsonNode = yamlMapper.readTree(text)
-    return when (jsonNode.get("version")?.asInt(0) ?: 0) {
-        2 -> yamlMapper.treeToValue(jsonNode, ConfigProperties::class.java)
+    val node = yaml.parseToYamlNode(text)
+
+    return when (node.yamlMap.get<YamlNode>("version")?.yamlScalar?.toInt() ?: 0) {
+        2 -> yaml.decodeFromYamlNode(ConfigProperties.serializer(), node)
         1 -> runCatching {
-            yamlMapper.treeToValue(jsonNode, ConfigPropertiesV1::class.java).migration().also {
+            yaml.decodeFromYamlNode(ConfigPropertiesV1.serializer(), node).migration().also {
                 doBackup(it)
             }
         }.onFailure {
@@ -37,9 +42,9 @@ fun loadConfig(file: File): ConfigProperties? {
         }.getOrNull()
 
         0 -> runCatching {
-            yamlMapper.treeToValue(jsonNode, ConfigProperties::class.java)
+            yaml.decodeFromYamlNode(ConfigProperties.serializer(), node)
         }.recover {
-            yamlMapper.treeToValue(jsonNode, ConfigPropertiesV1::class.java).migration()
+            yaml.decodeFromYamlNode(ConfigPropertiesV1.serializer(), node).migration()
         }.getOrNull()?.also {
             doBackup(it)
         }

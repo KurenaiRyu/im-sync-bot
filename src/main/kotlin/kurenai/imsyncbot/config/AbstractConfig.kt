@@ -1,23 +1,15 @@
 package kurenai.imsyncbot.config
 
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import kotlinx.serialization.KSerializer
 import kurenai.imsyncbot.configs
+import kurenai.imsyncbot.utils.json
 import java.nio.file.Path
-import kotlin.io.path.createDirectories
-import kotlin.io.path.createFile
-import kotlin.io.path.exists
-
-val configDefaultMapper: ObjectMapper = jacksonObjectMapper()
-    .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+import kotlin.io.path.*
 
 abstract class AbstractConfig<T> {
 
-    open val mapper = configDefaultMapper
-    abstract val items: ArrayList<T>
-    protected abstract val typeRef: TypeReference<ArrayList<T>>
+    abstract val items: MutableList<T>
+    protected abstract val serializer: KSerializer<List<T>>
     abstract val path: Path
 
     init {
@@ -29,7 +21,7 @@ abstract class AbstractConfig<T> {
             path.parent.createDirectories()
             path.createFile()
         }
-        mapper.writeValue(path.toFile(), items)
+        path.writeText(json.encodeToString(serializer, items))
         refresh()
     }
 
@@ -37,7 +29,7 @@ abstract class AbstractConfig<T> {
 
     fun load(file: Path = this.path) {
         if (file.exists()) {
-            val configs = mapper.readValue(file.toFile(), typeRef)
+            val configs = json.decodeFromString(serializer, file.readText())
             if (configs.isNotEmpty()) {
                 items.clear()
                 items.addAll(configs)

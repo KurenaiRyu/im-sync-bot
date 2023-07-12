@@ -1,14 +1,15 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.springframework.boot") version "3.1.0"
+    id("org.springframework.boot") version "3.1.1"
     id("io.spring.dependency-management") version "1.1.0"
-    kotlin("jvm") version "1.8.21"
-    kotlin("plugin.spring") version "1.8.21"
-    kotlin("plugin.serialization") version "1.8.21"
-    kotlin("plugin.allopen") version "1.8.21"
-    kotlin("plugin.noarg") version "1.8.21"
-    kotlin("plugin.jpa") version "1.8.21"
+    id("org.graalvm.buildtools.native") version "0.9.23"
+    kotlin("jvm") version "1.8.22"
+    kotlin("plugin.spring") version "1.8.22"
+    kotlin("plugin.serialization") version "1.8.22"
+    kotlin("plugin.allopen") version "1.8.22"
+    kotlin("plugin.noarg") version "1.8.22"
+    kotlin("plugin.jpa") version "1.8.22"
 }
 
 group = "moe.kurenai.bot"
@@ -22,7 +23,8 @@ repositories {
 
 configurations {
     all {
-        exclude("org.springframework.boot", "spring-boot-starter-logging")
+//        exclude("org.springframework.boot", "spring-boot-starter-logging")
+        exclude("org.apache.logging.log4j", "log4j-api")
     }
 }
 
@@ -42,16 +44,18 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
+    implementation("org.springframework.boot:spring-boot-starter-logging")
+//    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
     implementation("org.jetbrains.kotlinx:atomicfu:0.20.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.21")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.2")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2")
+//    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.2")
+//    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2")
+    implementation("com.charleskorn.kaml:kaml:0.54.0")
 
     implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
 
     //db
-    runtimeOnly("com.h2database:h2")
+    implementation("com.h2database:h2")
 
     //discord
     implementation("dev.kord:kord-core:${Versions.kord}")
@@ -80,15 +84,18 @@ dependencies {
 
     implementation("io.ktor:ktor-client-core:${Versions.ktor}")
     implementation("io.ktor:ktor-client-okhttp:${Versions.ktor}")
+//    implementation("io.ktor:ktor-client-cio:${Versions.ktor}")
 
     //cache
     implementation("com.sksamuel.aedile:aedile-core:1.2.0")
 
     //logging
-    implementation("org.apache.logging.log4j:log4j-core:${Versions.log4j}")
-    implementation("org.apache.logging.log4j:log4j-api:${Versions.log4j}")
-    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:${Versions.log4j}")
-    implementation("com.lmax:disruptor:3.4.4")
+//    implementation("org.apache.logging.log4j:log4j-core:${Versions.log4j}")
+//    implementation("org.apache.logging.log4j:log4j-api:${Versions.log4j}")
+//    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:${Versions.log4j}")
+//    implementation("com.lmax:disruptor:3.4.4")
+
+//    implementation("ch.qos.logback:logback-classic:1.3.0-alpha16")
 
     //xml
     implementation("io.github.pdvrieze.xmlutil:core-jvm:0.84.3")
@@ -122,12 +129,19 @@ allOpen {
 
 noArg {
     annotation("javax.persistence.Entity")
+    annotation("org.springframework.stereotype.Service")
+    annotation("kurenai.imsyncbot.annotation.NoArg")
+    annotation("org.springframework.stereotype.Component")
 }
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 }
+
+//graalvmNative {
+//    toolchainDetection.set(true)
+//}
 
 tasks.withType<KotlinCompile> {
     kotlinOptions {

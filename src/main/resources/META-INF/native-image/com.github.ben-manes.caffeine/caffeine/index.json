@@ -1,0 +1,10 @@
+[
+  {
+    "latest": true,
+    "metadata-version": "3.1.6",
+    "module": "com.github.ben-manes.caffeine:caffeine",
+    "tested-versions": [
+      "3.1.6"
+    ]
+  }
+]

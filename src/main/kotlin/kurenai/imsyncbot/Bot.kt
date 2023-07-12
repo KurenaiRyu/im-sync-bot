@@ -60,7 +60,9 @@ suspend fun start() {
 fun loadInstants() = File("./config")
     .walk()
     .mapNotNull { file ->
+        log.info("Find config file {}", file.path)
         if ((file.name == "config.yaml" || file.name == "config.yml") && !file.parentFile.name.startsWith('.')) {
+            log.info("Find config yaml file {}", file.path)
             loadConfig(file)?.takeIf { it.enable }?.let { file.parentFile.path to it }
         } else null
     }

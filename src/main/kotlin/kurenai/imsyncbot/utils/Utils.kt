@@ -1,13 +1,13 @@
 package kurenai.imsyncbot.utils
 
+import com.charleskorn.kaml.Yaml
+import com.charleskorn.kaml.YamlConfiguration
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
-import com.fasterxml.jackson.module.kotlin.KotlinFeature
-import com.fasterxml.jackson.module.kotlin.kotlinModule
 import io.ktor.client.*
 import it.tdlight.jni.TdApi
 import kotlinx.coroutines.*
@@ -167,15 +167,4 @@ val json = Json {
     prettyPrint = true
 }
 
-val yamlMapper = ObjectMapper(
-    YAMLFactory().disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
-).registerModule(kotlinModule {
-    withReflectionCacheSize(512)
-    configure(KotlinFeature.NullToEmptyCollection, false)
-    configure(KotlinFeature.NullToEmptyMap, false)
-    configure(KotlinFeature.NullIsSameAsDefault, false)
-    configure(KotlinFeature.SingletonSupport, false)
-    configure(KotlinFeature.StrictNullChecks, false)
-}).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-    .setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
-    .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+val yaml = Yaml(configuration = YamlConfiguration(strictMode = false))

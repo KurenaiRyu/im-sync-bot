@@ -2,6 +2,9 @@ package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
 import it.tdlight.jni.TdApi.Message
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kurenai.imsyncbot.ImSyncBot
 import java.nio.file.Path
 
@@ -21,7 +24,7 @@ class GroupConfig(
     var filterGroups = emptyList<Long>()
     override val items = ArrayList<Group>()
     override val path = Path.of(configPath, "group.json")
-    override val typeRef = object : TypeReference<ArrayList<Group>>() {}
+    override val serializer: KSerializer<List<Group>> = ListSerializer(Group.serializer())
 
     init {
         Runtime.getRuntime().addShutdownHook(Thread {
@@ -153,6 +156,7 @@ class GroupConfig(
 
 }
 
+@Serializable
 data class Group(
     val tg: Long,
     val qq: Long,

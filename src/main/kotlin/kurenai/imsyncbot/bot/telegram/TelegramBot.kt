@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.bot.telegram
 
 import com.sksamuel.aedile.core.caffeineBuilder
+import it.tdlight.ConstructorDetector
 import it.tdlight.client.*
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
@@ -19,6 +20,7 @@ import kurenai.imsyncbot.utils.TelegramUtil.userSender
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.withIO
 import okhttp3.internal.toHexString
+import org.springframework.context.annotation.Configuration
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
@@ -107,6 +109,22 @@ class TelegramBot(
             isChatInfoDatabaseEnabled = true
             isMessageDatabaseEnabled = true
         }
+//        val declaredClasses = TdApi::class.java.declaredClasses
+//        log.info("Find TdApi ${declaredClasses.size} classes")
+//        ConstructorDetector::class.java
+//        val method =
+//            ConstructorDetector::class.java.getDeclaredMethod("setConstructorHashMap", declaredClasses::class.java)
+//        method.trySetAccessible()
+//        method.invoke(null, declaredClasses)
+//        val field = ConstructorDetector::class.java.getDeclaredField("constructorHashMapInverse")
+//        field.trySetAccessible()
+//        val constructorHashMapInverse = field.get(null) as IdentityHashMap<Class<out TdApi.Object>, Int>
+//        log.info("Find map ${constructorHashMapInverse.size} classes")
+//        val constructor: Int? = constructorHashMapInverse[UpdateAuthorizationState::class.java]
+//        if (constructor == null) {
+//            log.info("UpdateAuthorizationState not found.")
+//            log.info("Map has: \n{}", constructorHashMapInverse.keys.map { it.simpleName })
+//        }
         client =
             SimpleTelegramClientFactory().builder(settings).build(AuthenticationSupplier.bot(telegramProperties.token))
         client.addUpdateHandler(UpdateAuthorizationState::class.java) { update ->
