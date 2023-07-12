@@ -59,8 +59,8 @@ dependencies {
 
     //mirai
     implementation(platform("net.mamoe:mirai-bom:${Versions.mirai}"))
-    compileOnly("net.mamoe:mirai-core")
-    compileOnly("net.mamoe:mirai-core-utils")
+    implementation("net.mamoe:mirai-core")
+    implementation("net.mamoe:mirai-core-utils")
 //    implementation("net.mamoe", "mirai-core", miraiVersion)
 //    implementation("net.mamoe", "mirai-core-api", miraiVersion)
 //    implementation("net.mamoe", "mirai-core-utils", miraiVersion)
