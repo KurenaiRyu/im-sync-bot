@@ -3,12 +3,14 @@ package kurenai.imsyncbot.command
 import com.google.common.base.CaseFormat
 import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
+import kurenai.imsyncbot.config.Permission
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.qqCommands
 import kurenai.imsyncbot.tgCommands
 import kurenai.imsyncbot.utils.ParseMode
 import kurenai.imsyncbot.utils.TelegramUtil.text
+import kurenai.imsyncbot.utils.TelegramUtil.userSender
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.event.events.MessageEvent
 
@@ -38,7 +40,13 @@ object CommandDispatcher {
         for (cmd in tgCommands) {
             if (cmd.command.lowercase() == command.lowercase()) {
                 log.info("Match ${cmd.name}")
-                val isSupperAdmin = bot.userConfig.superAdmins.contains(sender.userId)
+                val permission = bot.userConfig.getPermission(
+                    bot.tg.getUser(
+                        message.userSender()?.userId ?: error("非用户无权限调用")
+                    )
+                )
+                val permissionLevel = permission.level
+                val isSupperAdmin = permissionLevel <= Permission.SUPPER_ADMIN.level
                 val input = content.text.text.substring(commandEntity.length).trim()
                 responseMsg = if (isSupperAdmin && input == "ban") {
                     handleBan(bot, message.chatId, cmd)
@@ -50,11 +58,11 @@ object CommandDispatcher {
                     log.debug("Command was banned for group[${message.chatId}(${message.chatId})].")
                     return
                 } else {
-                    if (cmd.onlyMaster && bot.userConfig.masterTg != sender.userId) {
+                    if (cmd.onlyMaster && permission != Permission.MASTER) {
                         "该命令只允许主人执行"
                     } else if (cmd.onlySupperAdmin && !isSupperAdmin) {
                         "该命令只允许超级管理员执行"
-                    } else if (cmd.onlyAdmin && !bot.userConfig.admins.contains(sender.userId)) {
+                    } else if (cmd.onlyAdmin && permissionLevel > Permission.ADMIN.level) {
                         "该命令只允许管理员执行"
                     } else if (cmd.onlyUserMessage && typeConstructor != ChatTypePrivate.CONSTRUCTOR) {
                         "该命令只允许私聊执行"

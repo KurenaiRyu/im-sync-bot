@@ -1,7 +1,10 @@
 package kurenai.imsyncbot.config
 
 import com.fasterxml.jackson.core.type.TypeReference
+import it.tdlight.jni.TdApi
 import kurenai.imsyncbot.ConfigProperties
+import kurenai.imsyncbot.utils.TelegramUtil.isBot
+import kurenai.imsyncbot.utils.TelegramUtil.username
 import java.nio.file.Path
 
 /**
@@ -17,7 +20,6 @@ class UserConfig(
 
     var masterTg: Long = configProperties.bot.masterOfTg
     var masterQQ: Long = configProperties.bot.masterOfQq
-    var masterChatId: Long = 0
     var masterUsername: String = ""
 
     var defaultChatId = configProperties.bot.privateChat
@@ -33,7 +35,7 @@ class UserConfig(
     var admins = emptyList<Long>()
     var superAdmins = emptyList<Long>()
     override val items = ArrayList<User>()
-    override val path = Path.of(configPath, "user.json")
+    override val path: Path = Path.of(configPath, "user.json")
     override val typeRef = object : TypeReference<ArrayList<User>>() {}
 
     init {
@@ -182,22 +184,33 @@ class UserConfig(
         afterUpdate()
     }
 
-//    fun setMaster(message: Message) {
-//        val master = items.firstOrNull { it.status.contains(UserStatus.ADMIN) }
-//        if (master == null) {
-//            items.add(User(masterTg, masterQQ, message.from?.firstName, chatId = message.chat.id, status = hashSetOf(UserStatus.MASTER)))
-//        } else {
-//
-//            message.userSender()?.userId?.firstName?.let {
-//                if (master.username == null) {
-//                    master.username = it
-//                    masterUsername = it
-//                }
-//            }
-//            masterChatId = message.chat.id
-//            master.chatId = message.chat.id
-//        }
-//    }
+    fun isQQMaster(id: Long) = masterQQ == id
+
+    fun getPermission(user: TdApi.User?): Permission {
+        return if (user == null || user.isBot()) Permission.NORMAL
+        else if (masterTg == user.id
+            || masterUsername == user.username()
+        ) Permission.MASTER
+        else if (user.id.let(superAdmins::contains)) Permission.SUPPER_ADMIN
+        else if (user.id.let(admins::contains)) Permission.ADMIN
+        else Permission.NORMAL
+    }
+
+    fun setMaster(message: TdApi.Message) {
+        val master = items.firstOrNull { it.status.contains(UserStatus.ADMIN) }
+        if (master == null) {
+            items.add(
+                User(
+                    masterTg,
+                    masterQQ,
+                    chatId = message.chatId,
+                    status = hashSetOf(UserStatus.MASTER)
+                )
+            )
+        } else {
+            master.chatId = message.chatId
+        }
+    }
 
     override fun refresh() {
         val ids = HashMap<Long, String>()
@@ -251,7 +264,6 @@ class UserConfig(
 
                     UserStatus.MASTER -> {
                         config.username?.let { masterUsername = it }
-                        config.chatId?.let { masterChatId = it }
                     }
                 }
             }
@@ -311,6 +323,10 @@ class UserConfig(
         this.items.addAll(configs)
     }
 
+}
+
+enum class Permission(val level: Int) {
+    ADMIN(30), SUPPER_ADMIN(20), MASTER(1), NORMAL(1000)
 }
 
 data class User(

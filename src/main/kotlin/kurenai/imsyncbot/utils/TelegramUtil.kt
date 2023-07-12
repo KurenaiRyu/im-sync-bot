@@ -127,6 +127,8 @@ object TelegramUtil {
     }
 
     fun User.username() = this.usernames.activeUsernames.firstOrNull() ?: this.id.toString()
+
+    fun User.isBot() = this.type.constructor == UserTypeBot.CONSTRUCTOR
 }
 
 enum class ParseMode(val ins: TextParseMode?) {
