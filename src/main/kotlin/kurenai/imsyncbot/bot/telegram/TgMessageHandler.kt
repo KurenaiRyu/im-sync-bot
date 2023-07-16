@@ -2,23 +2,22 @@ package kurenai.imsyncbot.bot.telegram
 
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.Running
 import kurenai.imsyncbot.command.CommandDispatcher
-import kurenai.imsyncbot.bot.discord.DiscordBot
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil
+import kurenai.imsyncbot.utils.TelegramUtil.idString
 import kurenai.imsyncbot.utils.TelegramUtil.userSender
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.message.sourceIds
-import net.mamoe.mirai.message.sourceMessage
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
 import it.tdlight.client.Result as TdResult
 
@@ -38,7 +37,7 @@ class TgMessageHandler(
         if (bot.configProperties.bot.qqMsgFormat.contains("\$msg")) qqMsgFormat = bot.configProperties.bot.qqMsgFormat
     }
 
-    fun handle(update: Update) = CoroutineScope(bot.tg.coroutineContext).launch {
+    fun handle(update: Update) = bot.tg.launch(CoroutineName(update.idString())) {
         TelegramBot.log.trace("Incoming update: {}", update.toString().trim())
         val status = bot.tg.status.value
         if (status != Running) {
@@ -75,7 +74,6 @@ class TgMessageHandler(
                             )
                         }
                     }.onFailure { it.printStackTrace() }
-
 
                     bot.tg.disposableHandlers.forEach {
                         if (it.handle(bot, update.message)) {
@@ -207,7 +205,7 @@ class TgMessageHandler(
     }
 
     private suspend fun onEditMessage(update: UpdateMessageContent): Int {
-        if (!bot.groupConfig.tgQQ.containsKey(update.chatId)) {
+        if (!bot.groupConfigService.tgQQ.containsKey(update.chatId)) {
             return CONTINUE
         }
 
@@ -222,15 +220,16 @@ class TgMessageHandler(
         return onMessage(message)
     }
 
+    @Suppress("SameReturnValue")
     @Throws(Exception::class)
     suspend fun onMessage(message: TdApi.Message): Int {
 
         val userSender = message.userSender()
-        if (!bot.groupConfig.tgQQ.containsKey(message.chatId)) {
+        if (!bot.groupConfigService.tgQQ.containsKey(message.chatId)) {
             log.info("ignore no configProperties group")
             return CONTINUE
         }
-        if (bot.groupConfig.bannedGroups.contains(message.chatId)) {
+        if (bot.groupConfigService.bannedGroups.contains(message.chatId)) {
             log.info("ignore banned group")
             return CONTINUE
         }
@@ -240,9 +239,9 @@ class TgMessageHandler(
         }
 
         val quoteMsgChain = MessageService.findQQByTg(message.chatId, message.replyToMessageId)
-        val groupId = quoteMsgChain?.source?.targetId ?: bot.groupConfig.tgQQ.getOrDefault(
+        val groupId = quoteMsgChain?.source?.targetId ?: bot.groupConfigService.tgQQ.getOrDefault(
             message.chatId,
-            bot.groupConfig.defaultQQGroup
+            bot.groupConfigService.defaultQQGroup
         )
         if (groupId == 0L) return CONTINUE
         val group = bot.qq.qqBot.getGroup(groupId)
@@ -334,165 +333,6 @@ class TgMessageHandler(
             }.onFailure {
                 log.warn("Cache message error", it)
             }
-        }
-
-        when {
-//            message.hasVoice() -> CoroutineScope(coroutineContext).launch {
-//                val voice = message.voice!!
-//                val file = getTgFile(voice.fileId, voice.fileUniqueId)
-//                uploadAndSend(group, file)
-//                if (!isMaster) group.sendMessage("Upload by $senderName.")
-//                if (caption.isNotBlank()) {
-//                    val builder = MessageChainBuilder()
-//                    formatMsgAndQuote(
-//                        quoteMsgChain,
-//                        isMaster,
-//                        senderId,
-//                        senderName,
-//                        message.captionEntities,
-//                        message.caption,
-//                        builder
-//                    )
-//                    MessageService.cache(group.sendMessage(builder.build()), message)
-//                }
-//            }
-//
-//            message.hasVideo() -> CoroutineScope(coroutineContext).launch {
-//                val video = message.video!!
-//                val file = getTgFile(video.fileId, video.fileUniqueId)
-//                uploadAndSend(group, file, video.fileId + ".mp4")
-//                if (!isMaster) group.sendMessage("Upload by $senderName.")
-//                if (caption.isNotBlank()) {
-//                    val builder = MessageChainBuilder()
-//                    formatMsgAndQuote(
-//                        quoteMsgChain,
-//                        isMaster,
-//                        senderId,
-//                        senderName,
-//                        message.captionEntities,
-//                        message.caption,
-//                        builder
-//                    )
-//                    MessageService.cache(group.sendMessage(builder.build()), message)
-//                }
-//            }
-//
-//            message.hasAnimation() -> CoroutineScope(coroutineContext).launch {
-//                val builder = MessageChainBuilder()
-//                val animation = message.animation!!
-//                val tgFile = getTgFile(animation.fileId, animation.fileUniqueId)
-//                if ((animation.fileSize ?: 0) > 800 * 1024) {
-//                    uploadAndSend(group, getTgFile(animation.fileId, "${animation.fileUniqueId}.mp4"))
-//                    if (!isMaster) group.sendMessage("Upload by $senderName.")
-//                    if (caption.isNotBlank()) {
-//                        formatMsgAndQuote(
-//                            quoteMsgChain,
-//                            isMaster,
-//                            senderId,
-//                            senderName,
-//                            message.captionEntities,
-//                            message.caption,
-//                            builder
-//                        )
-//                        MessageService.cache(group.sendMessage(builder.build()), message)
-//                    }
-//                } else {
-//                    BotUtil.mp42gif(animation.width, tgFile).let { gifFile ->
-//                        gifFile.toFile().toExternalResource().use {
-//                            builder.add(group.uploadImage(it))
-//                            formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
-//                            MessageService.cache(group.sendMessage(builder.build()), message)
-//                        }
-//                    }
-//                }
-//            }
-
-
-//            message.hasSticker() -> {
-//                val sticker = message.sticker!!
-//                val builder = MessageChainBuilder()
-//                if (sticker.isVideo) {
-//                    BotUtil.mp42gif(sticker.width, getTgFile(sticker.fileId, sticker.fileUniqueId)).let { gifFile ->
-//                        gifFile.toFile().toExternalResource().use {
-//                            builder.add(group.uploadImage(it))
-//                            formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
-//                            MessageService.cache(group.sendMessage(builder.build()), message)
-//                        }
-//                    }
-//                } else {
-//                    if (sticker.isAnimated) {
-//                        formatMsgAndQuote(
-//                            quoteMsgChain,
-//                            isMaster,
-//                            senderId,
-//                            senderName,
-//                            sticker.emoji ?: "NaN",
-//                            builder
-//                        )
-//                    } else {
-//                        getImage(group, sticker.fileId, sticker.fileUniqueId)?.let(builder::add)
-//                        formatMsgAndQuote(quoteMsgChain, isMaster, senderId, senderName, StringPool.EMPTY, builder)
-//                    }
-//                    group.sendMessage(builder.build()).let {
-//                        MessageService.cache(it, message)
-//                    }
-//                }
-//            }
-
-//            message.hasDocument() -> CoroutineScope(coroutineContext).launch {
-//                val document = message.document!!
-//                val file = getTgFile(document.fileId, document.fileUniqueId)
-//                uploadAndSend(group, file, document.fileName ?: document.fileId)
-//                if (!isMaster) group.sendMessage("Upload by $senderName.")
-//                if (caption.isNotBlank()) {
-//                    val builder = MessageChainBuilder()
-//                    formatMsgAndQuote(
-//                        quoteMsgChain,
-//                        isMaster,
-//                        senderId,
-//                        senderName,
-//                        message.captionEntities,
-//                        message.caption,
-//                        builder
-//                    )
-//                    MessageService.cache(group.sendMessage(builder.build()), message)
-//                }
-//            }
-
-//            message.hasPhoto() -> {
-//                val builder = MessageChainBuilder()
-//                message.photo!!.groupBy { it.fileId.substring(0, 40) }
-//                    .mapNotNull { (_: String, photoSizes: List<PhotoSize>) ->
-//                        photoSizes.maxByOrNull {
-//                            it.fileSize ?: 0
-//                        }
-//                    }
-//                    .mapNotNull { getImage(group, it.fileId, it.fileUniqueId) }.forEach(builder::add)
-//                formatMsgAndQuote(
-//                    quoteMsgChain,
-//                    isMaster,
-//                    senderId,
-//                    senderName,
-//                    message.captionEntities,
-//                    message.caption,
-//                    builder
-//                )
-//                MessageService.cache(group.sendMessage(builder.build()), message)
-//            }
-
-//            message.hasText() -> {
-//                val builder = MessageChainBuilder()
-//                formatMsgAndQuote(
-//                    quoteMsgChain,
-//                    isMaster,
-//                    senderId,
-//                    senderName,
-//                    message.entities,
-//                    message.text,
-//                    builder
-//                )
-//                MessageService.cache(group.sendMessage(builder.build()), message)
-//            }
         }
         return CONTINUE
     }

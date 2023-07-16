@@ -129,6 +129,28 @@ object TelegramUtil {
     fun User.username() = this.usernames.activeUsernames.firstOrNull() ?: this.id.toString()
 
     fun User.isBot() = this.type.constructor == UserTypeBot.CONSTRUCTOR
+
+    fun Update.idString() = when (this) {
+        is UpdateNewMessage -> {
+            "${this::class.simpleName}[${this.message.chatId}:${this.message.id}]"
+        }
+
+        is UpdateMessageContent -> {
+            "${this::class.simpleName}[${this.chatId}:${this.messageId}]"
+        }
+
+        is UpdateNewInlineQuery -> {
+            "${this::class.simpleName}[${this.id}]"
+        }
+
+        is UpdateMessageEdited -> {
+            "${this::class.simpleName}[${this.chatId}:${this.messageId}]"
+        }
+
+        else -> {
+            this::class.simpleName ?: "UnknownUpdateType"
+        }
+    }
 }
 
 enum class ParseMode(val ins: TextParseMode?) {

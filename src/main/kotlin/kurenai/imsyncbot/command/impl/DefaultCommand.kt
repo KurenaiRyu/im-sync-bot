@@ -16,7 +16,7 @@ class DefaultCommand : AbstractTelegramCommand() {
         sender: TdApi.MessageSenderUser,
         input: String
     ): String {
-        return if (bot.groupConfig.default(message))
+        return if (bot.groupConfigService.defaultGroup(message))
             "设置默认群成功"
         else
             "已撤销当前群作为默认群"

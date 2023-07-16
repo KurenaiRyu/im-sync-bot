@@ -6,9 +6,9 @@ import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kurenai.imsyncbot.*
+import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.ParseMode
@@ -34,22 +34,20 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * 机器人实例
+ * Telegram 机器人实例
  * @author Kurenai
  * @since 2021-06-30 14:05
  */
 
 lateinit var defaultTelegramBot: TelegramBot
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class TelegramBot(
-    parentCoroutineContext: CoroutineContext,
-    internal val telegramProperties: TelegramProperties,
+    private val telegramProperties: TelegramProperties,
     internal val bot: ImSyncBot,
-) {
+) : CoroutineScope {
 
     companion object {
-        val log = getLogger()
+        internal val log = getLogger()
     }
 
     private lateinit var apiToken: APIToken
@@ -57,26 +55,24 @@ class TelegramBot(
     // Configure the client
     private lateinit var settings: TDLibSettings
 
-    lateinit var client: SimpleTelegramClient
+    private lateinit var client: SimpleTelegramClient
 
-    val messageHandler: TgMessageHandler = TgMessageHandler(bot)
+    private val messageHandler: TgMessageHandler = TgMessageHandler(bot)
 
-    //发送消息
-    internal val messageOutChannel = Channel<ChannelMessage<*>>()
+    override val coroutineContext = bot.coroutineContext
+        .plus(CoroutineName("TelegramBot"))
+        .plus(SupervisorJob(bot.coroutineContext[Job]))
+        .plus(CoroutineExceptionHandler { context, ex ->
+            when (ex) {
+                is CancellationException -> {
+                    log.warn("{} was cancelled", context[CoroutineName])
+                }
 
-    //接收消息
-    private val updateMessageChannel = Channel<Update>()
-
-    val coroutineContext = parentCoroutineContext + CoroutineName("TelegramBot")
-
-    @OptIn(DelicateCoroutinesApi::class)
-    private val workerContext = newFixedThreadPoolContext(10, "${telegramProperties.username}-worker")
-    private val handlerContext = coroutineContext + workerContext.limitedParallelism(9)
-
-    val updateContext =
-        coroutineContext + workerContext.limitedParallelism(1) + CoroutineName("TelegramHandleUpdate")
-    val sendMessageContext =
-        coroutineContext + workerContext.limitedParallelism(1) + CoroutineName("TelegramSendMessage")
+                else -> {
+                    log.warn("with {}", context[CoroutineName], ex)
+                }
+            }
+        })
 
     val status = MutableStateFlow<BotStatus>(Initializing)
     val token: String = telegramProperties.token
@@ -84,16 +80,16 @@ class TelegramBot(
     val disposableHandlers = LinkedList<TelegramDisposableHandler>()
 
     val editedMessages = caffeineBuilder<String, Boolean> {
-        maximumSize = 200
-        expireAfterWrite = 5.minutes
+        maximumSize = 50
+        expireAfterWrite = 1.minutes
     }.build()
 
     val pendingMessage = caffeineBuilder<Long, CancellableContinuation<it.tdlight.client.Result<Object>>> {
-        maximumSize = 200
-        expireAfterWrite = 5.minutes
+        maximumSize = 50
+        expireAfterWrite = 1.minutes
     }.build()
 
-    suspend fun start() {
+    fun start() {
         apiToken = APIToken(
             telegramProperties.apiId ?: 94575,
             telegramProperties.apiHash ?: "a3406de8d171bb422bb6ddf3bbd800e2"
@@ -115,7 +111,7 @@ class TelegramBot(
                 status.update { Running }
                 if (!::defaultTelegramBot.isInitialized) defaultTelegramBot = this@TelegramBot
                 client.addUpdatesHandler(messageHandler::handle)
-                CoroutineScope(coroutineContext).launch {
+                launch {
                     updateCommand()
                 }
             }
@@ -278,7 +274,6 @@ class TelegramBot(
         timeout: Duration = 5.seconds
     ): R = send(untilPersistent, timeout) { func }
 
-    @Suppress("UNCHECKED_CAST")
     suspend fun <R : Object> send(
         untilPersistent: Boolean = false,
         timeout: Duration = 5.seconds,
@@ -287,30 +282,34 @@ class TelegramBot(
         contract {
             callsInPlace(block, InvocationKind.EXACTLY_ONCE)
         }
-        val result = suspendCancellableCoroutine<it.tdlight.client.Result<R>> { con ->
-            CoroutineScope(coroutineContext).launch {
-                client.send(block.invoke()) { result ->
-                    if (untilPersistent && !result.isError) {
-                        val obj = result.get()
-                        if ((obj as? Message)?.sendingState?.constructor == MessageSendingStatePending.CONSTRUCTOR) {
-                            pendingMessage[obj.id] = con as CancellableContinuation<it.tdlight.client.Result<Object>>
+
+        return withContext(this.coroutineContext) {
+            val result = suspendCancellableCoroutine<it.tdlight.client.Result<R>> { con ->
+                launch {
+                    client.send(block.invoke()) { result ->
+                        if (untilPersistent && !result.isError) {
+                            val obj = result.get()
+                            if ((obj as? Message)?.sendingState?.constructor == MessageSendingStatePending.CONSTRUCTOR) {
+                                pendingMessage[obj.id] =
+                                    con as CancellableContinuation<it.tdlight.client.Result<Object>>
+                            } else {
+                                con.resumeWith(Result.success(result))
+                            }
                         } else {
                             con.resumeWith(Result.success(result))
                         }
-                    } else {
-                        con.resumeWith(Result.success(result))
                     }
+                    delay(timeout)
+                    if (con.isActive) con.resumeWith(Result.failure(BotException("Telegram client timeout in $timeout s")))
                 }
-                delay(timeout)
-                if (con.isActive) con.resumeWith(Result.failure(BotException("Telegram client timeout in $timeout s")))
             }
-        }
-        return if (result.isError && result.error.message.contains("retry after")) {
-            val seconds = result.error.message.substringAfterLast(" ").toLongOrNull() ?: 200
-            delay(seconds * 1000)
-            send(untilPersistent, timeout, block)
-        } else {
-            result.get()
+            return@withContext if (result.isError && result.error.message.contains("retry after")) {
+                val seconds = result.error.message.substringAfterLast(" ").toLongOrNull() ?: 200
+                delay(seconds * 1000)
+                send(untilPersistent, timeout, block)
+            } else {
+                result.get()
+            }
         }
     }
 
@@ -344,170 +343,6 @@ class TelegramBot(
         log.error(it.message, it)
     }
 
-//    @Suppress("UNCHECKED_CAST")
-//    private tailrec suspend fun sendMessage() {
-//        val message = messageOutChannel.receive() as ChannelMessage<Any>
-//        CoroutineScope(sendMessageContext).launch {
-//            var ex: Throwable? = null
-//            var count = 0
-//            var response: Any? = null
-//            try {
-//                while (count <= 0) {
-//                    val request = message.request
-//                    try {
-//                        response = client.send(request, baseUrl = message.baseUrl)
-//                        count++
-//                    } catch (e: Exception) {
-//                        ex?.also { it.addSuppressed(e) } ?: kotlin.run { ex = e }
-//                        when (e) {
-//                            is TelegramApiRequestException -> {
-//                                val retryAfter = e.response?.parameters?.retryAfter
-//                                if (retryAfter != null) {
-//                                    log.info("Wait for ${retryAfter}s")
-//                                    delay(retryAfter * 1000L)
-//                                } else if (e.response?.description?.contains("wrong file identifier/HTTP URL specified") == true) {
-//                                    val inputFile = (request as? SendDocument)?.let {
-//                                        request.document
-//                                    } ?: (request as? SendPhoto)?.let {
-//                                        request.photo
-//                                    } ?: (request as? SendAnimation)?.let {
-//                                        request.animation
-//                                    } ?: (request as? SendAudio)?.let {
-//                                        request.audio
-//                                    }
-//                                    inputFile?.let { file ->
-//                                        log.warn(e.response?.description + ": ${inputFile.attachName}")
-//                                        val filename = file.fileName ?: UUID.randomUUID().toString()
-//                                        BotUtil.downloadImg(
-//                                            file.fileName ?: UUID.randomUUID().toString(),
-//                                            file.attachName
-//                                        ).let {
-//                                            file.file = it.toFile()
-//                                            file.attachName = "attach://${filename}"
-//                                            file.mimeType = Files.probeContentType(it)
-//                                        }
-//                                        response = client.send(request)
-//                                    } ?: kotlin.run {
-//                                        log.warn("消息发送失败", e)
-//                                    }
-//                                    count++
-//                                } else {
-//                                    count++
-//                                    log.warn("消息发送失败", e)
-//                                }
-//                            }
-//
-//                            else -> {
-//                                count++
-//                                log.warn("消息发送失败", e)
-//                            }
-//                        }
-//                    }
-//                }
-//            } catch (e: Exception) {
-//                log.error("Send message error", e)
-//            } finally {
-//                message.result.complete(response?.let {
-//                    Result.success(it)
-//                } ?: Result.failure(ex ?: BotException("异常不应该为空")))
-//            }
-//        }
-//        sendMessage()
-//    }
-
-//    private tailrec suspend fun handleUpdate() {
-//        try {
-//            val update = updateMessageChannel.receive()
-//            CoroutineScope(updateContext).launch {
-//                try {
-//                    disposableHandlers.firstOrNull {
-//                        if (it.timeout.plusMinutes(20).isBefore(LocalTime.now())) {
-//                            disposableHandlers.remove(it)
-//                            false
-//                        } else {
-//                            it.handle(bot, update)
-//                        }
-//                    }?.also {
-//                        disposableHandlers.remove(it)
-//                    } ?: run {
-//                        doHandleUpdate(update)
-//                    }
-//                } catch (e: Exception) {
-//                    val ex = if (e is BotException) e else BotException(
-//                        "处理消息失败: ${e.message ?: e::class.java.simpleName}",
-//                        e
-//                    )
-//                    reportError(
-//                        update,
-//                        ex
-//                    )
-//                }
-//            }
-//        } catch (e: Exception) {
-//            parentCoroutineContext.cancel(CancellationException("Handle update error", e))
-//            throw e
-//        }
-//        handleUpdate()
-//    }
-
-//    suspend fun doHandleUpdate(update: Update) {
-//        log.debug("${update.chatInfoString()}: {}", MAPPER.writeValueAsString(update))
-//        val message = update.message ?: update.editedMessage ?: update.callbackQuery?.message
-//        if (message == null) {
-//            log.debug("No message")
-//            return
-//        }
-//
-//        if (update.hasCallbackQuery()) {
-//            try {
-//                for (callback in callbacks) {
-//                    if (callback.match(update) && callback.handle(update, message) == Callback.END) {
-//                        return
-//                    }
-//                }
-//            } catch (e: Exception) {
-//                reportError(update, e, "执行回调失败")
-//            }
-//        }
-//
-//        if (message.isCommand()) {
-//            coroutineScope {
-//                launch(handlerContext) {
-//                    CommandDispatcher.execute(update, message)
-//                }
-//            }
-////        } else if (update.hasInlineQuery()) {
-////            coroutineScope {
-////                launch(handlerContext) {
-////                    CommandDispatcher.handleInlineQuery(update, update.inlineQuery!!)
-////                }
-////            }
-//        } else if (checkQQBotStatus()) {
-//            if (bot.userConfig.chatIdFriends.containsKey(message.chat.id)) {
-//                bot.tgMessageHandler.onFriendMessage(message)
-//            } else if ((message.isGroupMessage() || message.isSuperGroupMessage())) {
-//                var handled = false
-//                if (update.hasMessage()) {
-//                    for (handler in tgHandlers) {
-//                        if (handler.onMessage(message) == END) {
-//                            handled = true
-//                            break
-//                        }
-//                    }
-//                    if (!handled) bot.tgMessageHandler.onMessage(message)
-//                } else if (update.hasEditedMessage()) {
-//                    for (handler in tgHandlers) {
-//                        if (handler.onEditMessage(update.editedMessage!!) == END) {
-//                            handled = true
-//                            break
-//                        }
-//                    }
-//                    if (!handled) bot.tgMessageHandler.onEditMessage(update.editedMessage!!)
-//                }
-//            }
-//        }
-//    }
-
     suspend fun sendError(message: Message, throwable: Throwable, topic: String = "转发失败") {
         try {
             val errorMsg = "#$topic\n${throwable::class.simpleName}: ${
@@ -517,7 +352,7 @@ class TelegramBot(
                 )
             }"
 
-            send() {
+            send {
                 messageText(errorMsg.asFmtText(), message.chatId).apply {
                     this.replyToMessageId = message.id
                     this.options = MessageSendOptions().apply {
@@ -535,18 +370,3 @@ class TelegramBot(
         val result: CompletableDeferred<Result<T>>
     )
 }
-
-//suspend inline fun <T> Function<T>.send(bot: TelegramBot? = null) = this.sendCatching(bot).getOrThrow()
-//
-//suspend inline fun <T> Function<T>.sendCatching(bot: TelegramBot? = null) = sendCatching(bot) { this }
-//
-//
-//suspend inline fun <T> send(bot: TelegramBot? = null, noinline block: suspend () -> Function<T>) =
-//    sendCatching(bot, block)
-//
-//suspend fun <T> sendCatching(bot: TelegramBot? = null, block: suspend () -> Function<T>): Result<T> {
-//    val tg = bot ?: getBotOrThrow().tg
-//    val result = CompletableDeferred<Result<T>>()
-//    tg.messageOutChannel.send(TelegramBot.ChannelMessage(block(), result))
-//    return withTimeout(30.seconds) { result.await() }
-//}

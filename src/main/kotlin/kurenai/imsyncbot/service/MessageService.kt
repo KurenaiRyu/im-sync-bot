@@ -21,6 +21,14 @@ object MessageService {
 
     private val log = getLogger()
 
+    suspend fun save(message: QQMessage) = runCatching {
+        withIO {
+            qqMessageRepository.save(message)
+        }
+    }.onFailure {
+        log.error("Save message failed", it)
+    }
+
     /**
      * 缓存信息
      *

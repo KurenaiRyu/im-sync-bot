@@ -42,7 +42,7 @@ class QQMessageHandler(
 
     @Throws(Exception::class)
     override suspend fun onGroupMessage(context: GroupMessageContext): Int {
-        if (context.bot.groupConfig.bannedGroups.contains(context.group.id)) return CONTINUE
+        if (context.bot.groupConfigService.bannedGroups.contains(context.group.id)) return CONTINUE
         val messageType = context.getReadyToSendMessage()
         val list = if (messageType is GroupMessageContext.Forward) messageType.contextList else listOf(context)
         for (resolvedContext in list) {
@@ -210,7 +210,7 @@ class QQMessageHandler(
                 return
             }
         }
-        val chatId = bot.groupConfig.qqTg[event.group.id] ?: bot.groupConfig.defaultTgGroup
+        val chatId = bot.groupConfigService.qqTg[event.group.id] ?: bot.groupConfigService.defaultTgGroup
         bot.tg.sendMessageText(msg.fmt(), chatId)
     }
 

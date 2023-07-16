@@ -7,15 +7,13 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
-import kurenai.imsyncbot.bot.qq.login.qsign.UnidbgFetchQSignFactory
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.domain.getLocalDateTime
-import kurenai.imsyncbot.bot.telegram.TelegramBot
+import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.FixProtocolVersion
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.Bot
@@ -24,22 +22,38 @@ import net.mamoe.mirai.auth.BotAuthorization
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
-import net.mamoe.mirai.internal.spi.EncryptService
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
 import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.message.data.ids
 import net.mamoe.mirai.utils.BotConfiguration
-import net.mamoe.mirai.utils.Services
+import net.mamoe.mirai.utils.ConcurrentHashMap
 import java.io.File
 import kotlin.coroutines.CoroutineContext
 
 class QQBot(
-    private val parentCoroutineContext: CoroutineContext,
     private val qqProperties: QQProperties,
-    private val bot: ImSyncBot,
-) {
-    private val log = getLogger()
+    private val bot: ImSyncBot
+) : CoroutineScope {
+
+    companion object {
+        private val log = getLogger()
+    }
+
+    override val coroutineContext: CoroutineContext = bot.coroutineContext
+        .plus(SupervisorJob(bot.coroutineContext[Job]))
+        .plus(CoroutineExceptionHandler { context, exception ->
+            when (exception) {
+                is CancellationException -> {
+                    log.warn("{} was cancelled", context[CoroutineName])
+                }
+
+                else -> {
+                    log.warn("with {}", context[CoroutineName], exception)
+                }
+            }
+        })
+
     val status = MutableStateFlow<BotStatus>(Initializing)
 
     private val messageChannel = Channel<Event>(Channel.BUFFERED, BufferOverflow.DROP_OLDEST) {
@@ -47,13 +61,12 @@ class QQBot(
     }
 
     private val loginLock = Mutex()
+    private val groupLocks = ConcurrentHashMap<Long, Mutex>()
+
     lateinit var qqBot: Bot
 
-    val jobLock: Mutex = Mutex()
-
     @OptIn(DelicateCoroutinesApi::class)
-    private val workerContext = newFixedThreadPoolContext(10, "${qqProperties.account}-worker")
-    private val defaultScope = CoroutineScope(parentCoroutineContext + workerContext)
+    private val workerScope = this + newFixedThreadPoolContext(10, "${qqProperties.account}-worker")
 
     private fun buildMiraiBot(qrCodeLogin: Boolean = false): Bot {
         val configuration = BotConfiguration().apply {
@@ -61,7 +74,7 @@ class QQBot(
             fileBasedDeviceInfo("${bot.configPath}/device.json") // 使用 device.json 存储设备信息
             protocol = qqProperties.protocol // 切换协议
             highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
-            parentCoroutineContext = this@QQBot.parentCoroutineContext
+            parentCoroutineContext = this@QQBot.coroutineContext
 //            loginSolver = MultipleLoginSolver(bot)
         }
         log.info("协议版本检查更新...")
@@ -95,15 +108,15 @@ class QQBot(
                     bot.discord.incomingEventChannel.trySend(event)
                     when (event) {
                         is GroupAwareMessageEvent -> {
-                            if (bot.groupConfig.items.isEmpty()) return@filter false
+                            if (bot.groupConfigService.configs.isEmpty()) return@filter false
                             val groupId = event.group.id
-                            if (bot.groupConfig.filterGroups.isNotEmpty() && !bot.groupConfig.filterGroups.contains(
+                            if (bot.groupConfigService.filterGroups.isNotEmpty() && !bot.groupConfigService.filterGroups.contains(
                                     groupId
                                 )
                             ) {
                                 false
                             } else {
-                                !bot.groupConfig.bannedGroups.contains(groupId) && !bot.userConfig.bannedIds.contains(
+                                !bot.groupConfigService.bannedGroups.contains(groupId) && !bot.userConfig.bannedIds.contains(
                                     event.sender.id
                                 )
                             }.also { result ->
@@ -135,21 +148,15 @@ class QQBot(
                     log.error(it.message, it)
                 }.getOrDefault(false)
             }.subscribeAlways<Event> { event ->
-                messageChannel.send(event)
-            }
-
-            messageChannel.receiveAsFlow().collect {
-                runCatching {
-                    handleEvent(it)
-                }.onFailure {
-                    log.error("Handle event error: ${it.message}", it)
+                workerScope.launch(CoroutineName(event.idString())) {
+                    handleEvent(event)
                 }
             }
 
             log.info("Started qq-bot ${qqBot.nick}(${qqBot.id})")
         }
         if (waitForInit) initBot()
-        else defaultScope.launch { initBot() }
+        else workerScope.launch { initBot() }
     }
 
     private suspend fun handleEvent(event: Event) {
@@ -159,7 +166,7 @@ class QQBot(
                     val json = event.message.serializeToJsonString()
                     when (event) {
                         is FriendMessageEvent -> {
-                            qqMessageRepository.save(
+                            MessageService.save(
                                 QQMessage(
                                     event.message.ids[0],
                                     event.bot.id,
@@ -184,19 +191,18 @@ class QQBot(
                         }
 
                         is GroupTempMessageEvent -> {
-                            val message = qqMessageRepository.save(
-                                QQMessage(
-                                    event.message.ids[0],
-                                    event.bot.id,
-                                    event.subject.id,
-                                    event.sender.id,
-                                    event.source.targetId,
-                                    QQMessage.QQMessageType.GROUP_TEMP,
-                                    json,
-                                    false,
-                                    event.source.getLocalDateTime()
-                                )
+                            val message = QQMessage(
+                                event.message.ids[0],
+                                event.bot.id,
+                                event.subject.id,
+                                event.sender.id,
+                                event.source.targetId,
+                                QQMessage.QQMessageType.GROUP_TEMP,
+                                json,
+                                false,
+                                event.source.getLocalDateTime()
                             )
+                            MessageService.save(message)
 
                             bot.qqMessageHandler.onGroupMessage(
                                 GroupMessageContext(
@@ -210,29 +216,30 @@ class QQBot(
                         }
 
                         is GroupAwareMessageEvent -> {
-                            val message = qqMessageRepository.save(
-                                QQMessage(
-                                    event.message.ids[0],
-                                    event.bot.id,
-                                    event.subject.id,
-                                    event.sender.id,
-                                    event.source.targetId,
-                                    QQMessage.QQMessageType.GROUP,
-                                    json,
-                                    false,
-                                    event.source.getLocalDateTime()
-                                )
+                            val message = QQMessage(
+                                event.message.ids[0],
+                                event.bot.id,
+                                event.subject.id,
+                                event.sender.id,
+                                event.source.targetId,
+                                QQMessage.QQMessageType.GROUP,
+                                json,
+                                false,
+                                event.source.getLocalDateTime()
                             )
+                            MessageService.save(message)
 
-                            bot.qqMessageHandler.onGroupMessage(
-                                GroupMessageContext(
-                                    message,
-                                    bot,
-                                    event,
-                                    event.group,
-                                    event.message
+                            groupLocks.computeIfAbsent(event.group.id) { Mutex() }.withLock {
+                                bot.qqMessageHandler.onGroupMessage(
+                                    GroupMessageContext(
+                                        message,
+                                        bot,
+                                        event,
+                                        event.group,
+                                        event.message
+                                    )
                                 )
-                            )
+                            }
                         }
 
                         else -> {
@@ -243,13 +250,13 @@ class QQBot(
 
                 is MessageRecallEvent.GroupRecall -> {
                     event.messageIds
-                    defaultScope.launch {
+                    workerScope.launch {
                         bot.qqMessageHandler.onRecall(event)
                     }
                 }
 
                 is GroupEvent -> {
-                    defaultScope.launch {
+                    workerScope.launch {
                         bot.qqMessageHandler.onGroupEvent(event)
                     }
                 }
@@ -306,7 +313,7 @@ class QQBot(
                         this.type = TextEntityTypeMentionName(bot.userConfig.masterTg)
                     })
                 },
-                bot.groupConfig.qqTg[event.group.id] ?: bot.groupConfig.defaultTgGroup
+                bot.groupConfigService.qqTg[event.group.id] ?: bot.groupConfigService.defaultTgGroup
             )
         }.onFailure {
             log.error("Send remind message fail.", it)
@@ -323,5 +330,16 @@ class QQBot(
         }
     }
 
+    private fun Event.idString() = when (this) {
+        is GroupEvent -> {
+            "${this::class.simpleName}[${this.group.id}]"
+        }
+
+        is UserEvent -> {
+            "${this::class.simpleName}[${this.user.id}]"
+        }
+
+        else -> "${this::class.simpleName}"
+    }
 
 }

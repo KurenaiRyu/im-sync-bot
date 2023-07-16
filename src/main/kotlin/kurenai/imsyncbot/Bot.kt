@@ -6,7 +6,6 @@ import kurenai.imsyncbot.bot.qq.QQMessageHandler
 import kurenai.imsyncbot.command.AbstractInlineCommand
 import kurenai.imsyncbot.command.AbstractQQCommand
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.config.AbstractConfig
 import kurenai.imsyncbot.utils.SnowFlake
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.humanReadableByteCountBin
@@ -32,8 +31,6 @@ internal val snowFlake = SnowFlake(1)
 internal val reflections = Reflections("kurenai.imsyncbot")
 internal val dfs: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
-internal val configs = ArrayList<AbstractConfig<*>>()
-
 //internal val callbacks = reflections.getSubTypesOf(Callback::class.java).map { it.getConstructor().newInstance() }
 internal val tgCommands = ArrayList<AbstractTelegramCommand>()
 internal val qqCommands = ArrayList<AbstractQQCommand>()
@@ -52,7 +49,6 @@ internal lateinit var instants: MutableList<ImSyncBot>
 suspend fun start() {
     Init.init()
     instants = loadInstants()
-    configs.first()
     commonInit()
     instants.forEach { it.start() }
 }

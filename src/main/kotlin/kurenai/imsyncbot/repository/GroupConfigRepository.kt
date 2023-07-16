@@ -12,4 +12,6 @@ interface GroupConfigRepository : JpaRepository<GroupConfig, Long> {
 
     fun findByQqGroupId(groupId: Long): GroupConfig?
 
+    fun findAllByQqGroupIdIn(groupIds: Collection<Long>): Collection<GroupConfig>
+
 }

@@ -12,7 +12,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -32,7 +31,6 @@ import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.GroupTempMessageEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.ForwardMessage
-import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.utils.MiraiExperimentalApi
 import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
 import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
@@ -131,7 +129,7 @@ class GroupMessageContext(
     val chatId: Long = if (isTempMessage) {
         bot.userConfig.defaultChatId
     } else {
-        bot.groupConfig.qqTg[group.id] ?: bot.groupConfig.defaultTgGroup
+        bot.groupConfigService.qqTg[group.id] ?: bot.groupConfigService.defaultTgGroup
     }
     var replayToMessageId: Long = -1
     val normalType: Normal by lazy { Normal() }

@@ -1,11 +1,15 @@
 package kurenai.imsyncbot.config
 
-import com.fasterxml.jackson.core.type.TypeReference
 import it.tdlight.jni.TdApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.utils.TelegramUtil.isBot
 import kurenai.imsyncbot.utils.TelegramUtil.username
+import kurenai.imsyncbot.utils.json
 import java.nio.file.Path
+import kotlin.io.path.exists
+import kotlin.io.path.readText
 
 /**
  * 用户配置类
@@ -34,22 +38,35 @@ class UserConfig(
     var picBannedIds = emptyList<Long>()
     var admins = emptyList<Long>()
     var superAdmins = emptyList<Long>()
-    override val items = ArrayList<User>()
+    override lateinit var configs: MutableList<User>
     override val path: Path = Path.of(configPath, "user.json")
-    override val typeRef = object : TypeReference<ArrayList<User>>() {}
 
     init {
-        Runtime.getRuntime().addShutdownHook(Thread {
-            save()
-        })
         load()
     }
 
+    fun load() {
+
+        if (path.exists()) {
+            configs = json.decodeFromString(ListSerializer(User.serializer()), path.readText()).toMutableList()
+            if (configs.isNotEmpty()) {
+                this.configs.clear()
+                this.configs.addAll(configs)
+                refresh()
+            }
+        }
+    }
+
+    override fun migration() {
+        TODO("Not yet implemented")
+    }
+
+
     fun admin(id: Long, username: String? = null, isSuper: Boolean = false) {
-        val filter = items.filter { c -> id == c.tg }
+        val filter = configs.filter { c -> id == c.tg }
         val adminStatus = if (isSuper) UserStatus.SUPER_ADMIN else UserStatus.ADMIN
         if (filter.isEmpty()) {
-            items.add(User(id, username = username, status = hashSetOf(adminStatus)))
+            configs.add(User(id, username = username, status = hashSetOf(adminStatus)))
         } else {
             filter.forEach { c ->
                 username?.let { c.username = username }
@@ -59,36 +76,32 @@ class UserConfig(
                 if (!isSuper) c.status.remove(UserStatus.SUPER_ADMIN)
             }
         }
-        afterUpdate()
     }
 
     fun removeAdmin(id: Long) {
-        items.filter { c -> id == c.tg }.forEach {
+        configs.filter { c -> id == c.tg }.forEach {
             it.status.remove(UserStatus.SUPER_ADMIN)
             it.status.remove(UserStatus.ADMIN)
         }
-        afterUpdate()
     }
 
     fun unbindChat(chatId: Long) {
         if (chatId == masterTg) return
-        items.filter {
+        configs.filter {
             it.chatId == chatId
         }.forEach {
             it.chatId = null
         }
-        afterUpdate()
     }
 
     fun bindChat(qq: Long, chatId: Long) {
         if (qq == masterQQ) return
-        val list = items.filter { it.qq == qq }
+        val list = configs.filter { it.qq == qq }
         if (list.isEmpty()) {
-            add0(User(qq = qq, chatId = chatId))
+            add(User(qq = qq, chatId = chatId))
         } else {
             list.forEach { it.chatId = chatId }
         }
-        afterUpdate()
     }
 
     fun ban(tg: Long? = null, qq: Long? = null, username: String? = null) {
@@ -108,9 +121,9 @@ class UserConfig(
     }
 
     private fun addStatus(status: UserStatus, tg: Long? = null, qq: Long? = null, username: String? = null) {
-        val filter = items.filter { c -> tg?.let { c.tg == it } ?: qq?.let { c.qq == it } ?: false }
+        val filter = configs.filter { c -> tg?.let { c.tg == it } ?: qq?.let { c.qq == it } ?: false }
         if (filter.isEmpty()) {
-            items.add(User(tg, qq, username, status = hashSetOf(status)))
+            configs.add(User(tg, qq, username, status = hashSetOf(status)))
         } else {
             filter.forEach { c ->
                 username?.let { c.username = username }
@@ -119,52 +132,47 @@ class UserConfig(
                 }
             }
         }
-        afterUpdate()
     }
 
     private fun removeStatus(id: Long, status: UserStatus) {
-        items.filter { c -> (id == c.tg || id == c.qq) }.forEach {
+        configs.filter { c -> (id == c.tg || id == c.qq) }.forEach {
             it.status.remove(status)
         }
-        afterUpdate()
     }
 
     fun bindName(tg: Long? = null, qq: Long? = null, bindingName: String, username: String? = null) {
-        val filter = items.filter { c -> tg?.let { c.tg == it } ?: qq?.let { c.qq == it } ?: false }
+        val filter = configs.filter { c -> tg?.let { c.tg == it } ?: qq?.let { c.qq == it } ?: false }
         if (filter.isEmpty()) {
-            items.add(User(tg, qq, username, bindingName))
+            configs.add(User(tg, qq, username, bindingName))
         } else {
             filter.forEach { c ->
                 username?.let { c.username = username }
                 c.bindingName = bindingName
             }
         }
-        afterUpdate()
     }
 
     fun link(tg: Long, qq: Long, username: String) {
-        val list = items.filter { it.tg == tg || it.qq == qq }
-        items.removeIf { it.tg == tg || it.qq == qq }
+        val list = configs.filter { it.tg == tg || it.qq == qq }
+        configs.removeIf { it.tg == tg || it.qq == qq }
         val bindingName = list.mapNotNull { it.bindingName }.firstOrNull()
         val status = if (list.isEmpty()) HashSet()
         else list.map { it.status.toMutableList() }
             .reduce { acc, item -> acc.also { it.addAll(item) } }
             .distinct().toHashSet()
-        items.add(User(tg, qq, username, bindingName, status = status))
-        afterUpdate()
+        configs.add(User(tg, qq, username, bindingName, status = status))
     }
 
     fun unlink(user: User) {
-        items.remove(user)
-        items.add(User(user.tg, username = user.username, bindingName = user.bindingName, status = user.status))
+        configs.remove(user)
+        configs.add(User(user.tg, username = user.username, bindingName = user.bindingName, status = user.status))
         user.qq?.let {
-            items.add(User(qq = user.qq, bindingName = user.bindingName, status = user.status))
+            configs.add(User(qq = user.qq, bindingName = user.bindingName, status = user.status))
         }
-        afterUpdate()
     }
 
     fun unbindUsername(id: Long? = null, username: String? = null) {
-        items.removeIf { b ->
+        configs.removeIf { b ->
             if (id != null && id == b.tg || id == b.qq) {
                 if (b.status.isEmpty()) {
                     true
@@ -181,7 +189,6 @@ class UserConfig(
                 }
             } else false
         }
-        afterUpdate()
     }
 
     fun isQQMaster(id: Long) = masterQQ == id
@@ -197,9 +204,9 @@ class UserConfig(
     }
 
     fun setMaster(message: TdApi.Message) {
-        val master = items.firstOrNull { it.status.contains(UserStatus.ADMIN) }
+        val master = configs.firstOrNull { it.status.contains(UserStatus.ADMIN) }
         if (master == null) {
-            items.add(
+            configs.add(
                 User(
                     masterTg,
                     masterQQ,
@@ -224,7 +231,7 @@ class UserConfig(
         val friendChats = HashMap<Long, Long>()
         val chatFriends = HashMap<Long, Long>()
 
-        for (config in items) {
+        for (config in configs) {
             if (config.tg != null && config.qq != null) links.add(config)
             if (config.username?.isNotBlank() == true && config.qq != null) {
                 qqUsernames[config.qq] = config.username!!
@@ -298,10 +305,10 @@ class UserConfig(
         return "用户名绑定配置"
     }
 
-    override fun add0(config: User) {
-        val filter = items.filter { c -> config.tg?.let { c.tg == it } ?: config.qq?.let { c.qq == it } ?: false }
+    fun add(config: User) {
+        val filter = configs.filter { c -> config.tg?.let { c.tg == it } ?: config.qq?.let { c.qq == it } ?: false }
         if (filter.isEmpty()) {
-            items.add(config)
+            configs.add(config)
         } else {
             filter.forEach { c ->
                 config.bindingName?.let { c.bindingName = it }
@@ -316,19 +323,13 @@ class UserConfig(
         }
     }
 
-    override fun addAll0(configs: Collection<User>) {
-        val ids = configs.mapNotNull { it.tg }
-        val usernameList = configs.mapNotNull { it.username }
-        this.items.removeIf { ids.contains(it.tg) || usernameList.contains(it.username) }
-        this.items.addAll(configs)
-    }
-
 }
 
 enum class Permission(val level: Int) {
     ADMIN(30), SUPPER_ADMIN(20), MASTER(1), NORMAL(1000)
 }
 
+@Serializable
 data class User(
     val tg: Long? = null,
     val qq: Long? = null,

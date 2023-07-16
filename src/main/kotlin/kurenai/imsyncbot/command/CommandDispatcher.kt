@@ -48,37 +48,26 @@ object CommandDispatcher {
                 val permissionLevel = permission.level
                 val isSupperAdmin = permissionLevel <= Permission.SUPPER_ADMIN.level
                 val input = content.text.text.substring(commandEntity.length).trim()
-                responseMsg = if (isSupperAdmin && input == "ban") {
-                    handleBan(bot, message.chatId, cmd)
-                    "Banned command: ${cmd.command}"
-                } else if (isSupperAdmin && input == "unban") {
-                    handleUnban(bot, message.chatId, cmd)
-                    "Unbanned command: ${cmd.command}"
-                } else if (bot.groupConfig.statusContain(message.chatId, cmd.getCommandBannedStatus())) {
-                    log.debug("Command was banned for group[${message.chatId}(${message.chatId})].")
-                    return
+                responseMsg = if (cmd.onlyMaster && permission != Permission.MASTER) {
+                    "该命令只允许主人执行"
+                } else if (cmd.onlySupperAdmin && !isSupperAdmin) {
+                    "该命令只允许超级管理员执行"
+                } else if (cmd.onlyAdmin && permissionLevel > Permission.ADMIN.level) {
+                    "该命令只允许管理员执行"
+                } else if (cmd.onlyUserMessage && typeConstructor != ChatTypePrivate.CONSTRUCTOR) {
+                    "该命令只允许私聊执行"
+                } else if (cmd.onlyGroupMessage && !(typeConstructor == ChatTypeBasicGroup.CONSTRUCTOR || typeConstructor == ChatTypeSupergroup.CONSTRUCTOR)) {
+                    "该命令只允许群组执行"
+                } else if (cmd.onlyReply && message.replyToMessageId != 0L) {
+                    "需要引用一条消息"
                 } else {
-                    if (cmd.onlyMaster && permission != Permission.MASTER) {
-                        "该命令只允许主人执行"
-                    } else if (cmd.onlySupperAdmin && !isSupperAdmin) {
-                        "该命令只允许超级管理员执行"
-                    } else if (cmd.onlyAdmin && permissionLevel > Permission.ADMIN.level) {
-                        "该命令只允许管理员执行"
-                    } else if (cmd.onlyUserMessage && typeConstructor != ChatTypePrivate.CONSTRUCTOR) {
-                        "该命令只允许私聊执行"
-                    } else if (cmd.onlyGroupMessage && !(typeConstructor == ChatTypeBasicGroup.CONSTRUCTOR || typeConstructor == ChatTypeSupergroup.CONSTRUCTOR)) {
-                        "该命令只允许群组执行"
-                    } else if (cmd.onlyReply && message.replyToMessageId != 0L) {
-                        "需要引用一条消息"
-                    } else {
-                        try {
-                            cmd.execute(bot, message, sender, input)?.also {
-                                reply = cmd.reply
-                                parseMode = cmd.parseMode
-                            }
-                        } catch (e: BotException) {
-                            e.message
+                    try {
+                        cmd.execute(bot, message, sender, input)?.also {
+                            reply = cmd.reply
+                            parseMode = cmd.parseMode
                         }
+                    } catch (e: BotException) {
+                        e.message
                     }
                 }
                 break
@@ -90,38 +79,15 @@ object CommandDispatcher {
         }
     }
 
-    private fun handleUnban(bot: ImSyncBot, groupId: Long, handler: AbstractTelegramCommand) {
-        bot.groupConfig.removeStatus(groupId, handler.getCommandBannedStatus())
-        log.info("Unbanned command: ${handler.command}")
-    }
-
-    private fun handleBan(bot: ImSyncBot, groupId: Long, handler: AbstractTelegramCommand) {
-        bot.groupConfig.addStatus(groupId, handler.getCommandBannedStatus())
-        log.info("Banned command: ${handler.command}")
-    }
-
-    private fun AbstractTelegramCommand.getCommandBannedStatus(): String {
-        return "${CaseFormat.UPPER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, this::class.simpleName!!)}_BANNED"
-    }
-
-    private fun AbstractQQCommand.getCommandBannedStatus(): String {
-        return "${
-            CaseFormat.UPPER_CAMEL.to(
-                CaseFormat.UPPER_UNDERSCORE,
-                this::class.simpleName!!.replace("QQ", "")
-            )
-        }_BANNED"
-    }
-
     suspend fun execute(event: MessageEvent): Int {
         val bot = getBotOrThrow()
         var matched = false
         for (handler in qqCommands) {
-            if (bot.groupConfig.items.any { it.qq == event.subject.id && it.status.contains(handler.getCommandBannedStatus()) })
-                if (handler.execute(event) == 1) {
-                    matched = true
-                    break
-                }
+            if (bot.groupConfigService.configs.any { it.qqGroupId == event.subject.id }
+                && handler.execute(event) == 1) {
+                matched = true
+                break
+            }
         }
         return if (matched) 1 else 0
     }

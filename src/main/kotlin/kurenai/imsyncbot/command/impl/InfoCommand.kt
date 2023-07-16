@@ -38,11 +38,11 @@ class InfoCommand : AbstractTelegramCommand() {
                 val qqMsg = MessageService.findQQByTg(replyMessage)
                 if (qqMsg != null) {
                     val userId = qqMsg.source.fromId
-                    val qqGroup = bot.groupConfig.tgQQ[message.chatId]?.let { qqBot.getGroup(it) }
+                    val qqGroup = bot.groupConfigService.tgQQ[message.chatId]?.let { qqBot.getGroup(it) }
                     if (qqGroup == null) {
                         return "找不到绑定的qq群"
                     } else {
-                        val config = bot.userConfig.items.firstOrNull { it.qq == userId }
+                        val config = bot.userConfig.configs.firstOrNull { it.qq == userId }
                         val member = qqGroup[userId]
                         if (member != null) {
 
@@ -103,7 +103,7 @@ class InfoCommand : AbstractTelegramCommand() {
                 list.add("firstName: `${user.firstName.escapeMarkdownChar()}`")
                 list.add("lastName: `${user.lastName?.escapeMarkdownChar()}`")
                 list.add("isBot: ${user.type.constructor == UserTypeBot.CONSTRUCTOR}")
-                bot.userConfig.items.firstOrNull {
+                bot.userConfig.configs.firstOrNull {
                     it.tg == sender.userId
                 }?.let {
                     list.add("status: ${it.status.toString().escapeMarkdownChar()}")
@@ -111,12 +111,12 @@ class InfoCommand : AbstractTelegramCommand() {
                 list.joinToString("\n")
             }
         } else {
-            val group = bot.groupConfig.tgQQ[message.chatId]?.let { qqBot.getGroup(it) }
+            val group = bot.groupConfigService.tgQQ[message.chatId]?.let { qqBot.getGroup(it) }
             if (group == null) {
                 return "找不到绑定的qq群"
             } else {
                 val list = ArrayList<String>()
-                val config = bot.groupConfig.items.firstOrNull { it.tg == message.chatId }
+                val config = bot.groupConfigService.configs.firstOrNull { it.telegramGroupId == message.chatId }
                 list.add("绑定群id: `${group.id}`")
                 list.add("绑定群名称: `${group.name.escapeMarkdownChar()}`")
                 list.add("绑定群群主: `${group.owner.nick.escapeMarkdownChar()}`\\(`${group.owner.id}`\\)")

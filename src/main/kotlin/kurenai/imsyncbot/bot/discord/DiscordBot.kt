@@ -8,7 +8,6 @@ import dev.kord.core.behavior.createCategory
 import dev.kord.core.behavior.createChatInputCommand
 import dev.kord.core.behavior.execute
 import dev.kord.core.behavior.interaction.respondEphemeral
-import dev.kord.core.behavior.reply
 import dev.kord.core.entity.Webhook
 import dev.kord.core.entity.channel.Category
 import dev.kord.core.entity.channel.TextChannel
@@ -24,7 +23,6 @@ import kotlinx.coroutines.flow.*
 import kurenai.imsyncbot.*
 import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.domain.QQDiscord
-import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.snowFlake
 import kurenai.imsyncbot.utils.getLogger
@@ -52,11 +50,24 @@ class DiscordBot(
 
     lateinit var kord: Kord
     val incomingEventChannel: Channel<Event> = Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
-    val syncMessageChannel: Channel<OnlineMessageSource.Outgoing> =
+    private val syncMessageChannel: Channel<OnlineMessageSource.Outgoing> =
         Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
-    override val coroutineContext: CoroutineContext = bot.coroutineContext + CoroutineName("DiscordBot")
+    override val coroutineContext: CoroutineContext = bot.coroutineContext
+        .plus(CoroutineName("DiscordBot"))
+        .plus(SupervisorJob(bot.coroutineContext[Job]))
+        .plus(CoroutineExceptionHandler { context, ex ->
+            when (ex) {
+                is CancellationException -> {
+                    TelegramBot.log.warn("{} was cancelled", context[CoroutineName])
+                }
 
-    val channelCache = WeakHashMap<Long, TextChannel>()
+                else -> {
+                    TelegramBot.log.warn("with {}", context[CoroutineName], ex)
+                }
+            }
+        })
+
+    private val channelCache = WeakHashMap<Long, TextChannel>()
 
     suspend fun start() {
         val token = bot.configProperties.bot.discord.token
@@ -89,7 +100,7 @@ class DiscordBot(
         }
     }
 
-    suspend fun initChannel() {
+    private suspend fun initChannel() {
 //        val groupConfigs = groupConfigRepository.findAll()
         val guild = kord.guilds.firstOrNull() ?: return
         guild.createChatInputCommand("bind", "Bind qq group") {
@@ -220,29 +231,29 @@ class DiscordBot(
         }
     }
 
-    suspend fun resolveMissChannel(groupConfigs: List<GroupConfig>) {
-        val missConfigs = if (groupConfigs.isEmpty()) {
-            bot.groupConfig.items.map {
-                GroupConfig(it.qq, it.title, it.tg, status = it.status.joinToString(","), id = snowFlake.nextId())
-            }
-        } else {
-            groupConfigs.filter { it.discordChannelId == null }
-        }
+//    suspend fun resolveMissChannel(groupConfigs: List<GroupConfig>) {
+//        val missConfigs = if (groupConfigs.isEmpty()) {
+//            bot.groupConfigService.configs.map {
+//                GroupConfig(it.qqGroupId, it.name, it.telegramGroupId, status = it.status.joinToString(","), id = snowFlake.nextId())
+//            }
+//        } else {
+//            groupConfigs.filter { it.discordChannelId == null }
+//        }
+//
+//        val guild = kord.guilds.firstOrNull() ?: return
+//        val category =
+//            guild.channels.firstOrNull { it is Category && it.name == "forward" } as? Category
+//                ?: guild.createCategory("forward")
+//        val existChannel = category.channels.toList().associateBy { it.name }
+//
+//        missConfigs.forEach { config ->
+//            val channel = existChannel[config.name] ?: category.createTextChannel(config.name)
+//            config.discordChannelId = channel.id.value.toLong()
+//        }
+//        groupConfigRepository.saveAll(missConfigs)
+//    }
 
-        val guild = kord.guilds.firstOrNull() ?: return
-        val category =
-            guild.channels.firstOrNull { it is Category && it.name == "forward" } as? Category
-                ?: guild.createCategory("forward")
-        val existChannel = category.channels.toList().associateBy { it.name }
-
-        missConfigs.forEach { config ->
-            val channel = existChannel[config.name] ?: category.createTextChannel(config.name)
-            config.discordChannelId = channel.id.value.toLong()
-        }
-        groupConfigRepository.saveAll(missConfigs)
-    }
-
-    suspend fun handleSyncMessage(source: OnlineMessageSource.Outgoing) {
+    private suspend fun handleSyncMessage(source: OnlineMessageSource.Outgoing) {
         val channel = channelCache[source.target.id] ?: run {
             val channelId = groupConfigRepository.findByQqGroupId(source.target.id)?.discordChannelId ?: return
             kord.getChannel(Snowflake(channelId)) as? TextChannel ?: return

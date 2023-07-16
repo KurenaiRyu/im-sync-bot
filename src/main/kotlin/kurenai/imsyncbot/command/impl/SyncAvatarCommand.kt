@@ -29,7 +29,7 @@ class SyncAvatarCommand : AbstractTelegramCommand() {
                 handled = true
             }
         }
-        bot.groupConfig.tgQQ[message.chatId]?.let { groupId ->
+        bot.groupConfigService.tgQQ[message.chatId]?.let { groupId ->
             qqBot.getGroup(groupId)?.let {
                 val avatarPath = BotUtil.downloadImg("group#$groupId.png", it.avatarUrl, overwrite = true)
                 bot.tg.send {

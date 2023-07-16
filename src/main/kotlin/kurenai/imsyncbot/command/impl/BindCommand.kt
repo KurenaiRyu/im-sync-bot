@@ -1,6 +1,5 @@
 package kurenai.imsyncbot.command.impl
 
-import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
@@ -53,7 +52,7 @@ class BindCommand : AbstractTelegramCommand() {
                     try {
                         val qq = param.toLong()
                         qqBot.getGroup(qq)?.let {
-                            bot.groupConfig.add(chat.id, qq, chat.title)
+                            bot.groupConfigService.bind(chat.id, qq, chat.title)
                             "绑定成功\n\n" +
                                     "绑定QQ群id: `${it.id}`\n" +
                                     "绑定QQ群名称: `${it.name.escapeMarkdownChar()}`\n" +
@@ -68,10 +67,16 @@ class BindCommand : AbstractTelegramCommand() {
             }
         } else if (chat.type.constructor == ChatTypePrivate.CONSTRUCTOR && bot.userConfig.superAdmins.contains(chat.id)) {
             val usernameBinds =
-                bot.userConfig.items.filter { it.bindingName != null }
+                bot.userConfig.configs.filter { it.bindingName != null }
                     .joinToString("\n") { "`${it.username?.escapeMarkdownChar() ?: it.tg}` \\<\\=\\> `${it.bindingName!!.escapeMarkdownChar()}`" }
             val groupBindings =
-                bot.groupConfig.items.joinToString("\n") { "`${it.tg}` \\<\\=\\> `${it.qq}` \\#${qqBot.getGroup(it.qq)?.name?.escapeMarkdownChar() ?: "找不到该QQ群"}" }
+                bot.groupConfigService.configs.joinToString("\n") {
+                    "`${it.telegramGroupId}` \\<\\=\\> `${it.qqGroupId}` \\#${
+                        qqBot.getGroup(
+                            it.qqGroupId
+                        )?.name?.escapeMarkdownChar() ?: "找不到该QQ群"
+                    }"
+                }
             "用户名绑定：\n$usernameBinds\n\nQ群绑定：\n$groupBindings"
         } else null
     }
@@ -88,7 +93,7 @@ class UnbindCommand : AbstractTelegramCommand() {
         val param = message.content.textOrCaption()?.text ?: return "参数错误"
         return if (param.isNotBlank()) {
             try {
-                bot.groupConfig.remove(param.toLong())
+                bot.groupConfigService.remove(param.toLong())
                 "解绑Q群成功"
             } catch (e: Exception) {
                 log.error("参数错误", e)
@@ -114,7 +119,7 @@ class UnbindCommand : AbstractTelegramCommand() {
                     }
                 } ?: "找不到引用的消息"
             } else {
-                bot.groupConfig.remove(message.chatId)
+                bot.groupConfigService.remove(message.chatId)
                 "解绑Q群成功"
             }
         }
