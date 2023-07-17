@@ -276,7 +276,7 @@ class TelegramBot(
 
     suspend fun <R : Object> send(
         untilPersistent: Boolean = false,
-        timeout: Duration = 5.seconds,
+        timeout: Duration = 10.seconds,
         block: suspend () -> TdApi.Function<R>
     ): R {
         contract {
@@ -300,7 +300,7 @@ class TelegramBot(
                         }
                     }
                     delay(timeout)
-                    if (con.isActive) con.resumeWith(Result.failure(BotException("Telegram client timeout in $timeout s")))
+                    if (con.isActive) con.resumeWith(Result.failure(BotException("Telegram client timeout in $timeout")))
                 }
             }
             return@withContext if (result.isError && result.error.message.contains("retry after")) {
