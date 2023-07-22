@@ -1,9 +1,8 @@
 package kurenai.imsyncbot.command
 
-import com.google.common.base.CaseFormat
 import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
-import kurenai.imsyncbot.config.Permission
+import kurenai.imsyncbot.configuration.Permission
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.qqCommands

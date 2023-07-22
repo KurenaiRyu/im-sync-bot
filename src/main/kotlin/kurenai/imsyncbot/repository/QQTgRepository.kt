@@ -1,6 +1,5 @@
 package kurenai.imsyncbot.repository
 
-import kotlinx.coroutines.flow.Flow
 import kurenai.imsyncbot.domain.QQTg
 import org.springframework.data.jpa.repository.JpaRepository
 

@@ -1,4 +1,4 @@
-package kurenai.imsyncbot.config
+package kurenai.imsyncbot.configuration
 
 import it.tdlight.jni.TdApi
 import kotlinx.serialization.Serializable

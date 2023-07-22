@@ -4,7 +4,7 @@ import it.tdlight.jni.TdApi.Message
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kurenai.imsyncbot.ImSyncBot
-import kurenai.imsyncbot.config.AbstractConfig
+import kurenai.imsyncbot.configuration.AbstractConfig
 import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.groupConfigRepository
 import kurenai.imsyncbot.snowFlake
@@ -46,23 +46,23 @@ class GroupConfigService(
                 val entities = configs.filter { (exists[it.qq]?.telegramGroupId ?: 0) == 0L }
                     .map {
                         exists[it.qq]?.let { exist ->
-                            GroupConfig(
-                                id = exist.id,
-                                name = it.title,
-                                qqGroupId = it.qq,
-                                telegramGroupId = it.tg,
-                                discordChannelId = exist.discordChannelId,
-                                status = it.status,
-                            )
+                            GroupConfig().apply {
+                                id = exist.id
+                                name = it.title
+                                qqGroupId = it.qq
+                                telegramGroupId = it.tg
+                                discordChannelId = exist.discordChannelId
+                                status = it.status
+                            }
                         } ?: run {
-                            GroupConfig(
-                                id = snowFlake.nextId(),
-                                name = it.title,
-                                qqGroupId = it.qq,
-                                telegramGroupId = it.tg,
-                                discordChannelId = null,
-                                status = it.status,
-                            )
+                            GroupConfig().apply {
+                                id = snowFlake.nextId()
+                                name = it.title
+                                qqGroupId = it.qq
+                                telegramGroupId = it.tg
+                                discordChannelId = null
+                                status = it.status
+                            }
                         }
                     }
                 groupConfigRepository.saveAll(entities)
@@ -111,7 +111,11 @@ class GroupConfigService(
             it.name = title
             withIO { groupConfigRepository.save(it) }
         } ?: run {
-            add(GroupConfig(qq, title, tg))
+            add(GroupConfig().apply {
+                this.qqGroupId = qq
+                this.name = title
+                this.telegramGroupId = tg
+            })
         }
     }
 
@@ -141,22 +145,18 @@ class GroupConfigService(
                 } ?: run {
                     add(
                         GroupConfig(
-                            telegramGroupId = message.chatId,
-                            qqGroupId = bot.groupConfigService.defaultQQGroup,
-                            name = chat.title,
-                            status = hashSetOf(GroupStatus.DEFAULT)
                         )
                     )
                 }
             }
         } else {
             add(
-                GroupConfig(
-                    telegramGroupId = message.chatId,
-                    qqGroupId = tgQQ[message.chatId] ?: 0L,
-                    name = chat.title,
+                GroupConfig().apply {
+                    telegramGroupId = message.chatId
+                    qqGroupId = tgQQ[message.chatId] ?: 0L
+                    name = chat.title
                     status = hashSetOf(GroupStatus.DEFAULT)
-                )
+                }
             )
         }
         return true

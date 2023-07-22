@@ -1,12 +1,6 @@
-package kurenai.imsyncbot.config
+package kurenai.imsyncbot.configuration
 
-import kotlinx.serialization.KSerializer
-import kurenai.imsyncbot.utils.json
 import java.nio.file.Path
-import kotlin.io.path.createDirectories
-import kotlin.io.path.createFile
-import kotlin.io.path.exists
-import kotlin.io.path.readText
 
 abstract class AbstractConfig<T> {
 

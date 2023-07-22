@@ -9,6 +9,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.kotlinModule
 import io.ktor.client.*
+import io.ktor.util.*
 import it.tdlight.jni.TdApi
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore

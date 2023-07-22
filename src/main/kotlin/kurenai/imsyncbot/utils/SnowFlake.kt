@@ -49,7 +49,7 @@ class SnowFlake(val machineId: Int) {
 
     fun nextAlpha(): String {
         val id = nextId()
-        return java.lang.Long.toString(id, ALPHA_NUMERIC_BASE)
+        return id.toString(ALPHA_NUMERIC_BASE)
     }
 
 

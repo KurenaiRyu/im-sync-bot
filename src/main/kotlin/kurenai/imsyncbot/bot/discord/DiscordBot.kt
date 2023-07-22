@@ -21,9 +21,9 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kurenai.imsyncbot.*
+import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.domain.QQDiscord
-import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.snowFlake
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.contact.Group
@@ -213,12 +213,12 @@ class DiscordBot(
                 }
             } else {
                 groupConfigRepository.save(
-                    GroupConfig(
-                        groupId,
-                        group.name,
-                        discordChannelId = channel.id.value.toLong(),
+                    GroupConfig().apply {
+                        this.qqGroupId = groupId
+                        this.name = group.name
+                        discordChannelId = channel.id.value.toLong()
                         id = snowFlake.nextId()
-                    )
+                    }
                 )
             }
         }
@@ -320,12 +320,12 @@ class DiscordBot(
                 else -> null
             }?.let { receive ->
                 qqDiscordRepository.save(
-                    QQDiscord(
-                        messageChain.source.targetId,
-                        messageChain.source.ids[0],
-                        receive.channelId.value.toLong(),
-                        receive.id.value.toLong()
-                    )
+                    QQDiscord().apply {
+                        this.qqGrpId = messageChain.source.targetId
+                        this.qqMsgId = messageChain.source.ids[0]
+                        this.discordChannelId = receive.channelId.value.toLong()
+                        this.discordMsgId = receive.id.value.toLong()
+                    }
                 )
             }
         }

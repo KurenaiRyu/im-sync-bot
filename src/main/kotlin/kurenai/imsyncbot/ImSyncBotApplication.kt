@@ -1,10 +1,13 @@
 package kurenai.imsyncbot
 
+import jakarta.persistence.EntityManager
 import kurenai.imsyncbot.repository.*
 import org.springframework.boot.Banner
+import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.context.ApplicationContext
+import org.springframework.context.annotation.Configuration
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 
 
@@ -34,4 +37,12 @@ suspend fun main(args: Array<String>) {
     groupConfigRepository = applicationContext.getBean(GroupConfigRepository::class.java)
     qqDiscordRepository = applicationContext.getBean(QqDiscordRepository::class.java)
     start()
+}
+
+@Configuration
+class JpaConfig {
+
+    fun config(manager: EntityManager) {
+    }
+
 }

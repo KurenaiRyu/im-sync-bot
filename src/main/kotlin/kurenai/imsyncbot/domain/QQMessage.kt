@@ -16,31 +16,8 @@ import java.time.ZoneOffset
  * @since 2023/6/3 16:38
  */
 
-@Entity
-@Table(
-    name = "QQ_MESSAGE", indexes = [
-        Index(
-            name = "QQ_MESSAGE_MESSAGE_ID_BOT_ID_OBJ_ID_TYPE_uindex",
-            columnList = "messageId DESC, botId, objId, type",
-            unique = true
-        )
-    ]
-)
-class QQMessage(
-    var messageId: Int,
-    var botId: Long,
-    var objId: Long,
-    var sender: Long,
-    var target: Long,
-    var type: QQMessageType,
-    @Column(name = "JSON_TXT") @Lob var json: String,
-    var handled: Boolean,
-    var msgTime: LocalDateTime,
-    @Id var id: Long = snowFlake.nextId()
-) {
-    enum class QQMessageType {
-        GROUP, GROUP_TEMP, FRIEND
-    }
+enum class QQMessageType {
+    GROUP, GROUP_TEMP, FRIEND
 }
 
 fun MessageSource.getLocalDateTime(): LocalDateTime =

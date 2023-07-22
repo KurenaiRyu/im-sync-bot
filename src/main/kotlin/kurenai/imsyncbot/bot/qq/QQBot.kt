@@ -12,6 +12,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
 import kurenai.imsyncbot.domain.QQMessage
+import kurenai.imsyncbot.domain.QQMessageType
 import kurenai.imsyncbot.domain.getLocalDateTime
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.FixProtocolVersion
@@ -167,17 +168,18 @@ class QQBot(
                     when (event) {
                         is FriendMessageEvent -> {
                             MessageService.save(
-                                QQMessage(
-                                    event.message.ids[0],
-                                    event.bot.id,
-                                    event.subject.id,
-                                    event.sender.id,
-                                    event.source.targetId,
-                                    QQMessage.QQMessageType.FRIEND,
-                                    json,
-                                    false,
-                                    event.source.getLocalDateTime()
-                                )
+                                QQMessage().apply {
+
+                                    messageId = event.message.ids[0]
+                                    botId = event.bot.id
+                                    objId = event.subject.id
+                                    sender = event.sender.id
+                                    target = event.source.targetId
+                                    type = QQMessageType.FRIEND
+                                    this.json = json
+                                    handled = false
+                                    msgTime = event.source.getLocalDateTime()
+                                }
                             )
 
 //                            bot.qqMessageHandler.onFriendMessage(
@@ -191,17 +193,17 @@ class QQBot(
                         }
 
                         is GroupTempMessageEvent -> {
-                            val message = QQMessage(
-                                event.message.ids[0],
-                                event.bot.id,
-                                event.subject.id,
-                                event.sender.id,
-                                event.source.targetId,
-                                QQMessage.QQMessageType.GROUP_TEMP,
-                                json,
-                                false,
-                                event.source.getLocalDateTime()
-                            )
+                            val message = QQMessage().apply {
+                                this.messageId = event.message.ids[0]
+                                this.botId = event.bot.id
+                                this.objId = event.subject.id
+                                this.sender = event.sender.id
+                                this.target = event.source.targetId
+                                this.type = QQMessageType.GROUP_TEMP
+                                this.json = json
+                                this.handled = false
+                                this.msgTime = event.source.getLocalDateTime()
+                            }
                             MessageService.save(message)
 
                             bot.qqMessageHandler.onGroupMessage(
@@ -216,17 +218,17 @@ class QQBot(
                         }
 
                         is GroupAwareMessageEvent -> {
-                            val message = QQMessage(
-                                event.message.ids[0],
-                                event.bot.id,
-                                event.subject.id,
-                                event.sender.id,
-                                event.source.targetId,
-                                QQMessage.QQMessageType.GROUP,
-                                json,
-                                false,
-                                event.source.getLocalDateTime()
-                            )
+                            val message = QQMessage().apply {
+                                this.messageId = event.message.ids[0]
+                                this.botId = event.bot.id
+                                this.objId = event.subject.id
+                                this.sender = event.sender.id
+                                this.target = event.source.targetId
+                                this.type = QQMessageType.GROUP
+                                this.json = json
+                                this.handled = false
+                                this.msgTime = event.source.getLocalDateTime()
+                            }
                             MessageService.save(message)
 
                             groupLocks.computeIfAbsent(event.group.id) { Mutex() }.withLock {

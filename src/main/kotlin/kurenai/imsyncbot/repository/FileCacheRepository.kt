@@ -1,7 +1,6 @@
 package kurenai.imsyncbot.repository
 
 import kurenai.imsyncbot.domain.FileCache
-import kurenai.imsyncbot.domain.QQTg
 import org.springframework.data.jpa.repository.JpaRepository
 
 /**

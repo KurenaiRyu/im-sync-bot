@@ -2,6 +2,7 @@ package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
 import kurenai.imsyncbot.domain.QQMessage
+import kurenai.imsyncbot.domain.QQMessageType
 import kurenai.imsyncbot.domain.QQTg
 import kurenai.imsyncbot.domain.getLocalDateTime
 import kurenai.imsyncbot.qqMessageRepository
@@ -41,20 +42,24 @@ object MessageService {
                 val qqMsg = qqMessageRepository.save(
                     entity?.apply {
                         handled = true
-                    } ?: QQMessage(
-                        messageChain.source.ids[0],
-                        messageChain.source.botId,
-                        messageChain.source.targetId,
-                        messageChain.source.fromId,
-                        messageChain.source.targetId,
-                        QQMessage.QQMessageType.GROUP,
-                        messageChain.serializeToJsonString(),
-                        true,
-                        messageChain.source.getLocalDateTime()
-                    )
+                    } ?: QQMessage().apply {
+                        messageId = messageChain.source.ids[0]
+                        botId = messageChain.source.botId
+                        target = messageChain.source.targetId
+                        sender = messageChain.source.fromId
+                        type = QQMessageType.GROUP
+                        json = messageChain.serializeToJsonString()
+                        handled = true
+                        msgTime = messageChain.source.getLocalDateTime()
+                    }
                 )
                 messages?.map {
-                    QQTg(qqMsg.id, qqMsg.messageId, it.chatId, it.id)
+                    QQTg().apply {
+                        this.qqId = qqMsg.id
+                        this.qqMsgId = qqMsg.messageId
+                        tgGrpId = it.chatId
+                        tgMsgId = it.id
+                    }
                 }?.let(qqTgRepository::saveAll)
             }
         }.onFailure {

@@ -264,13 +264,19 @@ class TgMessageHandler(
             }
 
             is MessageSticker -> {
-                val image = if (content.sticker.format.constructor == StickerFormatWebp.CONSTRUCTOR) {
-                    val file = bot.tg.downloadFile(content.sticker.sticker)
-                    group.uploadImage(BotUtil.webp2png(file).toFile().toExternalResource())
-                } else if (content.sticker.format.constructor == StickerFormatWebm.CONSTRUCTOR) {
-                    val file = bot.tg.downloadFile(content.sticker.sticker)
-                    group.uploadImage(BotUtil.mp42gif(content.sticker.width, file).toFile().toExternalResource())
-                } else null
+                val image = when (content.sticker.format.constructor) {
+                    StickerFormatWebp.CONSTRUCTOR -> {
+                        val file = bot.tg.downloadFile(content.sticker.sticker)
+                        group.uploadImage(BotUtil.webp2png(file).toFile().toExternalResource())
+                    }
+
+                    StickerFormatWebm.CONSTRUCTOR -> {
+                        val file = bot.tg.downloadFile(content.sticker.sticker)
+                        group.uploadImage(BotUtil.mp42gif(content.sticker.width, file).toFile().toExternalResource())
+                    }
+
+                    else -> null
+                }
                 image?.let {
                     builder.append(it).build().sendTo(group)
                 }

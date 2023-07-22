@@ -2,6 +2,7 @@ package kurenai.imsyncbot.utils
 
 import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.bot.telegram.defaultTelegramBot
+import java.lang.reflect.Constructor
 
 /**
  * @author Kurenai
@@ -151,6 +152,8 @@ object TelegramUtil {
             this::class.simpleName ?: "UnknownUpdateType"
         }
     }
+
+    infix fun <T : Object> T.constructorEquals(constructor: Int) = this.constructor == constructor
 }
 
 enum class ParseMode(val ins: TextParseMode?) {

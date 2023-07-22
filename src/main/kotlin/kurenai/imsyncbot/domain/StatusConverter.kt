@@ -1,6 +1,5 @@
-package kurenai.imsyncbot.config
+package kurenai.imsyncbot.domain
 
-import io.ktor.util.*
 import jakarta.persistence.AttributeConverter
 import jakarta.persistence.Converter
 import kurenai.imsyncbot.service.GroupStatus

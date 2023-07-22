@@ -2,7 +2,7 @@ package kurenai.imsyncbot
 
 import kotlinx.coroutines.*
 import kurenai.imsyncbot.service.GroupConfigService
-import kurenai.imsyncbot.config.UserConfig
+import kurenai.imsyncbot.configuration.UserConfig
 import kurenai.imsyncbot.bot.discord.DiscordBot
 import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.bot.qq.QQMessageHandler

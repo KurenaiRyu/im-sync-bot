@@ -3,12 +3,14 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     id("org.springframework.boot") version "3.1.0"
     id("io.spring.dependency-management") version "1.1.0"
-    kotlin("jvm") version "1.8.21"
-    kotlin("plugin.spring") version "1.8.21"
-    kotlin("plugin.serialization") version "1.8.21"
-    kotlin("plugin.allopen") version "1.8.21"
-    kotlin("plugin.noarg") version "1.8.21"
-    kotlin("plugin.jpa") version "1.8.21"
+    id("io.freefair.lombok") version "8.1.0"
+    kotlin("jvm") version "1.9.0"
+    kotlin("plugin.spring") version "1.9.0"
+    kotlin("plugin.lombok") version "1.9.0"
+    kotlin("plugin.serialization") version "1.9.0"
+    kotlin("plugin.allopen") version "1.9.0"
+    kotlin("plugin.noarg") version "1.9.0"
+    kotlin("plugin.jpa") version "1.9.0"
 }
 
 group = "moe.kurenai.bot"
@@ -26,6 +28,10 @@ configurations {
     }
 }
 
+lombok {
+    version.set(Versions.lombok)
+}
+
 object Versions {
     const val vertxVersion = "4.2.3"
     const val log4j = "2.20.0"
@@ -34,6 +40,7 @@ object Versions {
     const val mirai = "2.15.0"
     const val kord = "0.9.0"
     const val coroutineTest = "1.7.1"
+    const val lombok = "1.18.28"
 }
 dependencies {
 
@@ -51,8 +58,15 @@ dependencies {
 //    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
     implementation(files("libs/unidbg-fix.jar"))
 
-    //db
+    compileOnly("org.projectlombok:lombok:${Versions.lombok}")
+    annotationProcessor("org.projectlombok:lombok:${Versions.lombok}")
+
+    //db driver
     runtimeOnly("com.h2database:h2")
+//    runtimeOnly("org.xerial:sqlite-jdbc")
+//    runtimeOnly("com.github.gwenn:sqlite-dialect")
+//    runtimeOnly("mysql:mysql-connector-java")
+//    runtimeOnly("org.postgresql:postgresql")
 
     //discord
     implementation("dev.kord:kord-core:${Versions.kord}")
@@ -127,6 +141,10 @@ allOpen {
 noArg {
     annotation("javax.persistence.Entity")
 }
+
+//kapt {
+//    keepJavacAnnotationProcessors = true
+//}
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
