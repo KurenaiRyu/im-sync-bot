@@ -54,6 +54,8 @@ object FileService {
                         this.fileId = it.remote.id
                     }
                 }
+            }.filter {
+                it.fileId?.isNotBlank() ?: false && it.id?.isNotBlank() ?: false
             }.let(fileCacheRepository::saveAll)
         }
     }
