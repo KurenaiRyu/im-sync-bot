@@ -1,6 +1,6 @@
 package kurenai.imsyncbot.configuration.annotation
 
-import kurenai.imsyncbot.domain.SnowFlakeGenerator
+import kurenai.imsyncbot.configuration.SnowFlakeGenerator
 import org.hibernate.annotations.IdGeneratorType
 
 /**

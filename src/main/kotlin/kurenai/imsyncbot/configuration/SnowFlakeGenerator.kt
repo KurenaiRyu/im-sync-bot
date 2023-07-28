@@ -1,15 +1,14 @@
-package kurenai.imsyncbot.domain
+package kurenai.imsyncbot.configuration
 
-import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.configuration.annotation.SnowFlakeGenerator
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.snowFlake
-import org.hibernate.HibernateException
 import org.hibernate.engine.spi.SharedSessionContractImplementor
 import org.hibernate.generator.BeforeExecutionGenerator
 import org.hibernate.generator.EventType
 import org.hibernate.generator.EventTypeSets
 import org.hibernate.id.factory.spi.CustomIdGeneratorCreationContext
+import java.lang.reflect.Field
 import java.lang.reflect.Member
 import java.util.*
 
@@ -24,16 +23,21 @@ class SnowFlakeGenerator(
     val creationContext: CustomIdGeneratorCreationContext,
 ) : BeforeExecutionGenerator {
 
-    val memberType: MemberType
+    private val memberType: MemberType
 
     init {
-        val clazz = idMember.declaringClass
-        memberType = if (Long::class.java.isAssignableFrom(clazz)) {
-            MemberType.LONG
-        } else if (String::class.java.isAssignableFrom(clazz)) {
-            MemberType.STRING
+        if (idMember is Field) {
+            val type = idMember.type
+            memberType =
+                if (Long::class.java.isAssignableFrom(type) || java.lang.Long::class.java.isAssignableFrom(type)) {
+                    MemberType.LONG
+                } else if (String::class.java.isAssignableFrom(type)) {
+                    MemberType.STRING
+                } else {
+                    throw BotException("Unsupported id type [" + type.name + "] for snow flake generator")
+                }
         } else {
-            throw BotException("Unsupported id type [" + clazz.name + "] for snow flake generator")
+            throw BotException("Unsupported id [${idMember.declaringClass}.${idMember.name}] for snow flake generator")
         }
     }
 
@@ -44,11 +48,10 @@ class SnowFlakeGenerator(
     override fun generate(
         session: SharedSessionContractImplementor,
         owner: Any,
-        currentValue: Any,
+        currentValue: Any?,
         eventType: EventType
     ): Any {
-        val entityPersister = session.getEntityPersister(owner::class.qualifiedName, owner)
-        return entityPersister.getIdentifier(owner, session) ?: run {
+        return currentValue ?: run {
             when (memberType) {
                 MemberType.LONG -> snowFlake.nextId()
                 MemberType.STRING -> snowFlake.nextAlpha()
