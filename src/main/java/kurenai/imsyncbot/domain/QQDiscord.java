@@ -35,5 +35,8 @@ public class QQDiscord {
     Integer qqMsgId;
     Long discordChannelId;
     Long discordMsgId;
+    @Version
+    @Column(columnDefinition = "default 0")
+    Integer version;
 
 }

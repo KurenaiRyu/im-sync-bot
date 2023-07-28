@@ -1,9 +1,6 @@
 package kurenai.imsyncbot.domain;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import kurenai.imsyncbot.configuration.annotation.SnowFlakeGenerator;
 import kurenai.imsyncbot.service.GroupStatus;
 import lombok.AllArgsConstructor;
@@ -35,5 +32,8 @@ public class GroupConfig {
     private Long telegramGroupId;
     private Long discordChannelId;
     private HashSet<GroupStatus> status;
+    @Version
+    @Column(columnDefinition = "default 0")
+    Integer version;
 
 }

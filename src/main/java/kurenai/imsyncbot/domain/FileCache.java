@@ -1,9 +1,6 @@
 package kurenai.imsyncbot.domain;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import kurenai.imsyncbot.configuration.annotation.SnowFlakeGenerator;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -29,4 +26,7 @@ public class FileCache {
     @SnowFlakeGenerator
     String id;
     String fileId;
+    @Version
+    @Column(columnDefinition = "default 0")
+    Integer version;
 }

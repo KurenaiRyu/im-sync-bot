@@ -6,7 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.FieldNameConstants;
-import org.hibernate.annotations.GenericGenerator;
 
 /**
  * @author Kurenai
@@ -25,11 +24,14 @@ import org.hibernate.annotations.GenericGenerator;
 @FieldNameConstants
 public class QQTg {
 
+    @Id
+    @SnowFlakeGenerator
+    Long id;
     Long qqId;
     Integer qqMsgId;
     Long tgGrpId;
     Long tgMsgId;
-    @Id
-    @SnowFlakeGenerator
-    Long id;
+    @Version
+    @Column(columnDefinition = "default 0")
+    Integer version;
 }

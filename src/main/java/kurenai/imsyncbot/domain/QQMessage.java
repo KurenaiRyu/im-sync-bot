@@ -6,7 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.FieldNameConstants;
-import org.hibernate.annotations.GenericGenerator;
 
 import java.time.LocalDateTime;
 
@@ -44,4 +43,7 @@ public class QQMessage {
     String json;
     Boolean handled;
     LocalDateTime msgTime;
+    @Version
+    @Column(columnDefinition = "default 0")
+    Integer version;
 }

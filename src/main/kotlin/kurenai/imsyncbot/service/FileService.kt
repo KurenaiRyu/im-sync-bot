@@ -49,7 +49,10 @@ object FileService {
         withIO {
             messages.mapIndexedNotNull { index, message ->
                 message.content.file()?.let {
-                    FileCache(images[index].md5.toHex(), it.remote.id)
+                    FileCache().apply {
+                        this.id = images[index].md5.toHex()
+                        this.fileId = it.remote.id
+                    }
                 }
             }.let(fileCacheRepository::saveAll)
         }
@@ -62,7 +65,11 @@ object FileService {
     suspend fun cache(md5Hex: String, message: TdApi.Message) {
         withIO {
             message.content.file()?.remote?.id?.takeIf { it.isNotBlank() }?.let {
-                fileCacheRepository.save(FileCache(md5Hex, it))
+                fileCacheRepository.save(
+                    FileCache().apply {
+                        this.id = md5Hex
+                        this.fileId = it
+                    })
             }
         }
     }
