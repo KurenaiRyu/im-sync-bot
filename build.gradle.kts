@@ -36,7 +36,7 @@ object Versions {
     const val vertxVersion = "4.2.3"
     const val log4j = "2.20.0"
     const val ktor = "2.3.0"
-    const val tdlight = "3.0.11+td.1.8.14"
+    const val tdlight = "3.0.12+td.1.8.14"
     const val mirai = "2.15.0"
     const val kord = "0.9.0"
     const val coroutineTest = "1.7.1"
@@ -79,8 +79,6 @@ dependencies {
 //    implementation("net.mamoe", "mirai-core-api", miraiVersion)
 //    implementation("net.mamoe", "mirai-core-utils", miraiVersion)
 
-    //telegram
-//    implementation("moe.kurenai.tdlight", "td-light-sdk", "0.1.0-SNAPSHOT")
     //tdlib
     implementation(platform("it.tdlight:tdlight-java-bom:${Versions.tdlight}"))
     implementation("it.tdlight:tdlight-java")
