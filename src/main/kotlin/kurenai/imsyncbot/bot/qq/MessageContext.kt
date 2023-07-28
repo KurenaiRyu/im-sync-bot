@@ -9,6 +9,7 @@ import it.tdlight.jni.TdApi.InputMessagePhoto
 import it.tdlight.jni.TdApi.InputMessageVideo
 import it.tdlight.jni.TdApi.SendMessageAlbum
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -272,7 +273,9 @@ class GroupMessageContext(
                 this.inputMessageContent = buildContent()
             }
         }.also {
-            FileService.cache(image, it)
+            CoroutineScope(bot.coroutineContext).launch {
+                FileService.cache(image, it)
+            }
         })
 
         private suspend fun buildContent(): InputMessageContent {

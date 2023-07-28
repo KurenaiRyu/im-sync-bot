@@ -30,6 +30,7 @@ import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
+import net.mamoe.mirai.event.subscribeAlways
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import java.util.WeakHashMap
@@ -93,6 +94,10 @@ class DiscordBot(
                     }.onFailure {
                         log.error("Try relogin failed", it)
                     }
+                }
+
+                bot.qq.qqBot.eventChannel.subscribeAlways<Event> {
+                    incomingEventChannel.trySend(it)
                 }
 
                 log.warn("Discord bot was logout")

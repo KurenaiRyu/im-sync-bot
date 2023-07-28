@@ -106,7 +106,6 @@ class QQBot(
         val initBot = suspend {
             qqBot.eventChannel.filter { event ->
                 return@filter kotlin.runCatching {
-                    bot.discord.incomingEventChannel.trySend(event)
                     when (event) {
                         is GroupAwareMessageEvent -> {
                             if (bot.groupConfigService.configs.isEmpty()) return@filter false

@@ -3,7 +3,7 @@ create table if not exists QQ_MESSAGE
     ID         LONG auto_increment    not null,
     MESSAGE_ID INTEGER                not null,
     BOT_ID     BIGINT                 not null,
-    OBJ_ID     INTEGER                not null,
+    OBJ_ID INTEGER null,
     SENDER     BIGINT                 not null,
     TARGET     BIGINT                 not null,
     TYPE       CHARACTER VARYING(15)  not null,

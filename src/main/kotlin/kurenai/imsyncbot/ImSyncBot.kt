@@ -51,7 +51,7 @@ class ImSyncBot(
     var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
     internal val qq: QQBot = QQBot(configProperties.bot.qq, this)
     internal val tg: TelegramBot = TelegramBot(configProperties.bot.telegram, this)
-    internal val discord: DiscordBot = DiscordBot(this)
+//    internal val discord: DiscordBot = DiscordBot(this)
 //    internal val privateHandle = PrivateChatHandler(configProperties)
 
     init {
@@ -76,7 +76,7 @@ class ImSyncBot(
             log.info("QQ bot ${configProperties.bot.qq.account}")
             tg.start()
             qq.start()
-            discord.start()
+//            discord.start()
         }
     }
 

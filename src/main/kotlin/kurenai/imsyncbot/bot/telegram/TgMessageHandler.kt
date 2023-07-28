@@ -334,7 +334,9 @@ class TgMessageHandler(
                 if (it.sourceIds.isEmpty()) {
                     throw BotException("回执消息为空，可能被风控")
                 } else {
-                    MessageService.cache(it, message)
+                    bot.tg.launch {
+                        MessageService.cache(it, message)
+                    }
                 }
             }.onFailure {
                 log.warn("Cache message error", it)
