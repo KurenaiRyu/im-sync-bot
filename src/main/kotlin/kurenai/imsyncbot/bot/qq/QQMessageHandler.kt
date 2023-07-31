@@ -1,22 +1,15 @@
 package kurenai.imsyncbot.bot.qq
 
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import it.tdlight.jni.TdApi.EditMessageCaption
-import it.tdlight.jni.TdApi.EditMessageText
-import it.tdlight.jni.TdApi.InputMessageText
-import it.tdlight.jni.TdApi.MessageText
-import it.tdlight.jni.TdApi.TextEntity
-import it.tdlight.jni.TdApi.TextEntityTypeStrikethrough
+import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.TelegramUtil.textOrCaption
 import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
 import kurenai.imsyncbot.utils.TelegramUtil.fmt
+import kurenai.imsyncbot.utils.TelegramUtil.textOrCaption
 import kurenai.imsyncbot.utils.TelegramUtil.userSender
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.contact.remarkOrNameCardOrNick
@@ -32,8 +25,6 @@ class QQMessageHandler(
     private var tgMsgFormat = "\$name: \$msg"
     private var qqMsgFormat = "\$name: \$msg"
     private var enableRecall = configProperties.bot.enableRecall
-    private val mapper = jacksonObjectMapper()
-        .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
 
     init {
         if (configProperties.bot.tgMsgFormat.contains("\$msg")) tgMsgFormat = configProperties.bot.tgMsgFormat
@@ -151,6 +142,7 @@ class QQMessageHandler(
     }
 
     suspend fun onGroupEvent(event: GroupEvent) {
+        val chatId = bot.groupConfigService.qqTg[event.group.id] ?: return
         val msg = when (event) {
             is MemberJoinEvent -> {
                 val tag = "\\#入群 \\#id${event.member.id} \\#group${event.group.id}\n"
@@ -211,7 +203,6 @@ class QQMessageHandler(
                 return
             }
         }
-        val chatId = bot.groupConfigService.qqTg[event.group.id] ?: bot.groupConfigService.defaultTgGroup
         bot.tg.sendMessageText(msg.fmt(), chatId)
     }
 
