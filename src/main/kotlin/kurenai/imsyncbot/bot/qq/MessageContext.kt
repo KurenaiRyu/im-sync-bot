@@ -206,13 +206,12 @@ class GroupMessageContext(
                 else lastAt = target
                 val id: Long?
                 content += if (target == group.bot.id && getReplayToMessageId() <= 0) {
-                    id = bot.userConfig.masterTg
-                    bot.userConfig.masterUsername.ifBlank { id.toString() }.let {
-                        "[${it.formatUsername().escapeMarkdownChar()}](tg://user?id=$id)"
+                    bot.userConfig.masterUsername.ifBlank { bot.userConfig.masterTg.toString() }.let {
+                        "[${it.formatUsername().escapeMarkdownChar()}](tg://user?id=$it)"
                     }
                 } else {
                     id = bot.userConfig.links.find { it.qq == target }?.tg
-                    val bindName = (bot.userConfig.qqUsernames[target] ?: bot.userConfig.idBindings[target]).let {
+                    val bindName = (bot.userConfig.qqUsernames[target] ?: bot.userConfig.idBindings[target]).let { it ->
                         if (it.isNullOrBlank())
                             messageChain.bot.getFriend(target)?.remarkOrNick?.takeIf { it.isNotBlank() }
                                 ?: group.getMember(target)?.remarkOrNameCardOrNick?.takeIf { it.isNotBlank() }

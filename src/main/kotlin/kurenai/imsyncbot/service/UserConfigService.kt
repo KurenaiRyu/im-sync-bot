@@ -259,7 +259,6 @@ class UserConfigService(
                         config.qq?.let(admins::add)
                     }
 
-                    UserStatus.MASTER,
                     UserStatus.SUPER_ADMIN -> {
                         config.tg?.let {
                             admins.add(it)
@@ -269,6 +268,18 @@ class UserConfigService(
                             admins.add(it)
                             superAdmins.add(it)
                         }
+                    }
+
+                    UserStatus.MASTER -> {
+                        config.tg?.let {
+                            admins.add(it)
+                            superAdmins.add(it)
+                        }
+                        config.qq?.let {
+                            admins.add(it)
+                            superAdmins.add(it)
+                        }
+                        masterUsername = config.bindingName
                     }
                 }
             }
