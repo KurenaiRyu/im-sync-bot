@@ -36,7 +36,7 @@ object MessageService {
      * @param messageChain
      * @param messages
      */
-    suspend fun cache(entity: QQMessage?, messageChain: MessageChain, messages: List<TdApi.Message>? = null) =
+    suspend fun cache(entity: QQMessage?, messageChain: MessageChain, messages: Array<TdApi.Message>? = null) =
         runCatching {
             withIO {
                 val qqMsg = qqMessageRepository.save(
@@ -74,7 +74,7 @@ object MessageService {
      * @param message
      */
     suspend fun cache(receipt: MessageReceipt<*>, message: TdApi.Message) {
-        cache(null, receipt.sourceMessage.plus(receipt.source), listOf(message))
+        cache(null, receipt.sourceMessage.plus(receipt.source), arrayOf(message))
     }
 
     suspend fun findTgIdByQQ(botId: Long, targetId: Long, msgId: Int): QQTg? {

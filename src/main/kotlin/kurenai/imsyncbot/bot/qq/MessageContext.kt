@@ -9,7 +9,6 @@ import it.tdlight.jni.TdApi.InputMessagePhoto
 import it.tdlight.jni.TdApi.InputMessageVideo
 import it.tdlight.jni.TdApi.SendMessageAlbum
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -33,6 +32,7 @@ import net.mamoe.mirai.event.events.GroupTempMessageEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.ForwardMessage
 import net.mamoe.mirai.utils.MiraiExperimentalApi
+import net.mamoe.mirai.utils.mapToArray
 import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
 import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
 import nl.adaptivity.xmlutil.serialization.XML
@@ -168,7 +168,7 @@ class GroupMessageContext(
             val images = messageChain.filterIsInstance<Image>()
             if (images.size == 1) {
                 val image = images.first()
-                if (image.imageType == ImageType.GIF || image.imageType == ImageType.APNG)
+                if (image.imageType == ImageType.GIF || image.imageType == ImageType.APNG || image.imageType == ImageType.UNKNOWN)
                     GifImage(image)
                 else
                     SingleImage(image)
@@ -231,13 +231,13 @@ class GroupMessageContext(
     }
 
     sealed interface ReadyToSendMessage {
-        suspend fun send(): List<TdApi.Message>
+        suspend fun send(): Array<TdApi.Message>
     }
 
     inner class XmlReadyToSendMessage(val msg: XmlMessageContent) : ReadyToSendMessage {
         val url: String? = msg.url?.handleUrl()
 
-        override suspend fun send(): List<TdApi.Message> = listOf(
+        override suspend fun send(): Array<TdApi.Message> = arrayOf(
             bot.tg.sendMessageText(
                 url?.escapeMarkdownChar()?.formatMsg(senderId, senderName)?.fmt() ?: simpleContent.asFmtText(),
                 chatId,
@@ -250,7 +250,7 @@ class GroupMessageContext(
     inner class JsonReadyToSendMessage(val msg: JsonMessageContent) : ReadyToSendMessage {
         val url: String? = (msg.meta.news?.jumpUrl ?: msg.meta.detail1.qqdocurl)?.handleUrl()
 
-        override suspend fun send(): List<TdApi.Message> = listOf(
+        override suspend fun send(): Array<TdApi.Message> = arrayOf(
             bot.tg.sendMessageText(
                 url?.escapeMarkdownChar()?.formatMsg(senderId, senderName)?.fmt() ?: simpleContent.asFmtText(),
                 chatId,
@@ -265,18 +265,19 @@ class GroupMessageContext(
 
         private val shouldBeFile: Boolean = image.shouldBeFile()
 
-        override suspend fun send(): List<TdApi.Message> = listOf(bot.tg.send(untilPersistent = true) {
-            TdApi.SendMessage().apply {
+        override suspend fun send(): Array<TdApi.Message> {
+            val func = TdApi.SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.replyToMessageId = it }
                 this.inputMessageContent = buildContent()
             }
-        }.also {
-            CoroutineScope(bot.coroutineContext).launch {
-                FileService.cache(image, it)
-            }
-        })
+            return arrayOf(bot.tg.execute(untilPersistent = true, function = func).also {
+                CoroutineScope(bot.coroutineContext).launch {
+                    FileService.cache(image, it)
+                }
+            })
+        }
 
         private suspend fun buildContent(): InputMessageContent {
             val caption = if (onlyImage) {
@@ -312,9 +313,9 @@ class GroupMessageContext(
                 it.shouldBeFile()
         }
 
-        override suspend fun send(): List<TdApi.Message> = bot.tg.send(untilPersistent = true) {
+        override suspend fun send(): Array<TdApi.Message> {
             val formattedText = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
-            SendMessageAlbum().apply {
+            val func = SendMessageAlbum().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.replyToMessageId = it }
                 this.inputMessageContents = buildContents().also {
@@ -331,9 +332,10 @@ class GroupMessageContext(
                     }
                 }
             }
-        }.messages.toList().also {
-            CoroutineScope(bot.coroutineContext).launch {
-                FileService.cache(images, it)
+            return bot.tg.execute(func, untilPersistent = true).messages.also {
+                CoroutineScope(bot.coroutineContext).launch {
+                    FileService.cache(images, it)
+                }
             }
         }
 
@@ -352,17 +354,18 @@ class GroupMessageContext(
         val image: Image,
     ) : ReadyToSendMessage {
 
-        override suspend fun send(): List<TdApi.Message> = listOf(bot.tg.send(true) {
-            TdApi.SendMessage().apply {
+        override suspend fun send(): Array<TdApi.Message> {
+            val func = TdApi.SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.replyToMessageId = it }
                 this.inputMessageContent = buildContent()
             }
-        }.also {
-            CoroutineScope(bot.coroutineContext).launch {
-                FileService.cache(image, it)
-            }
-        })
+            return arrayOf(bot.tg.execute(func, untilPersistent = true).also {
+                CoroutineScope(bot.coroutineContext).launch {
+                    FileService.cache(image, it)
+                }
+            })
+        }
 
         private suspend fun buildContent(): InputMessageContent {
             getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
@@ -376,10 +379,10 @@ class GroupMessageContext(
 
     inner class Video(val fileMessage: FileMessage) : ReadyToSendMessage {
 
-        override suspend fun send(): List<TdApi.Message> = listOf(bot.tg.send(true) {
+        override suspend fun send(): Array<TdApi.Message> {
             val url = fileMessage.toAbsoluteFile(group)?.getUrl()
             require(url != null) { "获取视频地址失败" }
-            TdApi.SendMessage().apply {
+            val func = TdApi.SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.replyToMessageId = it }
                 this.inputMessageContent = InputMessageVideo().apply {
@@ -387,11 +390,12 @@ class GroupMessageContext(
                     this.video = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
                 }
             }
-        }.also {
-            CoroutineScope(bot.coroutineContext).launch {
-                FileService.cache(Path.of(BotUtil.getDocumentPath(fileMessage.name)).md5(), it)
-            }
-        })
+            return arrayOf(bot.tg.execute(func, true).also {
+                CoroutineScope(bot.coroutineContext).launch {
+                    FileService.cache(Path.of(BotUtil.getDocumentPath(fileMessage.name)).md5(), it)
+                }
+            })
+        }
     }
 
     inner class File(
@@ -401,17 +405,16 @@ class GroupMessageContext(
         // http://183.47.111.39/ftn_handler/B5C4BFA68F2C8362F222D540E5DE5CD40592321149BC8EE21CED5E4A516F2BED00DBA98D5E659DBCEBBC6662CAC8368F728482811326AF3BF8F9170BE2EE9C7C/?fname=31633433666234612D353338312D313165642D393662322D353235343030643663323236
         // Client request error: [400]Bad Request: wrong file identifier/HTTP URL specified
 
-        override suspend fun send(): List<TdApi.Message> {
+        override suspend fun send(): Array<TdApi.Message> {
             val url = getUrl()
-            return listOf(bot.tg.send(true) {
-                TdApi.SendMessage().apply {
-                    this.chatId = this@GroupMessageContext.chatId
-                    this.inputMessageContent = InputMessageDocument().apply {
-                        this.caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
-                        this.document = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
-                    }
+            val func = TdApi.SendMessage().apply {
+                this.chatId = this@GroupMessageContext.chatId
+                this.inputMessageContent = InputMessageDocument().apply {
+                    this.caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
+                    this.document = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
                 }
-            }.also {
+            }
+            return arrayOf(bot.tg.execute(func, true).also {
                 CoroutineScope(bot.coroutineContext).launch {
                     FileService.cache(Path.of(BotUtil.getDocumentPath(fileMessage.name)).md5(), it)
                 }
@@ -439,7 +442,7 @@ class GroupMessageContext(
             )
         }
 
-        override suspend fun send(): List<TdApi.Message> {
+        override suspend fun send(): Array<TdApi.Message> {
             return msg.nodeList.map {
                 GroupMessageContext(
                     null,
@@ -451,14 +454,14 @@ class GroupMessageContext(
                     senderName = "$senderName forward from ${it.senderName}"
                 )
             }.map {
-                it.readyToSendMessage.send()
-            }.flatten()
+                it.readyToSendMessage.send().toList()
+            }.flatten().toTypedArray()
         }
     }
 
     inner class Normal : ReadyToSendMessage {
 
-        override suspend fun send(): List<TdApi.Message> = listOf(
+        override suspend fun send(): Array<TdApi.Message> = arrayOf(
             bot.tg.sendMessageText(
                 getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt(),
                 chatId,

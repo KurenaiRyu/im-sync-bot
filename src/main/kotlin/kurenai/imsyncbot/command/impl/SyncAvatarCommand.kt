@@ -20,7 +20,7 @@ class SyncAvatarCommand : AbstractTelegramCommand() {
         bot.userConfig.chatIdFriends[message.chatId]?.let { friendId ->
             qqBot.getFriend(friendId)?.let { friend ->
                 val avatarPath = BotUtil.downloadImg("friend#$friendId.png", friend.avatarUrl, overwrite = true)
-                bot.tg.send {
+                bot.tg.execute {
                     SetChatPhoto(
                         message.chatId,
                         InputChatPhotoStatic(InputFileLocal(avatarPath.pathString))
@@ -32,7 +32,7 @@ class SyncAvatarCommand : AbstractTelegramCommand() {
         bot.groupConfigService.tgQQ[message.chatId]?.let { groupId ->
             qqBot.getGroup(groupId)?.let {
                 val avatarPath = BotUtil.downloadImg("group#$groupId.png", it.avatarUrl, overwrite = true)
-                bot.tg.send {
+                bot.tg.execute {
                     SetChatPhoto(
                         message.chatId,
                         InputChatPhotoStatic(InputFileLocal(avatarPath.pathString))

@@ -5,10 +5,9 @@ import it.tdlight.client.*
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
+import kotlinx.datetime.Instant
 import kurenai.imsyncbot.*
-import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.ParseMode
@@ -26,12 +25,13 @@ import java.util.*
 import kotlin.Result
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
-import kotlin.coroutines.CoroutineContext
 import kotlin.io.path.pathString
 import kotlin.io.path.writeBytes
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.measureTimedValue
 
 /**
  * Telegram 机器人实例
@@ -133,7 +133,7 @@ class TelegramBot(
         replayToMessageId: Long? = null,
         messageThreadId: Long? = null,
         untilPersistent: Boolean = false,
-    ) = send(untilPersistent) {
+    ) = execute(untilPersistent) {
         messageText(formattedText, chatId).apply {
             replayToMessageId?.let { this.replyToMessageId = it }
             messageThreadId?.let { this.messageThreadId = it }
@@ -167,7 +167,7 @@ class TelegramBot(
         replayToMessageId: Long? = null,
         messageThreadId: Long? = null,
         untilPersistent: Boolean = false,
-    ) = send(untilPersistent = untilPersistent) {
+    ): Message {
         SendMessage().apply {
             replayToMessageId?.let { this.replyToMessageId = it }
             messageThreadId?.let { this.messageThreadId = it }
@@ -176,9 +176,11 @@ class TelegramBot(
                 this.caption = formattedText
             }
         }
-        messageText(formattedText, chatId).apply {
-            replayToMessageId?.let { this.replyToMessageId = it }
-            messageThreadId?.let { this.messageThreadId = it }
+        return execute(untilPersistent = untilPersistent) {
+            messageText(formattedText, chatId).apply {
+                replayToMessageId?.let { this.replyToMessageId = it }
+                messageThreadId?.let { this.messageThreadId = it }
+            }
         }
     }
 
@@ -189,7 +191,7 @@ class TelegramBot(
         filename: String = "${System.currentTimeMillis()}",
         replayToMessageId: Long? = null,
         untilPersistent: Boolean = false,
-    ) = send(untilPersistent = untilPersistent) {
+    ) = execute(untilPersistent = untilPersistent) {
         val path = Path.of(BotUtil.getImagePath(filename))
         path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
         SendMessage().apply {
@@ -204,7 +206,7 @@ class TelegramBot(
 
     suspend fun deleteMessages(chatId: Long, vararg messageIds: Long) {
         require(messageIds.isNotEmpty()) { "message id cannot be null" }
-        send {
+        execute {
             DeleteMessages().apply {
                 this.chatId = chatId
                 this.messageIds = messageIds
@@ -238,60 +240,61 @@ class TelegramBot(
             this.priority = priority
             this.synchronous = synchronous
         }
-        return if (synchronous) withIO { send(downloadFile) }
-        else send(downloadFile)
+        return if (synchronous) withIO { execute(downloadFile) }
+        else execute(downloadFile)
     }
 
-    suspend inline fun getMessage(chatId: Long, messageId: Long) = send {
+    suspend inline fun getMessage(chatId: Long, messageId: Long) = execute {
         GetMessage(chatId, messageId)
     }
 
-    suspend inline fun getChatMember(chatId: Long, sender: MessageSender) = send {
+    suspend inline fun getChatMember(chatId: Long, sender: MessageSender) = execute {
         GetChatMember(chatId, sender)
     }
 
-    suspend inline fun getUser(userId: Long) = send {
+    suspend inline fun getUser(userId: Long) = execute {
         GetUser(userId)
     }
 
     suspend inline fun getUser(message: Message) = message.userSender()?.let { user ->
-        send {
+        execute {
             GetUser(user.userId)
         }
     }
 
     fun getMe(): User = client.me
 
-    suspend inline fun getChat(chatId: Long) = send {
+    suspend inline fun getChat(chatId: Long) = execute {
         GetChat(chatId)
     }
 
     fun getUsername(): String = client.me.usernames.activeUsernames.first()
 
-    suspend inline fun <R : Object, Fun : TdApi.Function<R>> send(
-        func: Fun,
+    suspend inline fun <R : Object, Fun : TdApi.Function<R>> execute(
+        function: Fun,
         untilPersistent: Boolean = false,
         timeout: Duration = 5.seconds
-    ): R = send(untilPersistent, timeout) { func }
+    ): R = execute(untilPersistent, timeout) { function }
 
-    suspend fun <R : Object> send(
+    @OptIn(ExperimentalTime::class)
+    suspend fun <R : Object> execute(
         untilPersistent: Boolean = false,
         timeout: Duration = 10.seconds,
-        block: suspend () -> TdApi.Function<R>
+        block: () -> TdApi.Function<R>
     ): R {
         contract {
             callsInPlace(block, InvocationKind.EXACTLY_ONCE)
         }
-
-        return withContext(this.coroutineContext) {
-            val result = suspendCancellableCoroutine<it.tdlight.client.Result<R>> { con ->
-                launch {
-                    client.send(block.invoke()) { result ->
+        val params = block()
+        val (value, duration) = measureTimedValue {
+            withContext(this.coroutineContext) {
+                val result = suspendCancellableCoroutine<it.tdlight.client.Result<R>> { con ->
+                    client.send(params) { result ->
                         if (untilPersistent && !result.isError) {
                             val obj = result.get()
                             if ((obj as? Message)?.sendingState?.constructor == MessageSendingStatePending.CONSTRUCTOR) {
                                 pendingMessage[obj.id] =
-                                    con as CancellableContinuation<it.tdlight.client.Result<Object>>
+                                    con as CancellableContinuation<it.tdlight.client.Result<TdApi.Object>>
                             } else {
                                 con.resumeWith(Result.success(result))
                             }
@@ -299,24 +302,29 @@ class TelegramBot(
                             con.resumeWith(Result.success(result))
                         }
                     }
-                    delay(timeout)
-                    if (con.isActive) con.resumeWith(Result.failure(BotException("Telegram client timeout in $timeout")))
+                }
+                return@withContext if (result.isError && result.error.message.contains("retry after")) {
+                    val seconds = result.error.message.substringAfterLast(" ").toLongOrNull() ?: 5
+                    log.warn("Wait for {}s", seconds)
+                    delay(seconds * 1000)
+                    execute(untilPersistent, timeout, block)
+                } else {
+                    result.get()
                 }
             }
-            return@withContext if (result.isError && result.error.message.contains("retry after")) {
-                val seconds = result.error.message.substringAfterLast(" ").toLongOrNull() ?: 200
-                delay(seconds * 1000)
-                send(untilPersistent, timeout, block)
-            } else {
-                result.get()
-            }
         }
+        if (log.isTraceEnabled) {
+            log.trace("in {}, Execute {}", duration, params)
+        } else {
+            log.debug("Execute {} in {}", params::class.simpleName, duration)
+        }
+        return value
     }
 
     private suspend fun updateCommand() = runCatching {
-        send { DeleteCommands().apply { this.scope = BotCommandScopeAllPrivateChats() } }
-        send { DeleteCommands().apply { this.scope = BotCommandScopeAllGroupChats() } }
-        send {
+        execute { DeleteCommands().apply { this.scope = BotCommandScopeAllPrivateChats() } }
+        execute { DeleteCommands().apply { this.scope = BotCommandScopeAllGroupChats() } }
+        execute {
             SetCommands().apply {
                 this.scope = BotCommandScopeAllPrivateChats()
                 this.commands = tgCommands.filter { it.onlyUserMessage }.map { cmd ->
@@ -328,7 +336,7 @@ class TelegramBot(
             }
         }
 
-        send {
+        execute {
             SetCommands().apply {
                 this.scope = BotCommandScopeAllGroupChats()
                 this.commands = tgCommands.filter { it.onlyGroupMessage }.map { cmd ->
@@ -352,7 +360,7 @@ class TelegramBot(
                 )
             }"
 
-            send {
+            execute {
                 messageText(errorMsg.asFmtText(), message.chatId).apply {
                     this.replyToMessageId = message.id
                     this.options = MessageSendOptions().apply {

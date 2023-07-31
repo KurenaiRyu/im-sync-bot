@@ -82,7 +82,7 @@ class InfoCommand : AbstractTelegramCommand() {
                                     overwrite = true
                                 )
                             }
-                            bot.tg.send {
+                            bot.tg.execute {
                                 messagePhoto(
                                     message.chatId,
                                     path.pathString,
@@ -125,7 +125,7 @@ class InfoCommand : AbstractTelegramCommand() {
 
                 val path =
                     withIO { BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl, overwrite = true) }
-                bot.tg.send {
+                bot.tg.execute {
                     messagePhoto(message.chatId, path.pathString, list.joinToString("\n").fmt(ParseMode.MARKDOWN_V2))
                 }
                 null

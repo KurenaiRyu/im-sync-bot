@@ -1,8 +1,8 @@
 package kurenai.imsyncbot.utils
 
 import it.tdlight.jni.TdApi.*
+import kotlinx.coroutines.runBlocking
 import kurenai.imsyncbot.bot.telegram.defaultTelegramBot
-import java.lang.reflect.Constructor
 
 /**
  * @author Kurenai
@@ -27,8 +27,10 @@ object TelegramUtil {
      * @param parseMode
      * @return
      */
-    suspend inline fun String.fmt(parseMode: ParseMode = ParseMode.MARKDOWN_V2): FormattedText = parseMode.ins?.let {
-        defaultTelegramBot.send(ParseTextEntities(this, it))
+    fun String.fmt(parseMode: ParseMode = ParseMode.MARKDOWN_V2): FormattedText = parseMode.ins?.let {
+        runBlocking {
+            defaultTelegramBot.execute(ParseTextEntities(this@fmt, it))
+        }
     } ?: this.asFmtText()
 
     fun String.asFmtText() = FormattedText().apply { text = this@asFmtText }

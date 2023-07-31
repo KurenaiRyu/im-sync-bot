@@ -50,9 +50,10 @@ class QQMessageHandler(
             kotlin.runCatching {
                 readyToSendMessage.send()
             }.recoverCatching {
+                log.warn("Send group message error, try to send normal type message", it)
                 resolvedContext.normalType.send()
             }.getOrThrow().also { messages ->
-                log.debug("${context.infoString} Sent ${mapper.writeValueAsString(messages)}")
+                log.debug("{} Sent {}", context.infoString, messages)
                 if (context.entity == null) return@also
                 CoroutineScope(bot.coroutineContext).launch {
                     MessageService.cache(context.entity, context.messageChain, messages)
@@ -117,7 +118,7 @@ class QQMessageHandler(
             } else {
                 val originMsg = bot.tg.getMessage(message.tgGrpId, message.tgMsgId)
                 if (originMsg.userSender()?.userId != bot.tg.getMe().id) return CONTINUE
-                bot.tg.send {
+                bot.tg.execute {
                     val content = originMsg.content
                     if (content is MessageText) {
                         EditMessageText().apply {

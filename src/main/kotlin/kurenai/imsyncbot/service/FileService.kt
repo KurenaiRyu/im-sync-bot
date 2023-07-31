@@ -13,6 +13,7 @@ import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.message.data.ImageType
+import net.mamoe.mirai.utils.MiraiInternalApi
 import kotlin.io.path.pathString
 import kotlin.jvm.optionals.getOrNull
 
@@ -23,14 +24,21 @@ import kotlin.jvm.optionals.getOrNull
 
 object FileService {
 
+    @OptIn(MiraiInternalApi::class)
     suspend fun download(image: Image) = withIO {
         fileCacheRepository.findById(image.md5.toHex()).getOrNull()?.let {
             InputFileRemote(it.fileId)
         } ?: run {
-            InputFileLocal(BotUtil.downloadImg(image.imageId, image.queryUrl()).pathString)
+            InputFileLocal(
+                BotUtil.downloadImg(
+                    "${image.imageId.substring(1..36).replace("-", "")}.${image.imageType.formatName}",
+                    image.queryUrl()
+                ).pathString
+            )
         }
     }
 
+    @OptIn(MiraiInternalApi::class)
     suspend fun download(images: List<Image>) = channelFlow {
         val imgMap = images.associateBy { it.md5.toHex() }.toMutableMap()
         val caches = withIO { fileCacheRepository.findAllById(imgMap.keys) }
@@ -40,12 +48,12 @@ object FileService {
         }
 
         imgMap.entries.takeIf { it.isNotEmpty() }?.forEach { (key, img) ->
-            val filename = if (img.imageType == ImageType.UNKNOWN) "$key.jpg" else img.imageId
+            val filename = "${img.imageId.substring(1..36).replace("-", "")}.${img.imageType.formatName}"
             send(InputFileLocal(BotUtil.downloadImg(filename, img.queryUrl()).pathString))
         }
     }
 
-    suspend fun cache(images: List<Image>, messages: List<TdApi.Message>) {
+    suspend fun cache(images: List<Image>, messages: Array<TdApi.Message>) {
         withIO {
             messages.mapIndexedNotNull { index, message ->
                 message.content.file()?.let {
