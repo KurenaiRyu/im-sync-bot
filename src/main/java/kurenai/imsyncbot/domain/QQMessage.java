@@ -27,7 +27,6 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@FieldNameConstants
 public class QQMessage {
     @Id
     @SnowFlakeGenerator

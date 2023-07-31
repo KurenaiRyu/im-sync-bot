@@ -1,36 +1,36 @@
 package kurenai.imsyncbot.domain;
 
 import jakarta.persistence.*;
+import kurenai.imsyncbot.service.UserStatus;
 import kurenai.imsyncbot.configuration.annotation.SnowFlakeGenerator;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.FieldNameConstants;
 
+import java.util.HashSet;
+
 /**
  * @author Kurenai
- * @since 2023/7/22 19:40
+ * @since 2023/7/22 18:26
  */
 
 @Entity
-@Table(
-        name = "QQ_TG", indexes = {
-        @Index(name = "QQ_TG_GRP_ID_TG_MSG_ID_uindex", columnList = "tgGrpId, tgMsgId DESC", unique = true)
-}
-)
+@Table(name = "USER_CONFIG")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class QQTg {
+public class UserConfig {
 
     @Id
     @SnowFlakeGenerator
-    Long id;
-    Long qqId;
-    Integer qqMsgId;
-    Long tgGrpId;
-    Long tgMsgId;
+    private Long id;
+    private Long tg;
+    private Long qq;
+    private String bindingName;
+    private HashSet<UserStatus> status;
     @Version
-    @Column(columnDefinition = "default 0")
+    @Column(columnDefinition = "integer default 0")
     Integer version;
+
 }

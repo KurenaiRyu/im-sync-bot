@@ -3,6 +3,7 @@ package kurenai.imsyncbot.domain
 import jakarta.persistence.AttributeConverter
 import jakarta.persistence.Converter
 import kurenai.imsyncbot.service.GroupStatus
+import kurenai.imsyncbot.service.UserStatus
 
 /**
  * @author Kurenai
@@ -10,7 +11,7 @@ import kurenai.imsyncbot.service.GroupStatus
  */
 
 @Converter(autoApply = true)
-class StatusConverter : AttributeConverter<HashSet<GroupStatus>, String> {
+class GroupStatusConverter : AttributeConverter<HashSet<GroupStatus>, String> {
 
     override fun convertToDatabaseColumn(attribute: HashSet<GroupStatus>?): String? {
         return attribute?.joinToString(",")
@@ -20,5 +21,17 @@ class StatusConverter : AttributeConverter<HashSet<GroupStatus>, String> {
         return dbData?.split(",")?.filter { it.isNotBlank() }?.map(GroupStatus::valueOf)?.toHashSet() ?: hashSetOf()
     }
 
+}
+
+@Converter(autoApply = true)
+class UserStatusConverter : AttributeConverter<HashSet<UserStatus>, String> {
+
+    override fun convertToDatabaseColumn(attribute: HashSet<UserStatus>?): String? {
+        return attribute?.joinToString(",")
+    }
+
+    override fun convertToEntityAttribute(dbData: String?): HashSet<UserStatus> {
+        return dbData?.split(",")?.filter { it.isNotBlank() }?.map(UserStatus::valueOf)?.toHashSet() ?: hashSetOf()
+    }
 
 }

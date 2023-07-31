@@ -40,7 +40,7 @@ class BindCommand : AbstractTelegramCommand() {
                             bot.userConfig.bindName(qq = qqMsg.source.fromId, bindingName = param)
                             "qq`${qqMsg.source.fromId}` 绑定名称为 `${param.escapeMarkdownChar()}`"
                         } else {
-                            bot.userConfig.bindName(user.id, null, param, user.username())
+                            bot.userConfig.bindName(user.id, null, param)
                             "`${user.firstName.escapeMarkdownChar()}` 绑定名称为 `${param.escapeMarkdownChar()}`"
                         }
                     } else {
@@ -68,7 +68,7 @@ class BindCommand : AbstractTelegramCommand() {
         } else if (chat.type.constructor == ChatTypePrivate.CONSTRUCTOR && bot.userConfig.superAdmins.contains(chat.id)) {
             val usernameBinds =
                 bot.userConfig.configs.filter { it.bindingName != null }
-                    .joinToString("\n") { "`${it.username?.escapeMarkdownChar() ?: it.tg}` \\<\\=\\> `${it.bindingName!!.escapeMarkdownChar()}`" }
+                    .joinToString("\n") { "`${it.tg}` \\<\\=\\> `${it.bindingName!!.escapeMarkdownChar()}`" }
             val groupBindings =
                 bot.groupConfigService.configs.joinToString("\n") {
                     "`${it.telegramGroupId}` \\<\\=\\> `${it.qqGroupId}` \\#${
@@ -102,16 +102,16 @@ class UnbindCommand : AbstractTelegramCommand() {
         } else {
             if (message.replyToMessageId != 0L) {
                 bot.tg.getMessage(message.replyInChatId, message.replyToMessageId)?.let { reply ->
-                    val userId = reply.userSender()?.userId
+                    val userId = reply.userSender()?.userId!!
                     if (userId == bot.tg.getMe().id) {
                         val qqMsg = MessageService.findQQByTg(reply)
                         if (qqMsg != null) {
-                            bot.userConfig.unbindUsername(qqMsg.source.fromId)
+                            bot.userConfig.unbindNameByQQ(qqMsg.source.fromId)
                             "qq[${qqMsg.source.fromId}] 解绑名称成功"
                         } else "找不到该qq信息"
                     } else {
                         if (bot.userConfig.superAdmins.contains(message.userSender()?.userId)) {
-                            bot.userConfig.unbindUsername(userId)
+                            bot.userConfig.unbindNameByTG(userId)
                             "$userId 解绑名称成功"
                         } else {
                             "绑定群组操作需要超级管理员权限"

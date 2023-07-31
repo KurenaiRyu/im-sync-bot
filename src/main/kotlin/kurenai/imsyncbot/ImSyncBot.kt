@@ -2,8 +2,7 @@ package kurenai.imsyncbot
 
 import kotlinx.coroutines.*
 import kurenai.imsyncbot.service.GroupConfigService
-import kurenai.imsyncbot.configuration.UserConfig
-import kurenai.imsyncbot.bot.discord.DiscordBot
+import kurenai.imsyncbot.service.UserConfigService
 import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.bot.qq.QQMessageHandler
 import kurenai.imsyncbot.bot.qq.login.qsign.UnidbgFetchQSignFactory
@@ -46,7 +45,7 @@ class ImSyncBot(
         }
 
     internal val proxy: Proxy? = configProxy()
-    internal val userConfig: UserConfig = UserConfig(configPath, configProperties)
+    internal val userConfig: UserConfigService = UserConfigService(configPath, configProperties)
     internal val groupConfigService: GroupConfigService = GroupConfigService(this, configPath)
     var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
     internal val qq: QQBot = QQBot(configProperties.bot.qq, this)

@@ -24,6 +24,7 @@ lateinit var qqMessageRepository: QQMessageRepository
 lateinit var qqTgRepository: QQTgRepository
 lateinit var fileCacheRepository: FileCacheRepository
 lateinit var groupConfigRepository: GroupConfigRepository
+lateinit var userConfigRepository: UserConfigRepository
 lateinit var qqDiscordRepository: QqDiscordRepository
 lateinit var applicationContext: ApplicationContext
 
@@ -35,6 +36,7 @@ suspend fun main(args: Array<String>) {
     qqTgRepository = applicationContext.getBean(QQTgRepository::class.java)
     fileCacheRepository = applicationContext.getBean(FileCacheRepository::class.java)
     groupConfigRepository = applicationContext.getBean(GroupConfigRepository::class.java)
+    userConfigRepository = applicationContext.getBean(UserConfigRepository::class.java)
     qqDiscordRepository = applicationContext.getBean(QqDiscordRepository::class.java)
     start()
 }

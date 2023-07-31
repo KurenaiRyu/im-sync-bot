@@ -2,7 +2,7 @@ package kurenai.imsyncbot.command
 
 import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
-import kurenai.imsyncbot.configuration.Permission
+import kurenai.imsyncbot.service.Permission
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.qqCommands

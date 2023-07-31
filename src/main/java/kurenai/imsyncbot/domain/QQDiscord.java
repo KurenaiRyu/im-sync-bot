@@ -25,7 +25,6 @@ import org.hibernate.annotations.GenericGenerator;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@FieldNameConstants
 public class QQDiscord {
 
     @Id

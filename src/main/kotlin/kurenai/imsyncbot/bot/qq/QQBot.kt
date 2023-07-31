@@ -16,6 +16,7 @@ import kurenai.imsyncbot.domain.QQMessageType
 import kurenai.imsyncbot.domain.getLocalDateTime
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.FixProtocolVersion
+import kurenai.imsyncbot.utils.FixProtocolVersion.fetch
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.BotFactory
@@ -80,8 +81,8 @@ class QQBot(
         }
         log.info("协议版本检查更新...")
         try {
-            FixProtocolVersion.update()
-            FixProtocolVersion.sync(configuration.protocol)
+//            FixProtocolVersion.update()
+            fetch(protocol = configuration.protocol, version = "latest")
             log.info("当前协议\n{}", FixProtocolVersion.info())
         } catch (cause: Throwable) {
             log.error("协议版本升级失败", cause)

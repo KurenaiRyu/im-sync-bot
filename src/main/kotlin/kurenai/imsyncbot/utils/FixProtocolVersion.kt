@@ -15,6 +15,19 @@ public object FixProtocolVersion {
     private val constructor = clazz.constructors.single()
 
     @PublishedApi
+    internal val protocols: MutableMap<BotConfiguration.MiraiProtocol, MiraiProtocolInternal> by lazy {
+        try {
+            MiraiProtocolInternal.protocols
+        } catch (_: NoSuchMethodError) {
+            with(MiraiProtocolInternal) {
+                this::class.members
+                    .first { "protocols" == it.name }
+                    .call(this)
+            }.cast()
+        }
+    }
+
+    @PublishedApi
     internal fun <T> MiraiProtocolInternal.field(name: String, default: T): T {
         @Suppress("UNCHECKED_CAST")
         return kotlin.runCatching {
@@ -42,7 +55,6 @@ public object FixProtocolVersion {
                 builder.buildTime,
                 builder.ssoVersion
             )
-
             11 -> constructor.newInstance(
                 builder.apkId,
                 builder.id,
@@ -56,7 +68,6 @@ public object FixProtocolVersion {
                 builder.ssoVersion,
                 builder.supportsQRLogin
             )
-
             else -> this
         } as MiraiProtocolInternal
     }
@@ -76,9 +87,14 @@ public object FixProtocolVersion {
         var supportsQRLogin: Boolean = impl.field("supportsQRLogin", false)
     }
 
+    /**
+     * fix-protocol-version 插件最初的功能
+     *
+     * 根据本地代码检查协议版本更新
+     */
     @JvmStatic
     public fun update() {
-        MiraiProtocolInternal.protocols.compute(BotConfiguration.MiraiProtocol.ANDROID_PHONE) { _, impl ->
+        protocols.compute(BotConfiguration.MiraiProtocol.ANDROID_PHONE) { _, impl ->
             when {
                 null == impl -> null
                 impl.runCatching { id }.isFailure -> impl.change {
@@ -93,7 +109,6 @@ public object FixProtocolVersion {
                     buildTime = 1684467300L
                     ssoVersion = 20
                 }
-
                 impl.id < 537163098 -> impl.apply {
                     apkId = "com.tencent.mobileqq"
                     id = 537163098
@@ -109,11 +124,10 @@ public object FixProtocolVersion {
                     appKey = "0S200MNJT807V3GE"
                     supportsQRLogin = false
                 }
-
                 else -> impl
             }
         }
-        MiraiProtocolInternal.protocols.compute(BotConfiguration.MiraiProtocol.ANDROID_PAD) { _, impl ->
+        protocols.compute(BotConfiguration.MiraiProtocol.ANDROID_PAD) { _, impl ->
             when {
                 null == impl -> null
                 impl.runCatching { id }.isFailure -> impl.change {
@@ -128,7 +142,6 @@ public object FixProtocolVersion {
                     buildTime = 1684467300L
                     ssoVersion = 20
                 }
-
                 impl.id < 537161402 -> impl.apply {
                     apkId = "com.tencent.mobileqq"
                     id = 537161402
@@ -144,11 +157,10 @@ public object FixProtocolVersion {
                     appKey = "0S200MNJT807V3GE"
                     supportsQRLogin = false
                 }
-
                 else -> impl
             }
         }
-        MiraiProtocolInternal.protocols.compute(BotConfiguration.MiraiProtocol.ANDROID_WATCH) { _, impl ->
+        protocols.compute(BotConfiguration.MiraiProtocol.ANDROID_WATCH) { _, impl ->
             when {
                 null == impl -> null
                 impl.runCatching { id }.isFailure -> impl.change {
@@ -164,7 +176,6 @@ public object FixProtocolVersion {
                     ssoVersion = 5
                     supportsQRLogin = true
                 }
-
                 impl.id < 537065138 -> impl.apply {
                     apkId = "com.tencent.qqlite"
                     id = 537065138
@@ -179,11 +190,10 @@ public object FixProtocolVersion {
                     ssoVersion = 5
                     supportsQRLogin = true
                 }
-
                 else -> impl
             }
         }
-        MiraiProtocolInternal.protocols.compute(BotConfiguration.MiraiProtocol.IPAD) { _, impl ->
+        protocols.compute(BotConfiguration.MiraiProtocol.IPAD) { _, impl ->
             when {
                 null == impl -> null
                 impl.runCatching { id }.isFailure -> impl.change {
@@ -198,7 +208,6 @@ public object FixProtocolVersion {
                     buildTime = 1676531414L
                     ssoVersion = 19
                 }
-
                 impl.id < 537155074 -> impl.apply {
                     apkId = "com.tencent.minihd.qq"
                     id = 537155074
@@ -214,11 +223,10 @@ public object FixProtocolVersion {
                     appKey = "0S200MNJT807V3GE"
                     supportsQRLogin = false
                 }
-
                 else -> impl
             }
         }
-        MiraiProtocolInternal.protocols.compute(BotConfiguration.MiraiProtocol.MACOS) { _, impl ->
+        protocols.compute(BotConfiguration.MiraiProtocol.MACOS) { _, impl ->
             when {
                 null == impl -> null
                 impl.runCatching { id }.isFailure -> impl.change {
@@ -226,86 +234,101 @@ public object FixProtocolVersion {
                     ver = "6.8.2.21241"
                     buildTime = 1647227495
                 }
-
                 impl.id < 537128930 -> impl.apply {
                     id = 537128930
                     ver = "6.8.2"
                     buildVer = "6.8.2.21241"
                     buildTime = 1647227495
                 }
-
                 else -> impl
             }
         }
     }
 
+    /**
+     * 从 [RomiChan/protocol-versions](https://github.com/RomiChan/protocol-versions) 同步最新协议
+     *
+     * @since 1.6.0
+     */
+    @Deprecated(
+        message = "sync 作用不明确，故废弃",
+        ReplaceWith(
+            """fetch(protocol = protocol, version = "latest")""",
+            "xyz.cssxsh.mirai.tool.FixProtocolVersion.fetch"
+        )
+    )
     @JvmStatic
-    public fun sync(protocol: BotConfiguration.MiraiProtocol) {
+    public fun sync(protocol: BotConfiguration.MiraiProtocol): Unit = fetch(protocol = protocol, version = "latest")
+
+    /**
+     * 从 [RomiChan/protocol-versions](https://github.com/RomiChan/protocol-versions) 获取指定版本协议
+     *
+     * @since 1.9.6
+     */
+    @JvmStatic
+    public fun fetch(protocol: BotConfiguration.MiraiProtocol, version: String) {
         val (file, url) = when (protocol) {
             BotConfiguration.MiraiProtocol.ANDROID_PHONE -> {
                 File("android_phone.json") to
-                        URL("https://raw.githubusercontent.com/RomiChan/protocol-versions/master/android_phone.json")
+                        when (version) {
+                            "", "latest" -> URL("https://raw.githubusercontent.com/RomiChan/protocol-versions/master/android_phone.json")
+                            else -> URL("https://raw.githubusercontent.com/RomiChan/protocol-versions/master/android_phone/${version}.json")
+                        }
             }
-
             BotConfiguration.MiraiProtocol.ANDROID_PAD -> {
                 File("android_pad.json") to
-                        URL("https://raw.githubusercontent.com/RomiChan/protocol-versions/master/android_pad.json")
+                        when (version) {
+                            "", "latest" -> URL("https://raw.githubusercontent.com/RomiChan/protocol-versions/master/android_pad.json")
+                            else -> URL("https://raw.githubusercontent.com/RomiChan/protocol-versions/master/android_pad/${version}.json")
+                        }
             }
 
-            else -> {
-                throw IllegalArgumentException("不支持同步的协议: ${protocol.name}")
-            }
-        }
-        val system = System.getProperty("java.net.useSystemProxies", "false")
-        val proxy = try {
-            System.setProperty("java.net.useSystemProxies", "true")
-            ProxySelector.getDefault()
-                .select(URI("https://www.google.com/"))
-                .firstOrNull() ?: Proxy.NO_PROXY
-        } finally {
-            System.setProperty("java.net.useSystemProxies", system)
+            else -> throw IllegalArgumentException("不支持同步的协议: ${protocol.name}")
         }
 
         val json: JsonObject = kotlin.runCatching {
-            url.openConnection(proxy)
+            url.openConnection()
                 .apply {
-                    connectTimeout = 60_000
-                    readTimeout = 60_000
+                    connectTimeout = 30_000
+                    readTimeout = 30_000
                 }
                 .getInputStream().use { it.readBytes() }
                 .decodeToString()
+        }.recoverCatching { throwable ->
+            try {
+                URL("https://ghproxy.com/$url").openConnection()
+                    .apply {
+                        connectTimeout = 30_000
+                        readTimeout = 30_000
+                    }
+                    .getInputStream().use { it.readBytes() }
+                    .decodeToString()
+            } catch (cause: Throwable) {
+                val exception = throwable.cause as? java.net.UnknownHostException ?: throwable
+                exception.addSuppressed(cause)
+                throw exception
+            }
         }.fold(
             onSuccess = { text ->
                 val online = Json.parseToJsonElement(text).jsonObject
-                if (file.isFile) {
-                    val local = Json.parseToJsonElement(file.readText()).jsonObject
-                    if (local.getValue("dump_time").jsonPrimitive.long <
-                        online.getValue("dump_time").jsonPrimitive.long
-                    ) {
-                        file.writeText(text)
-                        file.setLastModified(online.getValue("build_time").jsonPrimitive.long * 1000)
-                        online
-                    } else {
-                        local
-                    }
-                } else {
-                    file.writeText(text)
-                    file.setLastModified(online.getValue("build_time").jsonPrimitive.long * 1000)
-                    online
-                }
+                check(online.getValue("app_id").jsonPrimitive.long != 0L) { "载入的 ${protocol.name.lowercase()}.json 有误" }
+                file.writeText(text)
+                file.setLastModified(online.getValue("build_time").jsonPrimitive.long * 1000)
+                online
             },
             onFailure = { cause ->
-                if (file.isFile) {
-                    Json.parseToJsonElement(file.readText()).jsonObject
-                } else {
-                    throw FileNotFoundException(file.path).initCause(cause)
-                }
+                throw IllegalStateException("从 $url 下载协议失败", cause)
             }
         )
 
         store(protocol, json)
     }
 
+    /**
+     * 从本地加载协议
+     *
+     * @since 1.8.0
+     */
     @JvmStatic
     public fun load(protocol: BotConfiguration.MiraiProtocol) {
         val file = File("${protocol.name.lowercase()}.json")
@@ -316,7 +339,8 @@ public object FixProtocolVersion {
 
     @JvmStatic
     private fun store(protocol: BotConfiguration.MiraiProtocol, json: JsonObject) {
-        MiraiProtocolInternal.protocols.compute(protocol) { _, impl ->
+        check(json.getValue("app_id").jsonPrimitive.long != 0L) { "载入的 ${protocol.name.lowercase()}.json 有误" }
+        protocols.compute(protocol) { _, impl ->
             when {
                 null == impl -> null
                 impl.runCatching { id }.isFailure -> impl.change {
@@ -331,7 +355,6 @@ public object FixProtocolVersion {
                     buildTime = json.getValue("build_time").jsonPrimitive.long
                     ssoVersion = json.getValue("sso_version").jsonPrimitive.int
                 }
-
                 else -> impl.apply {
                     apkId = json.getValue("apk_id").jsonPrimitive.content
                     id = json.getValue("app_id").jsonPrimitive.long
@@ -350,9 +373,14 @@ public object FixProtocolVersion {
         }
     }
 
+    /**
+     * 协议版本信息
+     *
+     * @since 1.6.0
+     */
     @JvmStatic
     public fun info(): Map<BotConfiguration.MiraiProtocol, String> {
-        return MiraiProtocolInternal.protocols.mapValues { (protocol, info) ->
+        return protocols.mapValues { (protocol, info) ->
             val version = info.field("buildVer", null as String?) ?: info.field("ver", "???")
             val epochSecond = info.field("buildTime", 0L)
             val datetime = OffsetDateTime.ofInstant(Instant.ofEpochSecond(epochSecond), ZoneId.systemDefault())

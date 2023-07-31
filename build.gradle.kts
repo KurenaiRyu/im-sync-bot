@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.config.LanguageVersion
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
@@ -30,6 +32,12 @@ configurations {
 
 lombok {
     version.set(Versions.lombok)
+}
+
+kotlin {
+    compilerOptions {
+        languageVersion.set(KotlinVersion.KOTLIN_1_9)
+    }
 }
 
 object Versions {

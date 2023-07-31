@@ -21,7 +21,6 @@ import java.util.HashSet;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@FieldNameConstants
 public class GroupConfig {
 
     @Id
