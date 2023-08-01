@@ -233,7 +233,7 @@ class TgMessageHandler(
             log.info("ignore banned group")
             return CONTINUE
         }
-        if (userSender != null && bot.userConfig.bannedIds.contains(userSender.userId)) {
+        if (userSender != null && bot.userConfigService.bannedIds.contains(userSender.userId)) {
             log.info("ignore banned id")
             return CONTINUE
         }
@@ -249,7 +249,7 @@ class TgMessageHandler(
             log.error("QQ group[$groupId] not found.")
             return CONTINUE
         }
-        val isMaster = bot.userConfig.masterTg == userSender?.userId
+        val isMaster = bot.userConfigService.masterTg == userSender?.userId
         val senderName = getSenderName(message)
         val replyMessage = MessageService.findQQByTg(message.chatId, message.replyToMessageId)
 
@@ -566,8 +566,8 @@ class TgMessageHandler(
             is MessageSenderUser -> {
                 val user = bot.tg.getUser(sender.userId)
                 val username = user.usernames?.activeUsernames?.firstOrNull()
-                bot.userConfig.idBindings[sender.userId]
-                    ?: username?.let(bot.userConfig.usernameBindings::get)
+                bot.userConfigService.idBindings[sender.userId]
+                    ?: username?.let(bot.userConfigService.usernameBindings::get)
                     ?: let {
                         val fullName = "${user.firstName} ${user.lastName ?: ""}"
                         return fullName.ifBlank { username ?: "none" }

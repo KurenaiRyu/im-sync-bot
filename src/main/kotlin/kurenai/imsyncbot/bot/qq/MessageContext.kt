@@ -32,7 +32,6 @@ import net.mamoe.mirai.event.events.GroupTempMessageEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.ForwardMessage
 import net.mamoe.mirai.utils.MiraiExperimentalApi
-import net.mamoe.mirai.utils.mapToArray
 import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
 import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
 import nl.adaptivity.xmlutil.serialization.XML
@@ -118,7 +117,7 @@ class GroupMessageContext(
     val messageChain: MessageChain,
     val senderId: Long = messageChain.source.fromId,
     val sender: NormalMember? = group[senderId],
-    val senderName: String? = bot.userConfig.idBindings[senderId]
+    val senderName: String? = bot.userConfigService.idBindings[senderId]
         ?: bot.qq.qqBot.getFriend(senderId)?.remarkOrNick
         ?: sender?.remarkOrNameCardOrNick?.formatUsername()
 ) : MessageContext(entity, bot) {
@@ -128,7 +127,7 @@ class GroupMessageContext(
     val infoString by lazy { "[${group.name}(${this.group.id})]" }
     val simpleContent: String = messageChain.contentToString()
     val chatId: Long = if (isTempMessage) {
-        bot.userConfig.defaultChatId
+        bot.userConfigService.defaultChatId
     } else {
         bot.groupConfigService.qqTg[group.id] ?: bot.groupConfigService.defaultTgGroup
     }
@@ -206,12 +205,13 @@ class GroupMessageContext(
                 else lastAt = target
                 val id: Long?
                 content += if (target == group.bot.id && getReplayToMessageId() <= 0) {
-                    bot.userConfig.masterUsername.ifBlank { bot.userConfig.masterTg.toString() }.let {
+                    bot.userConfigService.masterUsername.ifBlank { bot.userConfigService.masterTg.toString() }.let {
                         "[${it.formatUsername().escapeMarkdownChar()}](tg://user?id=$it)"
                     }
                 } else {
-                    id = bot.userConfig.links.find { it.qq == target }?.tg
-                    val bindName = (bot.userConfig.qqUsernames[target] ?: bot.userConfig.idBindings[target]).let { it ->
+                    id = bot.userConfigService.links.find { it.qq == target }?.tg
+                    val bindName = (bot.userConfigService.qqUsernames[target]
+                        ?: bot.userConfigService.idBindings[target]).let { it ->
                         if (it.isNullOrBlank())
                             messageChain.bot.getFriend(target)?.remarkOrNick?.takeIf { it.isNotBlank() }
                                 ?: group.getMember(target)?.remarkOrNameCardOrNick?.takeIf { it.isNotBlank() }

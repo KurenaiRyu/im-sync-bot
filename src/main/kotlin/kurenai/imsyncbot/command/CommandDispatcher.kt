@@ -39,7 +39,7 @@ object CommandDispatcher {
         for (cmd in tgCommands) {
             if (cmd.command.lowercase() == command.lowercase()) {
                 log.info("Match ${cmd.name}")
-                val permission = bot.userConfig.getPermission(
+                val permission = bot.userConfigService.getPermission(
                     bot.tg.getUser(
                         message.userSender()?.userId ?: error("非用户无权限调用")
                     )

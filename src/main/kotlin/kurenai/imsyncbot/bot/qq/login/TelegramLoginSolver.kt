@@ -48,7 +48,7 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
                         val path = Path.of(BotUtil.getImagePath(filename))
                         path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
                         TdApi.SendMessage().apply {
-                            this.chatId = imSyncBot.userConfig.masterTg
+                            this.chatId = imSyncBot.userConfigService.masterTg
                             this.inputMessageContent = InputMessagePhoto().apply {
                                 this.caption = "请在手机 QQ 使用账号 ${bot.id} 扫码".asFmtText()
                                 this.photo = InputFileLocal(path.pathString)
@@ -81,7 +81,7 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
                 val path = Path.of(BotUtil.getImagePath(filename))
                 path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
                 TdApi.SendMessage().apply {
-                    this.chatId = imSyncBot.userConfig.masterTg
+                    this.chatId = imSyncBot.userConfigService.masterTg
                     this.inputMessageContent = InputMessagePhoto().apply {
                         this.caption = "请输入验证码".asFmtText()
                         this.photo = InputFileLocal(path.pathString)
@@ -98,7 +98,7 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
         runCatching {
             telegram.sendMessageText(
                 "需要滑动验证码, 请按照以下链接的步骤完成滑动验证码, 然后输入获取到的 ticket\n$url",
-                imSyncBot.userConfig.masterTg
+                imSyncBot.userConfigService.masterTg
             )
             getInput()
         }.onFailure {
@@ -136,7 +136,7 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
         return getInput()
     }
 
-    private suspend fun send(message: String) = telegram.sendMessageText(message, imSyncBot.userConfig.masterTg)
+    private suspend fun send(message: String) = telegram.sendMessageText(message, imSyncBot.userConfigService.masterTg)
 
     private suspend fun getInput(): String {
         val deferred = CompletableDeferred<String>()

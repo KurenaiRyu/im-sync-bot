@@ -17,7 +17,7 @@ class SyncAvatarCommand : AbstractTelegramCommand() {
     override suspend fun execute(bot: ImSyncBot, message: Message, sender: MessageSenderUser, input: String): String? {
         val qqBot = bot.qq.qqBot
         var handled = false
-        bot.userConfig.chatIdFriends[message.chatId]?.let { friendId ->
+        bot.userConfigService.chatIdFriends[message.chatId]?.let { friendId ->
             qqBot.getFriend(friendId)?.let { friend ->
                 val avatarPath = BotUtil.downloadImg("friend#$friendId.png", friend.avatarUrl, overwrite = true)
                 bot.tg.execute {

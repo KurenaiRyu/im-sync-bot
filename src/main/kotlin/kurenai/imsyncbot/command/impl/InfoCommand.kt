@@ -42,7 +42,7 @@ class InfoCommand : AbstractTelegramCommand() {
                     if (qqGroup == null) {
                         return "找不到绑定的qq群"
                     } else {
-                        val config = bot.userConfig.configs.firstOrNull { it.qq == userId }
+                        val config = bot.userConfigService.configs.firstOrNull { it.qq == userId }
                         val member = qqGroup[userId]
                         if (member != null) {
 
@@ -103,7 +103,7 @@ class InfoCommand : AbstractTelegramCommand() {
                 list.add("firstName: `${user.firstName.escapeMarkdownChar()}`")
                 list.add("lastName: `${user.lastName?.escapeMarkdownChar()}`")
                 list.add("isBot: ${user.type.constructor == UserTypeBot.CONSTRUCTOR}")
-                bot.userConfig.configs.firstOrNull {
+                bot.userConfigService.configs.firstOrNull {
                     it.tg == sender.userId
                 }?.let {
                     list.add("status: ${it.status.toString().escapeMarkdownChar()}")

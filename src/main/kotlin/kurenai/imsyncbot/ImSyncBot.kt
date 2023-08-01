@@ -45,7 +45,7 @@ class ImSyncBot(
         }
 
     internal val proxy: Proxy? = configProxy()
-    internal val userConfig: UserConfigService = UserConfigService(configPath, configProperties)
+    internal val userConfigService: UserConfigService = UserConfigService(configPath, configProperties)
     internal val groupConfigService: GroupConfigService = GroupConfigService(this, configPath)
     var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
     internal val qq: QQBot = QQBot(configProperties.bot.qq, this)

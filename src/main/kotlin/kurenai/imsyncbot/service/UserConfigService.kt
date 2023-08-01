@@ -152,11 +152,14 @@ class UserConfigService(
     fun bindName(tg: Long? = null, qq: Long? = null, bindingName: String) {
         val filter = configs.filter { c -> tg?.let { c.tg == it } ?: qq?.let { c.qq == it } ?: false }
         if (filter.isEmpty()) {
-            configs.add(UserConfig().apply {
+            val new = UserConfig().apply {
                 this.tg = tg
                 this.qq = qq
                 this.bindingName = bindingName
-            })
+            }
+            configs.add(new)
+            userConfigRepository.save(new)
+            refresh()
         } else {
             filter.forEach { c ->
                 c.bindingName = bindingName
@@ -170,7 +173,7 @@ class UserConfigService(
         filters.forEach {
             it.bindingName = null
         }
-        userConfigRepository.saveAll(filters)
+        afterUnbind(filters)
     }
 
     fun unbindNameByQQ(id: Long) {
@@ -178,7 +181,18 @@ class UserConfigService(
         filters.forEach {
             it.bindingName = null
         }
-        userConfigRepository.saveAll(filters)
+        afterUnbind(filters)
+    }
+
+    private fun afterUnbind(filters: List<UserConfig>) {
+        val deleteList = filters.filter { it.qq == null && it.tg == null }
+        if (deleteList.isNotEmpty()) {
+            userConfigRepository.deleteAll(deleteList)
+        }
+        val saveList = filters.filter { it.tg != null || it.qq != null }
+        if (saveList.isNotEmpty()) {
+            userConfigRepository.saveAll(saveList)
+        }
     }
 
     fun link(tg: Long, qq: Long) {

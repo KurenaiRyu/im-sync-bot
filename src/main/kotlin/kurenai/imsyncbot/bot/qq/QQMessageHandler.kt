@@ -148,11 +148,11 @@ class QQMessageHandler(
                 val tag = "\\#入群 \\#id${event.member.id} \\#group${event.group.id}\n"
                 when (event) {
                     is MemberJoinEvent.Active -> {
-                        "$tag`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`入群`${event.group.name}`"
+                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`入群`${event.group.name}`"
                     }
 
                     is MemberJoinEvent.Invite -> {
-                        "$tag`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`通过`${(bot.userConfig.idBindings[event.invitor.id] ?: event.invitor.remarkOrNameCardOrNick).escapeMarkdownChar()}` \\#id${event.invitor.id}\\ 的邀请入群`${event.group.name}`"
+                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`通过`${(bot.userConfigService.idBindings[event.invitor.id] ?: event.invitor.remarkOrNameCardOrNick).escapeMarkdownChar()}` \\#id${event.invitor.id}\\ 的邀请入群`${event.group.name}`"
                     }
 
                     else -> return
@@ -163,11 +163,11 @@ class QQMessageHandler(
                 val tag = "\\#退群 \\#id${event.member.id} \\#group${event.group.id}\n"
                 when (event) {
                     is MemberLeaveEvent.Kick -> {
-                        "$tag`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`被踢出群`${event.group.name}`"
+                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`被踢出群`${event.group.name}`"
                     }
 
                     is MemberLeaveEvent.Quit -> {
-                        "$tag`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`退出群`${event.group.name}`"
+                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`退出群`${event.group.name}`"
                     }
 
                     else -> return
@@ -175,27 +175,27 @@ class QQMessageHandler(
             }
 
             is MemberMuteEvent -> {
-                "\\#禁言\n\\#id${event.member.id}\n`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`被禁言${event.durationSeconds / 60}分钟"
+                "\\#禁言\n\\#id${event.member.id}\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`被禁言${event.durationSeconds / 60}分钟"
             }
 
             is GroupMuteAllEvent -> {
-                "\\#禁言\n`${(bot.userConfig.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.escapeMarkdownChar() ?: "?"}` \\#id${event.operator?.id ?: "?"} 禁言了所有人"
+                "\\#禁言\n`${(bot.userConfigService.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.escapeMarkdownChar() ?: "?"}` \\#id${event.operator?.id ?: "?"} 禁言了所有人"
             }
 
             is MemberUnmuteEvent -> {
-                "\\#禁言\n`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}` \\#id${event.member.id} 被`${(bot.userConfig.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.escapeMarkdownChar() ?: "?"})` \\#id${event.operator?.id ?: "?"} 解除禁言"
+                "\\#禁言\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}` \\#id${event.member.id} 被`${(bot.userConfigService.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.escapeMarkdownChar() ?: "?"})` \\#id${event.operator?.id ?: "?"} 解除禁言"
             }
 
             is MemberCardChangeEvent -> {
                 if (event.new.isNotEmpty()) {
-                    "\\#名称 \\#id${event.member.id}\n`${(bot.userConfig.idBindings[event.member.id] ?: event.origin).escapeMarkdownChar()}`名称改为`${event.new.escapeMarkdownChar()}`"
+                    "\\#名称 \\#id${event.member.id}\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.origin).escapeMarkdownChar()}`名称改为`${event.new.escapeMarkdownChar()}`"
                 } else {
                     return
                 }
             }
 
             is MemberSpecialTitleChangeEvent -> {
-                "\\#头衔 \\#id${event.member.id}\n`${(bot.userConfig.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`获得头衔`${event.new.escapeMarkdownChar()}`"
+                "\\#头衔 \\#id${event.member.id}\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`获得头衔`${event.new.escapeMarkdownChar()}`"
             }
 
             else -> {

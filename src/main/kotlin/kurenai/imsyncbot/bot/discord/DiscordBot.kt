@@ -30,7 +30,6 @@ import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
-import net.mamoe.mirai.event.subscribeAlways
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import java.util.WeakHashMap
@@ -280,7 +279,7 @@ class DiscordBot(
         }
         channelCache.putIfAbsent(group.id, channel)
         val webhook = channel.webhooks.firstOrNull() ?: channel.createWebhook("forward")
-        val name = "${bot.userConfig.idBindings[event.sender.id] ?: event.senderName} #${event.sender.id}"
+        val name = "${bot.userConfigService.idBindings[event.sender.id] ?: event.senderName} #${event.sender.id}"
         val avatarUrl = event.sender.avatarUrl
         val token = webhook.token ?: error("Webhook token is null")
         handleMessage(event.message, webhook, token, name, avatarUrl, group)

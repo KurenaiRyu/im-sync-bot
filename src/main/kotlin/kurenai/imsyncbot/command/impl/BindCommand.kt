@@ -8,7 +8,6 @@ import kurenai.imsyncbot.utils.ParseMode
 import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
 import kurenai.imsyncbot.utils.TelegramUtil.textOrCaption
 import kurenai.imsyncbot.utils.TelegramUtil.userSender
-import kurenai.imsyncbot.utils.TelegramUtil.username
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.message.data.source
 
@@ -35,12 +34,12 @@ class BindCommand : AbstractTelegramCommand() {
                 tg.getMessage(message.replyInChatId, message.replyToMessageId)?.let { replyMessage ->
                     if (param.isNotBlank()) {
                         val user = tg.getUser(replyMessage) ?: return "找不到用户"
-                        if (user == tg.getMe()) {
+                        if (user.id == tg.getMe().id) {
                             val qqMsg = MessageService.findQQByTg(replyMessage) ?: return "找不到该qq信息"
-                            bot.userConfig.bindName(qq = qqMsg.source.fromId, bindingName = param)
+                            bot.userConfigService.bindName(qq = qqMsg.source.fromId, bindingName = param)
                             "qq`${qqMsg.source.fromId}` 绑定名称为 `${param.escapeMarkdownChar()}`"
                         } else {
-                            bot.userConfig.bindName(user.id, null, param)
+                            bot.userConfigService.bindName(user.id, null, param)
                             "`${user.firstName.escapeMarkdownChar()}` 绑定名称为 `${param.escapeMarkdownChar()}`"
                         }
                     } else {
@@ -48,7 +47,7 @@ class BindCommand : AbstractTelegramCommand() {
                     }
                 } ?: "找不到引用的消息"
             } else {
-                if (bot.userConfig.superAdmins.contains(message.userSender()?.userId)) {
+                if (bot.userConfigService.superAdmins.contains(message.userSender()?.userId)) {
                     try {
                         val qq = param.toLong()
                         qqBot.getGroup(qq)?.let {
@@ -65,9 +64,12 @@ class BindCommand : AbstractTelegramCommand() {
                     "绑定群组操作需要超级管理员权限"
                 }
             }
-        } else if (chat.type.constructor == ChatTypePrivate.CONSTRUCTOR && bot.userConfig.superAdmins.contains(chat.id)) {
+        } else if (chat.type.constructor == ChatTypePrivate.CONSTRUCTOR && bot.userConfigService.superAdmins.contains(
+                chat.id
+            )
+        ) {
             val usernameBinds =
-                bot.userConfig.configs.filter { it.bindingName != null }
+                bot.userConfigService.configs.filter { it.bindingName != null }
                     .joinToString("\n") { "`${it.tg}` \\<\\=\\> `${it.bindingName!!.escapeMarkdownChar()}`" }
             val groupBindings =
                 bot.groupConfigService.configs.joinToString("\n") {
@@ -106,12 +108,12 @@ class UnbindCommand : AbstractTelegramCommand() {
                     if (userId == bot.tg.getMe().id) {
                         val qqMsg = MessageService.findQQByTg(reply)
                         if (qqMsg != null) {
-                            bot.userConfig.unbindNameByQQ(qqMsg.source.fromId)
+                            bot.userConfigService.unbindNameByQQ(qqMsg.source.fromId)
                             "qq[${qqMsg.source.fromId}] 解绑名称成功"
                         } else "找不到该qq信息"
                     } else {
-                        if (bot.userConfig.superAdmins.contains(message.userSender()?.userId)) {
-                            bot.userConfig.unbindNameByTG(userId)
+                        if (bot.userConfigService.superAdmins.contains(message.userSender()?.userId)) {
+                            bot.userConfigService.unbindNameByTG(userId)
                             "$userId 解绑名称成功"
                         } else {
                             "绑定群组操作需要超级管理员权限"

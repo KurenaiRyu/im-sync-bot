@@ -117,13 +117,13 @@ class QQBot(
                             ) {
                                 false
                             } else {
-                                !bot.groupConfigService.bannedGroups.contains(groupId) && !bot.userConfig.bannedIds.contains(
+                                !bot.groupConfigService.bannedGroups.contains(groupId) && !bot.userConfigService.bannedIds.contains(
                                     event.sender.id
                                 )
                             }.also { result ->
                                 if (!result) {
                                     event.message.filterIsInstance<At>()
-                                        .firstOrNull { it.target == bot.userConfig.masterQQ }
+                                        .firstOrNull { it.target == bot.userConfigService.masterQQ }
                                         ?.let { sendRemindMsg(event) }
                                 }
                             }
@@ -302,7 +302,7 @@ class QQBot(
 //    }
 
     private suspend fun sendRemindMsg(event: GroupAwareMessageEvent) {
-        if (bot.userConfig.masterUsername.isBlank()) return
+        if (bot.userConfigService.masterUsername.isBlank()) return
         val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
         kotlin.runCatching {
             bot.tg.sendMessageText(
@@ -312,7 +312,7 @@ class QQBot(
                     this.entities = arrayOf(TextEntity().apply {
                         this.offset = 0
                         this.length = 3
-                        this.type = TextEntityTypeMentionName(bot.userConfig.masterTg)
+                        this.type = TextEntityTypeMentionName(bot.userConfigService.masterTg)
                     })
                 },
                 bot.groupConfigService.qqTg[event.group.id] ?: bot.groupConfigService.defaultTgGroup
