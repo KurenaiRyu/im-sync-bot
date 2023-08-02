@@ -68,7 +68,7 @@ im同步机器人，现主要同步（转发）tg跟qq群。
 
 ## Development
 
-由于我使用了自己写的[缓存工具](https://github.com/KurenaiRyu/simple-cache.git) 和 [telegram sdk](https://github.com/KurenaiRyu/tdlight-sdk)，所以请到对应项目下载源码编译安装至本地maven仓库。
+由于我使用了自己写的 [telegram sdk](https://github.com/KurenaiRyu/tdlight-sdk)，所以请到对应项目下载源码编译安装至本地maven仓库。
 
 ## Thanks
 
