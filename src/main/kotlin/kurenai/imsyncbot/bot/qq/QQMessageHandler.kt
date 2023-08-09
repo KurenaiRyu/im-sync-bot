@@ -9,6 +9,7 @@ import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
 import kurenai.imsyncbot.utils.TelegramUtil.fmt
+import kurenai.imsyncbot.utils.TelegramUtil.sendUserId
 import kurenai.imsyncbot.utils.TelegramUtil.textOrCaption
 import kurenai.imsyncbot.utils.TelegramUtil.userSender
 import kurenai.imsyncbot.utils.getLogger
@@ -44,7 +45,15 @@ class QQMessageHandler(
                 log.warn("Send group message error, try to send normal type message", it)
                 resolvedContext.normalType.send()
             }.getOrThrow().also { messages ->
-                log.debug("{} Sent {}", context.infoString, messages)
+                log.debug("{} Sent {}", context.infoString,
+                    messages.joinToString(",") {
+                        "[${it.chatId}] ${it.sendUserId()} ${
+                            it.content.textOrCaption()?.text?.replace(
+                                "\r",
+                                "\\r"
+                            )?.replace("\n", "\\n")
+                        }"
+                    })
                 if (context.entity == null) return@also
                 CoroutineScope(bot.coroutineContext).launch {
                     MessageService.cache(context.entity, context.messageChain, messages)

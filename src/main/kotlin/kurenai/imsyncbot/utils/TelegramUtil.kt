@@ -107,6 +107,12 @@ object TelegramUtil {
         }
     }
 
+    fun Message.sendUserId() = when (val sender = this.senderId) {
+        is MessageSenderChat -> sender.chatId
+        is MessageSenderUser -> sender.userId
+        else -> 0
+    }
+
     fun Message.userSender(): MessageSenderUser? = this.senderId as? MessageSenderUser
 
     fun MessageContent.file() = when (this) {

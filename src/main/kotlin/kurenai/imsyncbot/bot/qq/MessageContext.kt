@@ -389,11 +389,7 @@ class GroupMessageContext(
                     this.video = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
                 }
             }
-            return arrayOf(bot.tg.execute(func, true).also {
-                CoroutineScope(bot.coroutineContext).launch {
-                    FileService.cache(Path.of(BotUtil.getDocumentPath(fileMessage.name)).md5(), it)
-                }
-            })
+            return arrayOf(bot.tg.execute(func, true))
         }
     }
 
@@ -413,11 +409,7 @@ class GroupMessageContext(
                     this.document = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
                 }
             }
-            return arrayOf(bot.tg.execute(func, true).also {
-                CoroutineScope(bot.coroutineContext).launch {
-                    FileService.cache(Path.of(BotUtil.getDocumentPath(fileMessage.name)).md5(), it)
-                }
-            })
+            return arrayOf(bot.tg.execute(func, true))
         }
 
         private suspend fun getUrl(): String {
