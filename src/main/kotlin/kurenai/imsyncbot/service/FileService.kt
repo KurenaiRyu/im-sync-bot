@@ -53,13 +53,17 @@ object FileService {
         }
     }
 
+    @OptIn(MiraiInternalApi::class)
     suspend fun cache(images: List<Image>, messages: Array<TdApi.Message>) {
         withIO {
             messages.mapIndexedNotNull { index, message ->
+                val image = images[index]
+                if (image.isEmoji.not()) return@mapIndexedNotNull null
                 message.content.file()?.let {
                     FileCache().apply {
-                        this.id = images[index].md5.toHex()
+                        this.id = image.md5.toHex()
                         this.fileId = it.remote.id
+                        this.fileType = image.imageType.formatName
                     }
                 }
             }.filter {
@@ -68,17 +72,20 @@ object FileService {
         }
     }
 
+    @OptIn(MiraiInternalApi::class)
     suspend fun cache(image: Image, message: TdApi.Message) {
-        cache(image.md5.toHex(), message)
+        if (image.isEmoji.not()) return
+        cache(image.md5.toHex(), message, image.imageType.formatName)
     }
 
-    suspend fun cache(md5Hex: String, message: TdApi.Message) {
+    suspend fun cache(md5Hex: String, message: TdApi.Message, fileType: String? = null) {
         withIO {
             message.content.file()?.remote?.id?.takeIf { it.isNotBlank() }?.let {
                 fileCacheRepository.save(
                     FileCache().apply {
                         this.id = md5Hex
                         this.fileId = it
+                        this.fileType = fileType
                     })
             }
         }

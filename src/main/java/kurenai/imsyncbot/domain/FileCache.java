@@ -22,9 +22,9 @@ import org.hibernate.annotations.GenericGenerator;
 public class FileCache {
 
     @Id
-    @SnowFlakeGenerator
     String id;
     String fileId;
+    String fileType;
     @Version
     @Column(columnDefinition = "default 0")
     Integer version;

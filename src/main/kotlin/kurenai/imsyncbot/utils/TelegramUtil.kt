@@ -3,6 +3,7 @@ package kurenai.imsyncbot.utils
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.runBlocking
 import kurenai.imsyncbot.bot.telegram.defaultTelegramBot
+import nl.adaptivity.xmlutil.core.impl.multiplatform.name
 
 /**
  * @author Kurenai
@@ -162,6 +163,30 @@ object TelegramUtil {
     }
 
     infix fun <T : Object> T.constructorEquals(constructor: Int) = this.constructor == constructor
+
+    /**
+     * 获取简短的描述
+     */
+    fun Update.info(): String {
+        return when (this) {
+            is UpdateConnectionState -> "Update connection state: ${state::class.simpleName}"
+            is UpdateMessageSendFailed -> "Sent message $oldMessageId -> ${message.id} to chat ${message.chatId} fail: $errorCode $errorMessage"
+            is UpdateMessageSendSucceeded -> "Sent message $oldMessageId -> ${message.id} to chat ${message.chatId}"
+            is UpdateDeleteMessages -> "Deleted messages $messageIds from chat $chatId"
+            is UpdateMessageContent -> "Edited message content $messageId from chat $chatId"
+            is UpdateMessageEdited -> "Edited message $messageId from chat $chatId"
+            is UpdateNewInlineQuery -> "New inline query (${this.id})[${query}] from user ${senderUserId}, offset $offset"
+            is UpdateNewMessage -> {
+                if (message.isOutgoing) {
+                    "New message(out going) ${message.id} from chat ${message.chatId}"
+                } else {
+                    "New message ${message.id} from chat ${message.chatId}"
+                }
+            }
+
+            else -> this::class.simpleName ?: "Unknown Update"
+        }
+    }
 }
 
 enum class ParseMode(val ins: TextParseMode?) {

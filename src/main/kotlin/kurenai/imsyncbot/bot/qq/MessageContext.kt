@@ -52,7 +52,7 @@ sealed class MessageContext(
     val bot: ImSyncBot
 ) {
 
-    protected var tgMsgFormat =
+    private var tgMsgFormat =
         if (bot.configProperties.bot.tgMsgFormat.contains("\$msg")) bot.configProperties.bot.tgMsgFormat else "\$name: \$msg"
 
     /**
@@ -167,7 +167,10 @@ class GroupMessageContext(
             val images = messageChain.filterIsInstance<Image>()
             if (images.size == 1) {
                 val image = images.first()
-                if (image.imageType == ImageType.GIF || image.imageType == ImageType.APNG || image.imageType == ImageType.UNKNOWN)
+                if (image.imageType == ImageType.GIF ||
+                    image.imageType == ImageType.APNG ||
+                    (image.imageType == ImageType.UNKNOWN && image.isEmoji)
+                )
                     GifImage(image)
                 else
                     SingleImage(image)
