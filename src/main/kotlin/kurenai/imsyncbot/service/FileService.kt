@@ -12,7 +12,6 @@ import kurenai.imsyncbot.utils.toHex
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
-import net.mamoe.mirai.message.data.ImageType
 import net.mamoe.mirai.utils.MiraiInternalApi
 import kotlin.io.path.pathString
 import kotlin.jvm.optionals.getOrNull
@@ -80,13 +79,21 @@ object FileService {
 
     suspend fun cache(md5Hex: String, message: TdApi.Message, fileType: String? = null) {
         withIO {
-            message.content.file()?.remote?.id?.takeIf { it.isNotBlank() }?.let {
-                fileCacheRepository.save(
-                    FileCache().apply {
-                        this.id = md5Hex
-                        this.fileId = it
-                        this.fileType = fileType
-                    })
+            message.content.file()?.remote?.id?.takeIf { it.isNotBlank() }?.let { fileId ->
+                val exist = fileCacheRepository.findById(md5Hex).orElse(null)
+                if (exist != null && (exist.fileId != fileId || exist.fileType != fileType)) {
+                    exist.fileId = fileId
+                    exist.fileType = fileType
+                    fileCacheRepository.save(exist)
+                }
+                if (exist == null) {
+                    fileCacheRepository.save(
+                        FileCache().apply {
+                            this.id = md5Hex
+                            this.fileId = fileId
+                            this.fileType = fileType
+                        })
+                }
             }
         }
     }
