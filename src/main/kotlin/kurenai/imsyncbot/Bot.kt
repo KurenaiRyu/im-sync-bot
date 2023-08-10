@@ -130,27 +130,53 @@ private fun setUpTimer() {
                     continue
                 }
 
-                val sizeOfDir = dirFile.listFiles()?.sumOf { Files.size(it.toPath()) } ?: 0L
+                val sizeOfDir = computeDirSize(dirFile)
                 log.info("Cache folder [${dirFile.name}] size: ${sizeOfDir.humanReadableByteCountBin()}")
                 val filesToDelete = ArrayList<File>()
 
                 val oldestAllowedFileDate =
                     LocalDateTime.now().minusHours(1).atZone(ZoneId.systemDefault()).toEpochSecond()
                 if (sizeOfDir > largeDirSize) {
-                    dirFile.listFiles { f ->
+                    var deleteSize = 0L
+                    val fileSet =
+                        dirFile.listFiles()?.sortedByDescending { it.lastModified() }?.toMutableSet() ?: continue
+                    fileSet.filter { f ->
                         f.toPath().fileSize() > largeFileSize
-                    }?.let(filesToDelete::addAll)
+                    }.forEach {
+                        deleteSize += Files.size(it.toPath())
+                        fileSet.remove(it)
+                        filesToDelete.add(it)
+                    }
                     dirFile.listFiles { f ->
                         f.lastModified() < oldestAllowedFileDate
-                    }?.let(filesToDelete::addAll)
+                    }?.forEach {
+                        deleteSize += Files.size(it.toPath())
+                        fileSet.remove(it)
+                        filesToDelete.add(it)
+                    }
+
+                    for (file in fileSet) {
+                        if (sizeOfDir - deleteSize > largeDirSize) {
+                            deleteSize += Files.size(file.toPath())
+                            filesToDelete.add(file)
+                        } else
+                            break
+                    }
+                    doDeleteCacheFile(filesToDelete)
+                    log.debug(
+                        "Now cache folder [{}] size: {}",
+                        dirFile.name,
+                        computeDirSize(dirFile).humanReadableByteCountBin()
+                    )
                 }
-                doDeleteCacheFile(filesToDelete)
             } catch (e: Exception) {
                 log.error(e.message, e)
             }
         }
     }, 5000L, TimeUnit.HOURS.toMillis(1))
 }
+
+private fun computeDirSize(dirFile: File) = dirFile.listFiles()?.sumOf { Files.size(it.toPath()) } ?: 0L
 
 private fun doDeleteCacheFile(filesToDelete: List<File>) {
     if (filesToDelete.isNotEmpty()) {
