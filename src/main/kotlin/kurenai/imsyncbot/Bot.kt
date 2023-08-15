@@ -13,8 +13,6 @@ import org.reflections.Reflections
 import org.slf4j.Logger
 import java.io.File
 import java.nio.file.Files
-import java.time.LocalDateTime
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -114,7 +112,7 @@ private fun registerInlineCommand() {
 }
 
 private val largeFileSize = 200 * 1024L
-private val largeDirSize = 100 * 1024 * 1024L
+private val cacheAllowSize = 100 * 1024 * 1024L
 
 private const val cachePath = "./cache"
 private val clearCacheTimer = Timer("ClearCache", true)
@@ -131,15 +129,13 @@ private fun setUpTimer() {
                 }
 
                 val sizeOfDir = computeDirSize(dirFile)
-                log.info("Cache folder [${dirFile.name}] size: ${sizeOfDir.humanReadableByteCountBin()}")
                 val filesToDelete = ArrayList<File>()
-
-                val oldestAllowedFileDate =
-                    LocalDateTime.now().minusHours(1).atZone(ZoneId.systemDefault()).toEpochSecond()
-                if (sizeOfDir > largeDirSize) {
+                if (sizeOfDir > cacheAllowSize) {
                     var deleteSize = 0L
                     val fileSet =
                         dirFile.listFiles()?.sortedByDescending { it.lastModified() }?.toMutableSet() ?: continue
+
+                    // remove large file
                     fileSet.filter { f ->
                         f.toPath().fileSize() > largeFileSize
                     }.forEach {
@@ -147,28 +143,18 @@ private fun setUpTimer() {
                         fileSet.remove(it)
                         filesToDelete.add(it)
                     }
-                    dirFile.listFiles { f ->
-                        f.lastModified() < oldestAllowedFileDate
-                    }?.forEach {
-                        deleteSize += Files.size(it.toPath())
-                        fileSet.remove(it)
-                        filesToDelete.add(it)
-                    }
 
+                    // remove until dir size less than allow cache size
                     for (file in fileSet) {
-                        if (sizeOfDir - deleteSize > largeDirSize) {
+                        if (sizeOfDir - deleteSize > cacheAllowSize) {
                             deleteSize += Files.size(file.toPath())
                             filesToDelete.add(file)
                         } else
                             break
                     }
                     doDeleteCacheFile(filesToDelete)
-                    log.debug(
-                        "Now cache folder [{}] size: {}",
-                        dirFile.name,
-                        computeDirSize(dirFile).humanReadableByteCountBin()
-                    )
                 }
+                log.info("Cache folder [${dirFile.name}] size: ${sizeOfDir.humanReadableByteCountBin()}")
             } catch (e: Exception) {
                 log.error(e.message, e)
             }
