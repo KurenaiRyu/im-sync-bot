@@ -9,6 +9,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
 import kurenai.imsyncbot.domain.QQMessage
@@ -18,6 +19,7 @@ import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.FixProtocolVersion
 import kurenai.imsyncbot.utils.FixProtocolVersion.fetch
 import kurenai.imsyncbot.utils.getLogger
+import kurenai.imsyncbot.utils.launchWithPermit
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.BotFactory
 import net.mamoe.mirai.auth.BotAuthorization
@@ -32,6 +34,8 @@ import net.mamoe.mirai.utils.BotConfiguration
 import net.mamoe.mirai.utils.ConcurrentHashMap
 import java.io.File
 import kotlin.coroutines.CoroutineContext
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 class QQBot(
     private val qqProperties: QQProperties,
@@ -69,6 +73,7 @@ class QQBot(
 
     @OptIn(DelicateCoroutinesApi::class)
     private val workerScope = this + newFixedThreadPoolContext(10, "${qqProperties.account}-worker")
+    private val groupMessageLockMap = HashMap<Long, Semaphore>()
 
     private fun buildMiraiBot(qrCodeLogin: Boolean = false): Bot {
         val configuration = BotConfiguration().apply {
@@ -149,8 +154,21 @@ class QQBot(
                     log.error(it.message, it)
                 }.getOrDefault(false)
             }.subscribeAlways<Event> { event ->
-                workerScope.launch(CoroutineName(event.idString())) {
-                    handleEvent(event)
+                event.id()?.let {
+                    val semaphore = groupMessageLockMap.computeIfAbsent(it) { _ ->
+                        Semaphore(1)
+                    }
+                    workerScope.launchWithPermit(semaphore, CoroutineName(event.idString())) {
+                        withTimeout(5.minutes) {
+                            handleEvent(event)
+                        }
+                    }
+                } ?: run {
+                    workerScope.launch(CoroutineName(event.idString())) {
+                        withTimeout(5.minutes) {
+                            handleEvent(event)
+                        }
+                    }
                 }
             }
 
@@ -342,6 +360,18 @@ class QQBot(
         }
 
         else -> "${this::class.simpleName}"
+    }
+
+    private fun Event.id() = when (this) {
+        is GroupEvent -> {
+            this.group.id
+        }
+
+        is UserEvent -> {
+            this.user.id
+        }
+
+        else -> null
     }
 
 }
