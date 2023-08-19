@@ -2,6 +2,7 @@ package kurenai.imsyncbot.bot.qq
 
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.ImSyncBot
@@ -37,6 +38,17 @@ class QQMessageHandler(
         if (context.bot.groupConfigService.bannedGroups.contains(context.group.id)) return CONTINUE
         val messageType = context.getReadyToSendMessage()
         val list = if (messageType is GroupMessageContext.Forward) messageType.contextList else listOf(context)
+        if (list.size > 5) {
+            coroutineScope {
+                launch { sendMessage(list, context) }
+            }
+        } else {
+            sendMessage(list, context)
+        }
+        return CONTINUE
+    }
+
+    private suspend fun sendMessage(list: List<GroupMessageContext>, context: GroupMessageContext) {
         for (resolvedContext in list) {
             val readyToSendMessage = resolvedContext.getReadyToSendMessage()
             kotlin.runCatching {
@@ -60,7 +72,6 @@ class QQMessageHandler(
                 }
             }
         }
-        return CONTINUE
     }
 
 //    @Throws(Exception::class)
