@@ -31,7 +31,7 @@ configurations {
 }
 
 lombok {
-    version.set(Versions.lombok)
+    version.set(Versions.LOMBOK)
 }
 
 kotlin {
@@ -41,14 +41,14 @@ kotlin {
 }
 
 object Versions {
-    const val vertxVersion = "4.2.3"
-    const val log4j = "2.20.0"
-    const val ktor = "2.3.0"
-    const val tdlight = "3.0.12+td.1.8.14"
-    const val mirai = "2.16.0-RC"
-    const val kord = "0.9.0"
-    const val coroutineTest = "1.7.1"
-    const val lombok = "1.18.28"
+    const val VERTX_VERSION = "4.2.3"
+    const val LOG4J = "2.20.0"
+    const val KTOR = "2.3.0"
+    const val TD_LIGHT = "3.1.4+td.1.8.17"
+    const val MIRAI = "2.16.0-RC"
+    const val KORD = "0.9.0"
+    const val COROUTINE_TEST = "1.7.1"
+    const val LOMBOK = "1.18.28"
 }
 dependencies {
 
@@ -66,8 +66,8 @@ dependencies {
 //    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
     implementation(files("libs/unidbg-fix.jar"))
 
-    compileOnly("org.projectlombok:lombok:${Versions.lombok}")
-    annotationProcessor("org.projectlombok:lombok:${Versions.lombok}")
+    compileOnly("org.projectlombok:lombok:${Versions.LOMBOK}")
+    annotationProcessor("org.projectlombok:lombok:${Versions.LOMBOK}")
 
     implementation("com.linecorp.kotlin-jdsl:spring-data-kotlin-jdsl-starter-jakarta:2.2.0.RELEASE")
 
@@ -79,10 +79,10 @@ dependencies {
 //    runtimeOnly("org.postgresql:postgresql")
 
     //discord
-    implementation("dev.kord:kord-core:${Versions.kord}")
+    implementation("dev.kord:kord-core:${Versions.KORD}")
 
     //mirai
-    implementation(platform("net.mamoe:mirai-bom:${Versions.mirai}"))
+    implementation(platform("net.mamoe:mirai-bom:${Versions.MIRAI}"))
     implementation("net.mamoe:mirai-core")
     implementation("net.mamoe:mirai-core-utils")
 //    implementation("net.mamoe", "mirai-core", miraiVersion)
@@ -90,27 +90,27 @@ dependencies {
 //    implementation("net.mamoe", "mirai-core-utils", miraiVersion)
 
     //tdlib
-    implementation(platform("it.tdlight:tdlight-java-bom:${Versions.tdlight}"))
+    implementation(platform("it.tdlight:tdlight-java-bom:${Versions.TD_LIGHT}"))
     implementation("it.tdlight:tdlight-java")
     val hostOs = System.getProperty("os.name")
     val isWin = hostOs.startsWith("Windows")
     val classifier = when {
-        hostOs == "Linux" -> "linux_amd64"
+        hostOs == "Linux" -> "linux_amd64_gnu_ssl1"
         isWin -> "windows_amd64"
         else -> throw GradleException("[$hostOs] is not support!")
     }
     implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
 
-    implementation("io.ktor:ktor-client-core:${Versions.ktor}")
-    implementation("io.ktor:ktor-client-okhttp:${Versions.ktor}")
+    implementation("io.ktor:ktor-client-core:${Versions.KTOR}")
+    implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR}")
 
     //cache
     implementation("com.sksamuel.aedile:aedile-core:1.2.0")
 
     //logging
-    implementation("org.apache.logging.log4j:log4j-core:${Versions.log4j}")
-    implementation("org.apache.logging.log4j:log4j-api:${Versions.log4j}")
-    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:${Versions.log4j}")
+    implementation("org.apache.logging.log4j:log4j-core:${Versions.LOG4J}")
+    implementation("org.apache.logging.log4j:log4j-api:${Versions.LOG4J}")
+    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:${Versions.LOG4J}")
     implementation("com.lmax:disruptor:3.4.4")
 
     //xml
@@ -135,7 +135,7 @@ dependencies {
     implementation("org.reflections", "reflections", "0.10.2")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.coroutineTest}")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINE_TEST}")
 }
 
 //application {
