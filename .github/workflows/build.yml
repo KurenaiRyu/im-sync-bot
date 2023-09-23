@@ -5,9 +5,9 @@ name: Kotlin CI with Gradle
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, dev ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, dev ]
   workflow_dispatch:
 
 jobs:
@@ -43,6 +43,13 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('src/*', 'bin/*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
+      - name: Run unit test
+        if: steps.cache-jar.outputs.cache-hit != 'true'
+        run: ./gradlew test
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       - name: Build with Gradle
         if: steps.cache-jar.outputs.cache-hit != 'true'
         run: ./gradlew build
