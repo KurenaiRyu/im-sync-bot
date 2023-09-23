@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import kurenai.imsyncbot.bot.telegram.defaultTelegramBot
 import kurenai.imsyncbot.utils.TelegramUtil.messageId
 import kurenai.imsyncbot.utils.TelegramUtil.replyToMessageId
+import kurenai.imsyncbot.utils.TelegramUtil.setMessageId
 
 /**
  * @author Kurenai
@@ -190,11 +191,18 @@ object TelegramUtil {
     }
 
     //////////////  message reply  //////////////
-    fun SendMessage.setReplyToMessageId(messageId: Long?, chatId: Long? = null) =
+    fun SendMessage.setReplyToMessageId(messageId: Long?, chatId: Long? = null) {
+        this.replyTo ?: run { this.replyTo = MessageReplyToMessage() }
         this.replyTo.setMessageId(messageId, chatId)
+    }
 
-    fun Message.replyToMessageId() = this.replyTo.messageId()
-    fun Message.replyInChatId() = this.replyTo.chatId()
+    fun SendMessageAlbum.setReplyToMessageId(messageId: Long?, chatId: Long? = null) {
+        this.replyTo ?: run { this.replyTo = MessageReplyToMessage() }
+        this.replyTo.setMessageId(messageId, chatId)
+    }
+
+    fun Message.replyToMessageId() = this.replyTo?.messageId()
+    fun Message.replyInChatId() = this.replyTo?.chatId()
 
     fun MessageReplyTo.setMessageId(messageId: Long?, chatId: Long? = null) = (this as? MessageReplyToMessage)?.apply {
         messageId?.also(this::messageId::set)

@@ -137,7 +137,7 @@ class TelegramBot(
         untilPersistent: Boolean = false,
     ) = execute(untilPersistent) {
         messageText(formattedText, chatId).apply {
-            replayToMessageId?.let { this.replyTo.setMessageId(it) }
+            replayToMessageId?.let { this.setReplyToMessageId(it) }
             messageThreadId?.let { this.messageThreadId = it }
         }
     }
@@ -171,7 +171,7 @@ class TelegramBot(
         untilPersistent: Boolean = false,
     ): Message {
         SendMessage().apply {
-            replayToMessageId?.let { this.replyTo.setMessageId(it) }
+            replayToMessageId?.let { this.setReplyToMessageId(it) }
             messageThreadId?.let { this.messageThreadId = it }
             this.inputMessageContent = InputMessagePhoto().apply {
                 this.photo = InputFileLocal(BotUtil.downloadImg(filename, url).pathString)
@@ -180,7 +180,7 @@ class TelegramBot(
         }
         return execute(untilPersistent = untilPersistent) {
             messageText(formattedText, chatId).apply {
-                replayToMessageId?.let { this.replyTo.setMessageId(it) }
+                replayToMessageId?.let { this.setReplyToMessageId(it) }
                 messageThreadId?.let { this.messageThreadId = it }
             }
         }
@@ -316,8 +316,11 @@ class TelegramBot(
                                 log.trace("Sended {}", params)
                             }
                             con.invokeOnCancellation {
-//                                message?.also { pendingMessage.invalidate(it.id) }
-                                log.warn("Send job cancelled.")
+                                if (log.isTraceEnabled) {
+                                    log.warn("Send job cancelled: {}", params)
+                                } else {
+                                    log.warn("Send job cancelled.")
+                                }
                             }
                         }
                     }
