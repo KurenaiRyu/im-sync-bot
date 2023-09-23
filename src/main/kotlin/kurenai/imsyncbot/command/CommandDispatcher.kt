@@ -2,13 +2,13 @@ package kurenai.imsyncbot.command
 
 import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
-import kurenai.imsyncbot.service.Permission
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.qqCommands
+import kurenai.imsyncbot.service.Permission
 import kurenai.imsyncbot.tgCommands
 import kurenai.imsyncbot.utils.ParseMode
-import kurenai.imsyncbot.utils.TelegramUtil.messageId
+import kurenai.imsyncbot.utils.TelegramUtil.replyToMessageId
 import kurenai.imsyncbot.utils.TelegramUtil.text
 import kurenai.imsyncbot.utils.TelegramUtil.userSender
 import kurenai.imsyncbot.utils.getLogger
@@ -58,7 +58,7 @@ object CommandDispatcher {
                     "该命令只允许私聊执行"
                 } else if (cmd.onlyGroupMessage && !(typeConstructor == ChatTypeBasicGroup.CONSTRUCTOR || typeConstructor == ChatTypeSupergroup.CONSTRUCTOR)) {
                     "该命令只允许群组执行"
-                } else if (cmd.onlyReply && message.replyTo.messageId() != 0L) {
+                } else if (cmd.onlyReply && message.replyToMessageId() != 0L) {
                     "需要引用一条消息"
                 } else {
                     try {
