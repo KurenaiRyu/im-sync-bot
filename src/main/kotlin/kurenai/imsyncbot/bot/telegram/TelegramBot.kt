@@ -13,6 +13,8 @@ import kurenai.imsyncbot.utils.ParseMode
 import kurenai.imsyncbot.utils.TelegramUtil.asFmtText
 import kurenai.imsyncbot.utils.TelegramUtil.fmt
 import kurenai.imsyncbot.utils.TelegramUtil.messageText
+import kurenai.imsyncbot.utils.TelegramUtil.setMessageId
+import kurenai.imsyncbot.utils.TelegramUtil.setReplyToMessageId
 import kurenai.imsyncbot.utils.TelegramUtil.userSender
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.withIO
@@ -135,7 +137,7 @@ class TelegramBot(
         untilPersistent: Boolean = false,
     ) = execute(untilPersistent) {
         messageText(formattedText, chatId).apply {
-            replayToMessageId?.let { this.replyToMessageId = it }
+            replayToMessageId?.let { this.replyTo.setMessageId(it) }
             messageThreadId?.let { this.messageThreadId = it }
         }
     }
@@ -169,7 +171,7 @@ class TelegramBot(
         untilPersistent: Boolean = false,
     ): Message {
         SendMessage().apply {
-            replayToMessageId?.let { this.replyToMessageId = it }
+            replayToMessageId?.let { this.replyTo.setMessageId(it) }
             messageThreadId?.let { this.messageThreadId = it }
             this.inputMessageContent = InputMessagePhoto().apply {
                 this.photo = InputFileLocal(BotUtil.downloadImg(filename, url).pathString)
@@ -178,7 +180,7 @@ class TelegramBot(
         }
         return execute(untilPersistent = untilPersistent) {
             messageText(formattedText, chatId).apply {
-                replayToMessageId?.let { this.replyToMessageId = it }
+                replayToMessageId?.let { this.replyTo.setMessageId(it) }
                 messageThreadId?.let { this.messageThreadId = it }
             }
         }
@@ -196,7 +198,7 @@ class TelegramBot(
         path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
         SendMessage().apply {
             this.chatId = chatId
-            replayToMessageId?.let { this.replyToMessageId = replayToMessageId }
+            this.setReplyToMessageId(replayToMessageId)
             this.inputMessageContent = InputMessagePhoto().apply {
                 this.caption = formattedText
                 this.photo = InputFileLocal(path.pathString)
@@ -384,7 +386,7 @@ class TelegramBot(
 
             execute {
                 messageText(errorMsg.asFmtText(), message.chatId).apply {
-                    this.replyToMessageId = message.id
+                    this.setReplyToMessageId(message.id)
                     this.options = MessageSendOptions().apply {
                         this.fromBackground = true
                     }

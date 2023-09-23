@@ -3,7 +3,8 @@ package kurenai.imsyncbot.utils
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.runBlocking
 import kurenai.imsyncbot.bot.telegram.defaultTelegramBot
-import nl.adaptivity.xmlutil.core.impl.multiplatform.name
+import kurenai.imsyncbot.utils.TelegramUtil.messageId
+import kurenai.imsyncbot.utils.TelegramUtil.replyToMessageId
 
 /**
  * @author Kurenai
@@ -187,6 +188,21 @@ object TelegramUtil {
             else -> this::class.simpleName ?: "Unknown Update"
         }
     }
+
+    //////////////  message reply  //////////////
+    fun SendMessage.setReplyToMessageId(messageId: Long?, chatId: Long? = null) =
+        this.replyTo.setMessageId(messageId, chatId)
+
+    fun Message.replyToMessageId() = this.replyTo.messageId()
+    fun Message.replyInChatId() = this.replyTo.chatId()
+
+    fun MessageReplyTo.setMessageId(messageId: Long?, chatId: Long? = null) = (this as? MessageReplyToMessage)?.apply {
+        messageId?.also(this::messageId::set)
+        chatId?.also(this::chatId::set)
+    }
+
+    fun MessageReplyTo.messageId() = (this as? MessageReplyToMessage)?.messageId
+    fun MessageReplyTo.chatId() = (this as? MessageReplyToMessage)?.chatId
 }
 
 enum class ParseMode(val ins: TextParseMode?) {

@@ -13,6 +13,7 @@ import kurenai.imsyncbot.qqTgRepository
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.TelegramUtil.idString
+import kurenai.imsyncbot.utils.TelegramUtil.messageId
 import kurenai.imsyncbot.utils.TelegramUtil.userSender
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.message.data.*
@@ -244,7 +245,7 @@ class TgMessageHandler(
             return CONTINUE
         }
 
-        val quoteMsgChain = MessageService.findQQByTg(message.chatId, message.replyToMessageId)
+        val quoteMsgChain = MessageService.findQQByTg(message.chatId, message.replyTo.messageId()!!)
         val groupId = quoteMsgChain?.source?.targetId ?: bot.groupConfigService.tgQQ.getOrDefault(
             message.chatId,
             bot.groupConfigService.defaultQQGroup

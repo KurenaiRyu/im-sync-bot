@@ -5,7 +5,11 @@ import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.ParseMode
+import kurenai.imsyncbot.utils.TelegramUtil.chatId
 import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
+import kurenai.imsyncbot.utils.TelegramUtil.messageId
+import kurenai.imsyncbot.utils.TelegramUtil.replyInChatId
+import kurenai.imsyncbot.utils.TelegramUtil.replyToMessageId
 import kurenai.imsyncbot.utils.TelegramUtil.textOrCaption
 import kurenai.imsyncbot.utils.TelegramUtil.userSender
 import kurenai.imsyncbot.utils.getLogger
@@ -30,8 +34,8 @@ class BindCommand : AbstractTelegramCommand() {
         return if (chat.type.constructor == ChatTypeSupergroup.CONSTRUCTOR
             || chat.type.constructor == ChatTypeBasicGroup.CONSTRUCTOR
         ) {
-            if (message.replyToMessageId != 0L) {
-                tg.getMessage(message.replyInChatId, message.replyToMessageId)?.let { replyMessage ->
+            if (message.replyTo.messageId() != 0L) {
+                tg.getMessage(message.replyTo.chatId()!!, message.replyTo.messageId()!!)?.let { replyMessage ->
                     if (param.isNotBlank()) {
                         val user = tg.getUser(replyMessage) ?: return "找不到用户"
                         if (user.id == tg.getMe().id) {
@@ -102,8 +106,8 @@ class UnbindCommand : AbstractTelegramCommand() {
                 "参数错误"
             }
         } else {
-            if (message.replyToMessageId != 0L) {
-                bot.tg.getMessage(message.replyInChatId, message.replyToMessageId)?.let { reply ->
+            if (message.replyToMessageId() != 0L) {
+                bot.tg.getMessage(message.replyInChatId()!!, message.replyToMessageId()!!)?.let { reply ->
                     val userId = reply.userSender()?.userId!!
                     if (userId == bot.tg.getMe().id) {
                         val qqMsg = MessageService.findQQByTg(reply)

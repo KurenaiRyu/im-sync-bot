@@ -11,6 +11,7 @@ import kurenai.imsyncbot.utils.ParseMode
 import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
 import kurenai.imsyncbot.utils.TelegramUtil.fmt
 import kurenai.imsyncbot.utils.TelegramUtil.messagePhoto
+import kurenai.imsyncbot.utils.TelegramUtil.replyToMessageId
 import kurenai.imsyncbot.utils.TelegramUtil.username
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.message.data.source
@@ -32,8 +33,8 @@ class InfoCommand : AbstractTelegramCommand() {
         input: String
     ): String? {
         val qqBot = bot.qq.qqBot
-        return if (message.replyToMessageId != 0L) {
-            val replyMessage = bot.tg.getMessage(message.chatId, message.replyToMessageId)
+        return if (message.replyToMessageId() != 0L) {
+            val replyMessage = bot.tg.getMessage(message.chatId, message.replyToMessageId()!!)
             if (sender.userId == bot.tg.getMe().id) {
                 val qqMsg = MessageService.findQQByTg(replyMessage)
                 if (qqMsg != null) {
