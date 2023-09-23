@@ -7,6 +7,7 @@ import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.configuration.AbstractConfig
 import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.groupConfigRepository
+import kurenai.imsyncbot.repository.GroupConfigRepository
 import kurenai.imsyncbot.snowFlake
 import kurenai.imsyncbot.utils.json
 import kurenai.imsyncbot.utils.withIO
@@ -94,24 +95,25 @@ class GroupConfigService(
     suspend fun addStatus(tg: Long, status: GroupStatus) {
         configs.firstOrNull { it.telegramGroupId == tg && !it.status.contains(status) }?.let {
             it.status.add(status)
-            withIO { groupConfigRepository.save(it) }
+            save(it)
         }
     }
 
     suspend fun removeStatus(tg: Long, status: GroupStatus) {
-        configs.firstOrNull { it.telegramGroupId == tg && it.status.contains(status) }?.let {
+        configs.firstOrNull { it.telegramGroupId == tg && it.status.contains(status) }?.also {
             it.status.remove(status)
-            withIO { groupConfigRepository.save(it) }
+            save(it)
         }
     }
 
     suspend fun bind(tg: Long, qq: Long, title: String) {
-        configs.firstOrNull { it.qqGroupId == qq }?.let {
-            it.telegramGroupId = tg
+        configs.firstOrNull { it.telegramGroupId == tg }?.also {
+            //Only modify qq when exist
             it.name = title
-            withIO { groupConfigRepository.save(it) }
+            it.qqGroupId = qq
+            save(it)
         } ?: run {
-            add(GroupConfig().apply {
+            save(GroupConfig().apply {
                 this.qqGroupId = qq
                 this.name = title
                 this.telegramGroupId = tg
@@ -119,15 +121,19 @@ class GroupConfigService(
         }
     }
 
+    /**
+     * Remove group bind by telegram id
+     *
+     * @param tg telegram id
+     */
     suspend fun remove(tg: Long) {
-        configs.firstOrNull { it.telegramGroupId == tg }?.let {
-            withIO { groupConfigRepository.delete(it) }
-            configs.remove(it)
+        configs.firstOrNull { it.telegramGroupId == tg }?.also {
+            delete(it)
         }
     }
 
     /**
-     * Set group which from message as default group
+     * Set group which from message as default group or not
      *
      * @param message
      * @return True if set group as default group, otherwise revoke group as default group
@@ -143,14 +149,14 @@ class GroupConfigService(
                 configs.firstOrNull { it.telegramGroupId == message.chatId }?.let {
                     addStatus(message.chatId, GroupStatus.DEFAULT)
                 } ?: run {
-                    add(
+                    save(
                         GroupConfig(
                         )
                     )
                 }
             }
         } else {
-            add(
+            save(
                 GroupConfig().apply {
                     telegramGroupId = message.chatId
                     qqGroupId = tgQQ[message.chatId] ?: 0L
@@ -205,11 +211,28 @@ class GroupConfigService(
         this.filterGroups = filterGroups.toList()
     }
 
-    private suspend fun add(config: GroupConfig) {
-        val exist = configs.firstOrNull { it.telegramGroupId == config.telegramGroupId }
-        if (exist != null) return
+    /**
+     * Save [GroupConfig]
+     *
+     * 需要调用[GroupConfigRepository.save]需要统一调用该方法，为了能够统一处理修改后的一些操作
+     *
+     * @param config Group config
+     */
+    private suspend fun save(config: GroupConfig) {
         withIO { groupConfigRepository.save(config) }
-        configs.add(config)
+        refresh()
+    }
+
+    /**
+     * Delete [GroupConfig]
+     *
+     * 需要调用[GroupConfigRepository.delete]需要统一调用该方法，为了能够统一处理修改后的一些操作
+     *
+     * @param config Group config
+     */
+    private suspend fun delete(config: GroupConfig) {
+        withIO { groupConfigRepository.delete(config) }
+        refresh()
     }
 
     override fun getConfigName(): String {

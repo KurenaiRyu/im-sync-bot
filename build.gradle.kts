@@ -1,4 +1,3 @@
-import org.jetbrains.kotlin.config.LanguageVersion
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -13,6 +12,7 @@ plugins {
     kotlin("plugin.allopen") version "1.9.0"
     kotlin("plugin.noarg") version "1.9.0"
     kotlin("plugin.jpa") version "1.9.0"
+    jacoco
 }
 
 group = "moe.kurenai.bot"
@@ -45,7 +45,7 @@ object Versions {
     const val log4j = "2.20.0"
     const val ktor = "2.3.0"
     const val tdlight = "3.0.12+td.1.8.14"
-    const val mirai = "2.15.0"
+    const val mirai = "2.16.0-RC"
     const val kord = "0.9.0"
     const val coroutineTest = "1.7.1"
     const val lombok = "1.18.28"
@@ -68,6 +68,8 @@ dependencies {
 
     compileOnly("org.projectlombok:lombok:${Versions.lombok}")
     annotationProcessor("org.projectlombok:lombok:${Versions.lombok}")
+
+    implementation("com.linecorp.kotlin-jdsl:spring-data-kotlin-jdsl-starter-jakarta:2.2.0.RELEASE")
 
     //db driver
     runtimeOnly("com.h2database:h2")
@@ -187,6 +189,14 @@ tasks.bootJar {
     enabled = true
     archiveFileName.set("${rootProject.name}.jar")
 }
+
+tasks.test {
+    finalizedBy(tasks.jacocoTestReport) // report is always generated after tests run
+}
+tasks.jacocoTestReport {
+    dependsOn(tasks.test) // tests are required to run before generating the report
+}
+
 
 //tasks.jar {
 //    enabled = false

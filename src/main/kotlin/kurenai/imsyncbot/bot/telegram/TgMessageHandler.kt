@@ -9,6 +9,7 @@ import kurenai.imsyncbot.Running
 import kurenai.imsyncbot.command.CommandDispatcher
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
+import kurenai.imsyncbot.qqTgRepository
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.TelegramUtil.idString
@@ -19,7 +20,6 @@ import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.message.sourceIds
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import it.tdlight.client.Result as TdResult
 
 class TgMessageHandler(
     val bot: ImSyncBot
@@ -153,10 +153,16 @@ class TgMessageHandler(
                             )
                         }
                     }.onFailure { it.printStackTrace() }
-                    bot.tg.pendingMessage.getIfPresent(update.oldMessageId)?.let {
+                    bot.tg.pendingMessage.getIfPresent(update.oldMessageId)?.also {
                         bot.tg.pendingMessage.invalidate(update.oldMessageId)
                         if (it.isActive) {
-                            it.resumeWith(Result.success(TdResult.of(update.message)))
+                            log.trace("Resume {}", it)
+                            it.resumeWith(Result.success(update.message))
+                        } else {
+                            qqTgRepository.findAllByTgMsgId(update.oldMessageId).forEach { old ->
+                                old.tgMsgId = update.message.id
+                                qqTgRepository.save(old)
+                            }
                         }
                     }
                 }
@@ -171,7 +177,7 @@ class TgMessageHandler(
                             update.errorCode,
                             update.errorMessage
                         )
-                    }.onFailure { }
+                    }
                     bot.tg.pendingMessage.getIfPresent(update.oldMessageId)?.let {
                         bot.tg.pendingMessage.invalidate(update.oldMessageId)
                         if (it.isActive) {
@@ -251,10 +257,9 @@ class TgMessageHandler(
         }
         val isMaster = bot.userConfigService.masterTg == userSender?.userId
         val senderName = getSenderName(message)
-        val replyMessage = MessageService.findQQByTg(message.chatId, message.replyToMessageId)
 
         val builder = MessageChainBuilder()
-        replyMessage?.let { builder.append(replyMessage.quote()) }
+        quoteMsgChain?.let { builder.append(quoteMsgChain.quote()) }
 
         //TODO: 添加发送人前缀
         when (val content = message.content) {
@@ -267,12 +272,16 @@ class TgMessageHandler(
                 val image = when (content.sticker.format.constructor) {
                     StickerFormatWebp.CONSTRUCTOR -> {
                         val file = bot.tg.downloadFile(content.sticker.sticker)
-                        group.uploadImage(BotUtil.webp2png(file).toFile().toExternalResource())
+                        BotUtil.webp2png(file).toFile().toExternalResource().use {
+                            group.uploadImage(it)
+                        }
                     }
 
                     StickerFormatWebm.CONSTRUCTOR -> {
                         val file = bot.tg.downloadFile(content.sticker.sticker)
-                        group.uploadImage(BotUtil.mp42gif(content.sticker.width, file).toFile().toExternalResource())
+                        BotUtil.mp42gif(content.sticker.width, file).toFile().toExternalResource().use {
+                            group.uploadImage(it)
+                        }
                     }
 
                     else -> null
@@ -284,29 +293,50 @@ class TgMessageHandler(
 
             is MessagePhoto -> {
                 val file = bot.tg.downloadFile(content.photo.sizes.maxBy { it.photo.size }.photo)
-                builder.add(group.uploadImage(java.io.File(file.local.path).toExternalResource()))
-                builder.add(content.caption.text)
-                group.sendMessage(builder.build())
+                java.io.File(file.local.path).toExternalResource().use {
+                    builder.add(group.uploadImage(it))
+                    builder.add(content.caption.text)
+                    group.sendMessage(builder.build())
+                }
             }
 
             is MessageAnimation -> {
                 val file = bot.tg.downloadFile(content.animation.animation)
+                val thumbnail = bot.tg.downloadFile(content.animation.thumbnail.file)
                 if (content.animation.animation.size > 800 * 1024) {
-                    group.files.uploadNewFile(
-                        content.animation.fileName,
-                        java.io.File(file.local.path).toExternalResource()
-                    )
+                    java.io.File(thumbnail.local.path).toExternalResource().use { thum ->
+                        java.io.File(file.local.path).toExternalResource().use { video ->
+                            group.uploadShortVideo(
+                                thumbnail = thum,
+                                video = video,
+                                fileName = content.animation.fileName,
+                            )
+                        }
+                    }
                     null
                 } else {
-                    BotUtil.mp42gif(content.animation.width, file)
-                    builder.add(
-                        group.uploadImage(
-                            BotUtil.mp42gif(content.animation.width, file).toFile().toExternalResource()
-                        )
-                    )
-                    builder.add(content.caption.text)
-                    group.sendMessage(builder.build())
+                    BotUtil.mp42gif(content.animation.width, file).toFile().toExternalResource().use {
+                        builder.add(group.uploadImage(it))
+                        builder.add(content.caption.text)
+                        group.sendMessage(builder.build())
+                    }
                 }
+            }
+
+            is MessageVideo -> {
+                val file = bot.tg.downloadFile(content.video.video)
+                val thumbnail = bot.tg.downloadFile(content.video.thumbnail.file)
+
+                java.io.File(thumbnail.local.path).toExternalResource().use { thumb ->
+                    java.io.File(file.local.path).toExternalResource().use { video ->
+                        group.uploadShortVideo(
+                            thumbnail = thumb,
+                            video = video,
+                            fileName = content.video.fileName,
+                        )
+                    }
+                }
+                null
             }
 //            is MessageAudio -> CoroutineScope(coroutineContext).launch {
 //                content.audio.audio.id
@@ -344,6 +374,7 @@ class TgMessageHandler(
         }
         return CONTINUE
     }
+
 
 //    @Throws(TelegramApiException::class, IOException::class)
 //    private suspend fun getImage(contact: Contact, fileId: String, fileUniqueId: String): Image? {

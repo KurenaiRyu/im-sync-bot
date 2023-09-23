@@ -1,13 +1,7 @@
 package kurenai.imsyncbot.bot.qq
 
 import it.tdlight.jni.TdApi
-import it.tdlight.jni.TdApi.InputFileLocal
-import it.tdlight.jni.TdApi.InputMessageAnimation
-import it.tdlight.jni.TdApi.InputMessageContent
-import it.tdlight.jni.TdApi.InputMessageDocument
-import it.tdlight.jni.TdApi.InputMessagePhoto
-import it.tdlight.jni.TdApi.InputMessageVideo
-import it.tdlight.jni.TdApi.SendMessageAlbum
+import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
@@ -21,16 +15,16 @@ import kurenai.imsyncbot.service.FileService
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.BotUtil.formatUsername
+import kurenai.imsyncbot.utils.ParseMode
 import kurenai.imsyncbot.utils.TelegramUtil.asFmtText
 import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
 import kurenai.imsyncbot.utils.TelegramUtil.fmt
-import kurenai.imsyncbot.utils.md5
+import kurenai.imsyncbot.utils.toHex
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.contact.*
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.GroupTempMessageEvent
 import net.mamoe.mirai.message.data.*
-import net.mamoe.mirai.message.data.ForwardMessage
 import net.mamoe.mirai.utils.MiraiExperimentalApi
 import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
 import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
@@ -39,7 +33,6 @@ import nl.adaptivity.xmlutil.serialization.XmlSerializationPolicy
 import org.apache.logging.log4j.LogManager
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
-import java.nio.file.Path
 import kotlin.io.path.pathString
 
 /**
@@ -163,6 +156,8 @@ class GroupMessageContext(
                     XmlReadyToSendMessage(xml.decodeFromString(XmlMessageContent.serializer(), content))
                 }
             }.recover { Normal() }.getOrThrow()
+        } else if (messageChain.contains(OnlineShortVideo.Key)) {
+            ShortVideo(messageChain[OnlineShortVideo.Key]!!)
         } else if (messageChain.contains(Image.Key)) {
             val images = messageChain.filterIsInstance<Image>()
             if (images.size == 1) {
@@ -268,7 +263,7 @@ class GroupMessageContext(
         private val shouldBeFile: Boolean = image.shouldBeFile()
 
         override suspend fun send(): Array<TdApi.Message> {
-            val func = TdApi.SendMessage().apply {
+            val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.replyToMessageId = it }
@@ -357,7 +352,7 @@ class GroupMessageContext(
     ) : ReadyToSendMessage {
 
         override suspend fun send(): Array<TdApi.Message> {
-            val func = TdApi.SendMessage().apply {
+            val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.replyToMessageId = it }
                 this.inputMessageContent = buildContent()
@@ -379,12 +374,29 @@ class GroupMessageContext(
         }
     }
 
+    inner class ShortVideo(val shortVideo: OnlineShortVideo) : ReadyToSendMessage {
+        override suspend fun send(): Array<TdApi.Message> {
+            val name = "${shortVideo.fileMd5.toHex()}.mp4"
+            val url = shortVideo.urlForDownload
+            val func = SendMessage().apply {
+                this.chatId = this@GroupMessageContext.chatId
+                this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.replyToMessageId = it }
+                this.inputMessageContent = InputMessageVideo().apply {
+                    this.caption = "${shortVideo.filename}.${shortVideo.fileFormat}"
+                        .escapeMarkdownChar().formatMsg(senderId, senderName).fmt()
+                    this.video = InputFileLocal(BotUtil.downloadDoc(name, url).pathString)
+                }
+            }
+            return arrayOf(bot.tg.execute(func, true))
+        }
+    }
+
     inner class Video(val fileMessage: FileMessage) : ReadyToSendMessage {
 
         override suspend fun send(): Array<TdApi.Message> {
             val url = fileMessage.toAbsoluteFile(group)?.getUrl()
             require(url != null) { "获取视频地址失败" }
-            val func = TdApi.SendMessage().apply {
+            val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.replyToMessageId = it }
                 this.inputMessageContent = InputMessageVideo().apply {
@@ -405,7 +417,7 @@ class GroupMessageContext(
 
         override suspend fun send(): Array<TdApi.Message> {
             val url = getUrl()
-            val func = TdApi.SendMessage().apply {
+            val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this.inputMessageContent = InputMessageDocument().apply {
                     this.caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()

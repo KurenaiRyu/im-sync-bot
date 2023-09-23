@@ -5,10 +5,9 @@ import it.tdlight.client.*
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
-import kotlinx.datetime.Instant
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kurenai.imsyncbot.*
-import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.ParseMode
 import kurenai.imsyncbot.utils.TelegramUtil.asFmtText
@@ -48,6 +47,7 @@ class TelegramBot(
 
     companion object {
         internal val log = getLogger()
+        val DEFAULT_TIMEOUT = 3.seconds
     }
 
     private lateinit var apiToken: APIToken
@@ -84,7 +84,7 @@ class TelegramBot(
         expireAfterWrite = 1.minutes
     }.build()
 
-    val pendingMessage = caffeineBuilder<Long, CancellableContinuation<it.tdlight.client.Result<Object>>> {
+    val pendingMessage = caffeineBuilder<Long, CancellableContinuation<Object>> {
         maximumSize = 50
         expireAfterWrite = 1.minutes
     }.build()
@@ -273,13 +273,13 @@ class TelegramBot(
     suspend inline fun <R : Object, Fun : TdApi.Function<R>> execute(
         function: Fun,
         untilPersistent: Boolean = false,
-        timeout: Duration = 5.seconds
+        timeout: Duration = DEFAULT_TIMEOUT
     ): R = execute(untilPersistent, timeout) { function }
 
     @OptIn(ExperimentalTime::class)
     suspend fun <R : Object> execute(
         untilPersistent: Boolean = false,
-        timeout: Duration = 10.seconds,
+        timeout: Duration = DEFAULT_TIMEOUT,
         block: () -> TdApi.Function<R>
     ): R {
         contract {
@@ -288,34 +288,56 @@ class TelegramBot(
         val params = block()
         val (value, duration) = measureTimedValue {
             withContext(this.coroutineContext) {
-                val result = suspendCancellableCoroutine<it.tdlight.client.Result<R>> { con ->
-                    client.send(params) { result ->
-                        if (untilPersistent && !result.isError) {
-                            val obj = result.get()
-                            if ((obj as? Message)?.sendingState?.constructor == MessageSendingStatePending.CONSTRUCTOR) {
-                                pendingMessage[obj.id] =
-                                    con as CancellableContinuation<it.tdlight.client.Result<TdApi.Object>>
-                            } else {
-                                con.resumeWith(Result.success(result))
+                var obj: R? = null
+                runCatching {
+                    withTimeout(timeout) {
+                        suspendCancellableCoroutine<R> { con ->
+                            var message: Message? = null
+                            CoroutineScope(Dispatchers.IO).launch {
+                                log.trace("Sending {}", params)
+                                client.send(params) { result ->
+                                    log.trace("Received {}", result)
+                                    if (untilPersistent && !result.isError) {
+                                        obj = result.get()
+                                        message = obj as? Message
+                                        if (message?.sendingState?.constructor == MessageSendingStatePending.CONSTRUCTOR) {
+                                            log.trace("Pending message {}", message)
+                                            pendingMessage[message!!.id] =
+                                                con as CancellableContinuation<Object>
+                                        } else {
+                                            con.resumeWith(Result.success(obj!!))
+                                        }
+                                    } else {
+                                        con.resumeWith(runCatching { result.get() })
+                                    }
+                                }
+                                log.trace("Sended {}", params)
                             }
-                        } else {
-                            con.resumeWith(Result.success(result))
+                            con.invokeOnCancellation {
+//                                message?.also { pendingMessage.invalidate(it.id) }
+                                log.warn("Send job cancelled.")
+                            }
                         }
                     }
-                }
-                return@withContext if (result.isError && result.error.message.contains("retry after")) {
-                    val seconds = result.error.message.substringAfterLast(" ").toLongOrNull() ?: 5
-                    log.warn("Wait for {}s", seconds)
-                    delay(seconds * 1000)
-                    execute(untilPersistent, timeout, block)
-                } else {
-                    result.get()
-                }
+                }.recoverCatching { ex: Throwable ->
+                    if (ex.message?.contains("retry after") == true) {
+                        val seconds = ex.message!!.substringAfterLast(" ").toLongOrNull() ?: 5
+                        log.warn("Wait for {}s", seconds)
+                        delay(seconds * 1000)
+                        return@recoverCatching execute<R>(untilPersistent, timeout, block)
+                    } else {
+                        if (ex is TimeoutCancellationException && obj != null) obj!!
+                        else throw ex
+                    }
+                }.getOrThrow()
             }
         }
         if (log.isTraceEnabled) {
             log.trace("in {}, Execute {}", duration, params)
         } else {
+            if (duration > 10.seconds) {
+                log.warn("Send job cost over 10s: {}", duration)
+            }
             log.debug("Execute {} in {}", params::class.simpleName, duration)
         }
         return value

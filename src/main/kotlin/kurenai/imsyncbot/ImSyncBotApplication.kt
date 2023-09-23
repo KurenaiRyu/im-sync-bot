@@ -1,5 +1,6 @@
 package kurenai.imsyncbot
 
+import com.linecorp.kotlinjdsl.spring.data.SpringDataQueryFactory
 import jakarta.persistence.EntityManager
 import kurenai.imsyncbot.repository.*
 import org.springframework.boot.Banner
@@ -7,7 +8,9 @@ import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.context.ApplicationContext
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Scope
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 
 
@@ -27,6 +30,7 @@ lateinit var groupConfigRepository: GroupConfigRepository
 lateinit var userConfigRepository: UserConfigRepository
 lateinit var qqDiscordRepository: QqDiscordRepository
 lateinit var applicationContext: ApplicationContext
+lateinit var queryFactory: SpringDataQueryFactory
 
 suspend fun main(args: Array<String>) {
     applicationContext = runApplication<ImSyncBotApplication>(*args) {
@@ -38,6 +42,7 @@ suspend fun main(args: Array<String>) {
     groupConfigRepository = applicationContext.getBean(GroupConfigRepository::class.java)
     userConfigRepository = applicationContext.getBean(UserConfigRepository::class.java)
     qqDiscordRepository = applicationContext.getBean(QqDiscordRepository::class.java)
+    queryFactory = applicationContext.getBean(SpringDataQueryFactory::class.java)
     start()
 }
 

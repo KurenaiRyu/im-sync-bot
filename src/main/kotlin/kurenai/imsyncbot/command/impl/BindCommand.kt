@@ -51,7 +51,7 @@ class BindCommand : AbstractTelegramCommand() {
                     try {
                         val qq = param.toLong()
                         qqBot.getGroup(qq)?.let {
-                            bot.groupConfigService.bind(chat.id, qq, chat.title)
+                            bot.groupConfigService.bind(chat.id, qq, it.name)
                             "绑定成功\n\n" +
                                     "绑定QQ群id: `${it.id}`\n" +
                                     "绑定QQ群名称: `${it.name.escapeMarkdownChar()}`\n" +
