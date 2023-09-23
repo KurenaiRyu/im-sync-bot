@@ -40,7 +40,7 @@ jobs:
         with:
           path: |
             build/libs/
-          key: ${{ runner.os }}-gradle-${{ hashFiles('src/*', 'bin/*') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('src/*', 'bin/*', '**/*.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
       - name: Run unit test
