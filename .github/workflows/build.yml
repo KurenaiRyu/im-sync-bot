@@ -47,6 +47,7 @@ jobs:
         if: steps.cache-jar.outputs.cache-hit != 'true'
         run: ./gradlew test
       - name: Upload coverage reports to Codecov
+        if: steps.cache-jar.outputs.cache-hit != 'true'
         uses: codecov/codecov-action@v3
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
