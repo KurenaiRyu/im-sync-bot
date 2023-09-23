@@ -245,7 +245,9 @@ class TgMessageHandler(
             return CONTINUE
         }
 
-        val quoteMsgChain = MessageService.findQQByTg(message.chatId, message.replyToMessageId()!!)
+        val quoteMsgChain = message.replyToMessageId()?.let {
+            MessageService.findQQByTg(message.chatId, it)
+        }
         val groupId = quoteMsgChain?.source?.targetId ?: bot.groupConfigService.tgQQ.getOrDefault(
             message.chatId,
             bot.groupConfigService.defaultQQGroup
