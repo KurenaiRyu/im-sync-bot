@@ -50,6 +50,8 @@ jobs:
         uses: codecov/codecov-action@v3
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          files: ./build/reports/jacoco/test/jacocoTestReport.xml
       - name: Build with Gradle
         if: steps.cache-jar.outputs.cache-hit != 'true'
         run: ./gradlew build
