@@ -21,6 +21,9 @@ import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.message.sourceIds
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 class TgMessageHandler(
     val bot: ImSyncBot
@@ -185,6 +188,23 @@ class TgMessageHandler(
                             it.resumeWith(Result.failure(BotException("[${update.errorCode}] ${update.errorMessage}")))
                         }
                     }
+                }
+
+                is UpdateFile -> {
+                    val file = update.file
+                    val minSize = min(file.local.downloadedSize, file.remote.uploadedSize)
+                    val maxSize = max(file.local.downloadedSize, file.remote.uploadedSize)
+                    if (traceEnabled.not()) TelegramBot.log.debug(
+                        "Update file [{}] {} {}/{}({}%) : {}",
+                        file.id,
+                        if (file.local.isDownloadingActive) "downloading"
+                        else if (file.remote.isUploadingActive) "uploading"
+                        else "completed",
+                        minSize,
+                        maxSize,
+                        (minSize / maxSize * 100.0).roundToInt(),
+                        file.local.path
+                    )
                 }
 
                 is UpdateConnectionState -> {
