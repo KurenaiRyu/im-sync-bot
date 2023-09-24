@@ -136,7 +136,15 @@ class QQMessageHandler(
                             this.chatId = originMsg.chatId
                             this.messageId = originMsg.id
                             this.inputMessageContent = InputMessageText().apply {
-                                this.text = content.text
+                                this.text = content.text.apply {
+                                    val size = this.entities.size + 1
+                                    this.entities = Array<TextEntity>(size) {
+                                        if (it == size - 1)
+                                            TextEntity(0, content.text.text.length, TextEntityTypeStrikethrough())
+                                        else
+                                            this.entities[it]
+                                    }
+                                }
                             }
                         }
                     } else {
@@ -146,7 +154,7 @@ class QQMessageHandler(
                             val caption = content.textOrCaption()
                             this.caption = caption?.apply {
                                 val size = this.entities.size + 1
-                                Array<TextEntity>(size) {
+                                this.entities = Array<TextEntity>(size) {
                                     if (it == size - 1)
                                         TextEntity(0, caption.text.length, TextEntityTypeStrikethrough())
                                     else
