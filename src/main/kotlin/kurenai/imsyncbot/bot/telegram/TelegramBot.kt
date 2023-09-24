@@ -13,7 +13,6 @@ import kurenai.imsyncbot.utils.ParseMode
 import kurenai.imsyncbot.utils.TelegramUtil.asFmtText
 import kurenai.imsyncbot.utils.TelegramUtil.fmt
 import kurenai.imsyncbot.utils.TelegramUtil.messageText
-import kurenai.imsyncbot.utils.TelegramUtil.setMessageId
 import kurenai.imsyncbot.utils.TelegramUtil.setReplyToMessageId
 import kurenai.imsyncbot.utils.TelegramUtil.userSender
 import kurenai.imsyncbot.utils.getLogger
@@ -290,37 +289,40 @@ class TelegramBot(
         val params = block()
         val (value, duration) = measureTimedValue {
             withContext(this.coroutineContext) {
-                var obj: R? = null
                 runCatching {
-                    withTimeout(timeout) {
-                        suspendCancellableCoroutine<R> { con ->
-                            var message: Message? = null
-                            CoroutineScope(Dispatchers.IO).launch {
-                                log.trace("Sending {}", params)
-                                client.send(params) { result ->
-                                    log.trace("Received {}", result)
-                                    if (untilPersistent && !result.isError) {
-                                        obj = result.get()
-                                        message = obj as? Message
-                                        if (message?.sendingState?.constructor == MessageSendingStatePending.CONSTRUCTOR) {
-                                            log.trace("Pending message {}", message)
-                                            pendingMessage[message!!.id] =
-                                                con as CancellableContinuation<Object>
-                                        } else {
-                                            con.resumeWith(Result.success(obj!!))
-                                        }
+                    suspendCancellableCoroutine { con: CancellableContinuation<R> ->
+                        var obj: R? = null
+                        CoroutineScope(Dispatchers.IO).launch {
+                            client.send(params) { result ->
+                                if (untilPersistent && !result.isError) {
+                                    obj = result.get()
+                                    val message = obj as? Message
+                                    if (message?.sendingState?.constructor == MessageSendingStatePending.CONSTRUCTOR) {
+                                        pendingMessage[message.id] =
+                                            con as CancellableContinuation<Object>
                                     } else {
-                                        con.resumeWith(runCatching { result.get() })
+                                        con.resumeWith(Result.success(obj!!))
                                     }
-                                }
-                                log.trace("Sended {}", params)
-                            }
-                            con.invokeOnCancellation {
-                                if (log.isTraceEnabled) {
-                                    log.warn("Send job cancelled: {}", params)
                                 } else {
-                                    log.warn("Send job cancelled.")
+                                    con.resumeWith(runCatching { result.get() })
                                 }
+                            }
+                        }
+                        CoroutineScope(Dispatchers.IO).launch {
+                            delay(timeout)
+                            if (con.isActive) {
+                                obj?.also {
+                                    con.resumeWith(Result.success(it))
+                                } ?: run {
+                                    con.cancel(CancellationException("Timeout with $timeout"))
+                                }
+                            }
+                        }
+                        con.invokeOnCancellation {
+                            if (log.isTraceEnabled) {
+                                log.warn("Send job cancelled: {}", params)
+                            } else {
+                                log.warn("Send job cancelled.")
                             }
                         }
                     }
@@ -331,8 +333,7 @@ class TelegramBot(
                         delay(seconds * 1000)
                         return@recoverCatching execute<R>(untilPersistent, timeout, block)
                     } else {
-                        if (ex is TimeoutCancellationException && obj != null) obj!!
-                        else throw ex
+                        throw ex
                     }
                 }.getOrThrow()
             }
