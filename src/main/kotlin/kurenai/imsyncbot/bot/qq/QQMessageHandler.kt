@@ -2,13 +2,12 @@ package kurenai.imsyncbot.bot.qq
 
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
+import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdown
 import kurenai.imsyncbot.utils.TelegramUtil.fmt
 import kurenai.imsyncbot.utils.TelegramUtil.sendUserId
 import kurenai.imsyncbot.utils.TelegramUtil.textOrCaption
@@ -39,8 +38,8 @@ class QQMessageHandler(
         val messageType = context.getReadyToSendMessage()
         val list = if (messageType is GroupMessageContext.Forward) messageType.contextList else listOf(context)
         if (list.size > 5) {
-            coroutineScope {
-                launch { sendMessage(list, context) }
+            CoroutineScope(bot.qq.coroutineContext).launch {
+                sendMessage(list, context)
             }
         } else {
             sendMessage(list, context)
@@ -50,26 +49,41 @@ class QQMessageHandler(
 
     private suspend fun sendMessage(list: List<GroupMessageContext>, context: GroupMessageContext) {
         for (resolvedContext in list) {
-            val readyToSendMessage = resolvedContext.getReadyToSendMessage()
-            kotlin.runCatching {
-                readyToSendMessage.send()
-            }.recoverCatching {
-                log.warn("Send group message error, try to send normal type message", it)
-                resolvedContext.normalType.send()
-            }.getOrThrow().also { messages ->
-                log.debug("{} Sent {}", context.infoString,
-                    messages.joinToString(",") {
-                        "[${it.chatId}] ${it.sendUserId()} ${
-                            it.content.textOrCaption()?.text?.replace(
-                                "\r",
-                                "\\r"
-                            )?.replace("\n", "\\n")
-                        }"
-                    })
-                if (context.entity == null) return@also
-                CoroutineScope(bot.coroutineContext).launch {
-                    MessageService.cache(context.entity, context.messageChain, messages)
+            when (resolvedContext.getReadyToSendMessage()) {
+                is GroupMessageContext.ShortVideo,
+                is GroupMessageContext.Video,
+                is GroupMessageContext.File -> CoroutineScope(bot.qq.coroutineContext).launch {
+                    sendMessage(
+                        resolvedContext,
+                        context
+                    )
                 }
+
+                else -> sendMessage(resolvedContext, context)
+            }
+        }
+    }
+
+    private suspend fun sendMessage(resolvedContext: GroupMessageContext, context: GroupMessageContext) {
+        val readyToSendMessage = resolvedContext.getReadyToSendMessage()
+        kotlin.runCatching {
+            readyToSendMessage.send()
+        }.recoverCatching {
+            log.warn("Send group message error, try to send normal type message", it)
+            resolvedContext.normalType.send()
+        }.getOrThrow().also { messages ->
+            log.debug("{} Sent {}", context.infoString,
+                messages.joinToString(",") {
+                    "[${it.chatId}] ${it.sendUserId()} ${
+                        it.content.textOrCaption()?.text?.replace(
+                            "\r",
+                            "\\r"
+                        )?.replace("\n", "\\n")
+                    }"
+                })
+            if (context.entity == null) return@also
+            CoroutineScope(bot.coroutineContext).launch {
+                MessageService.cache(context.entity, context.messageChain, messages)
             }
         }
     }
@@ -129,7 +143,7 @@ class QQMessageHandler(
             } else {
                 val originMsg = bot.tg.getMessage(message.tgGrpId, message.tgMsgId)
                 if (originMsg.userSender()?.userId != bot.tg.getMe().id) return CONTINUE
-                bot.tg.execute {
+                bot.tg.send {
                     val content = originMsg.content
                     if (content is MessageText) {
                         EditMessageText().apply {
@@ -176,11 +190,11 @@ class QQMessageHandler(
                 val tag = "\\#入群 \\#id${event.member.id} \\#group${event.group.id}\n"
                 when (event) {
                     is MemberJoinEvent.Active -> {
-                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`入群`${event.group.name}`"
+                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdown()}`入群`${event.group.name}`"
                     }
 
                     is MemberJoinEvent.Invite -> {
-                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`通过`${(bot.userConfigService.idBindings[event.invitor.id] ?: event.invitor.remarkOrNameCardOrNick).escapeMarkdownChar()}` \\#id${event.invitor.id}\\ 的邀请入群`${event.group.name}`"
+                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdown()}`通过`${(bot.userConfigService.idBindings[event.invitor.id] ?: event.invitor.remarkOrNameCardOrNick).escapeMarkdown()}` \\#id${event.invitor.id}\\ 的邀请入群`${event.group.name}`"
                     }
 
                     else -> return
@@ -191,11 +205,11 @@ class QQMessageHandler(
                 val tag = "\\#退群 \\#id${event.member.id} \\#group${event.group.id}\n"
                 when (event) {
                     is MemberLeaveEvent.Kick -> {
-                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`被踢出群`${event.group.name}`"
+                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdown()}`被踢出群`${event.group.name}`"
                     }
 
                     is MemberLeaveEvent.Quit -> {
-                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`退出群`${event.group.name}`"
+                        "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdown()}`退出群`${event.group.name}`"
                     }
 
                     else -> return
@@ -203,27 +217,27 @@ class QQMessageHandler(
             }
 
             is MemberMuteEvent -> {
-                "\\#禁言\n\\#id${event.member.id}\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`被禁言${event.durationSeconds / 60}分钟"
+                "\\#禁言\n\\#id${event.member.id}\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdown()}`被禁言${event.durationSeconds / 60}分钟"
             }
 
             is GroupMuteAllEvent -> {
-                "\\#禁言\n`${(bot.userConfigService.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.escapeMarkdownChar() ?: "?"}` \\#id${event.operator?.id ?: "?"} 禁言了所有人"
+                "\\#禁言\n`${(bot.userConfigService.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.escapeMarkdown() ?: "?"}` \\#id${event.operator?.id ?: "?"} 禁言了所有人"
             }
 
             is MemberUnmuteEvent -> {
-                "\\#禁言\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}` \\#id${event.member.id} 被`${(bot.userConfigService.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.escapeMarkdownChar() ?: "?"})` \\#id${event.operator?.id ?: "?"} 解除禁言"
+                "\\#禁言\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdown()}` \\#id${event.member.id} 被`${(bot.userConfigService.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick)?.escapeMarkdown() ?: "?"})` \\#id${event.operator?.id ?: "?"} 解除禁言"
             }
 
             is MemberCardChangeEvent -> {
                 if (event.new.isNotEmpty()) {
-                    "\\#名称 \\#id${event.member.id}\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.origin).escapeMarkdownChar()}`名称改为`${event.new.escapeMarkdownChar()}`"
+                    "\\#名称 \\#id${event.member.id}\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.origin).escapeMarkdown()}`名称改为`${event.new.escapeMarkdown()}`"
                 } else {
                     return
                 }
             }
 
             is MemberSpecialTitleChangeEvent -> {
-                "\\#头衔 \\#id${event.member.id}\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdownChar()}`获得头衔`${event.new.escapeMarkdownChar()}`"
+                "\\#头衔 \\#id${event.member.id}\n`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdown()}`获得头衔`${event.new.escapeMarkdown()}`"
             }
 
             else -> {

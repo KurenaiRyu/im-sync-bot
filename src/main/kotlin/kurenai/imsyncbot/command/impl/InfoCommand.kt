@@ -8,7 +8,7 @@ import kurenai.imsyncbot.dfs
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.ParseMode
-import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
+import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdown
 import kurenai.imsyncbot.utils.TelegramUtil.fmt
 import kurenai.imsyncbot.utils.TelegramUtil.messagePhoto
 import kurenai.imsyncbot.utils.TelegramUtil.replyToMessageId
@@ -33,8 +33,9 @@ class InfoCommand : AbstractTelegramCommand() {
         input: String
     ): String? {
         val qqBot = bot.qq.qqBot
-        return if (message.replyToMessageId() != 0L) {
-            val replyMessage = bot.tg.getMessage(message.chatId, message.replyToMessageId()!!)
+        val replyToMessageId = message.replyToMessageId()
+        return if (replyToMessageId != null) {
+            val replyMessage = bot.tg.getMessage(message.chatId, replyToMessageId)
             if (sender.userId == bot.tg.getMe().id) {
                 val qqMsg = MessageService.findQQByTg(replyMessage)
                 if (qqMsg != null) {
@@ -49,32 +50,32 @@ class InfoCommand : AbstractTelegramCommand() {
 
                             val list = ArrayList<String>()
                             list.add("id: `${member.id}`")
-                            list.add("昵称: `${member.nick.escapeMarkdownChar()}`")
+                            list.add("昵称: `${member.nick.escapeMarkdown()}`")
                             if (member.remark.isNotBlank())
-                                list.add("备注: `${member.nameCard.escapeMarkdownChar()}`")
+                                list.add("备注: `${member.nameCard.escapeMarkdown()}`")
                             if (member.nameCard.isNotBlank())
-                                list.add("名片: `${member.nameCard.escapeMarkdownChar()}`")
+                                list.add("名片: `${member.nameCard.escapeMarkdown()}`")
                             if (member.specialTitle.isNotBlank())
-                                list.add("头衔: `${member.specialTitle.escapeMarkdownChar()}`")
+                                list.add("头衔: `${member.specialTitle.escapeMarkdown()}`")
                             list.add("身份: ${member.permission}")
                             if (config?.bindingName?.isNotBlank() == true)
-                                list.add("绑定名称: `${config.bindingName!!.escapeMarkdownChar()}`")
+                                list.add("绑定名称: `${config.bindingName!!.escapeMarkdown()}`")
                             if (member.isMuted)
                                 list.add("被禁言${member.muteTimeRemaining}s")
                             list.add(
                                 "入群时间: `${
                                     Instant.ofEpochSecond(member.joinTimestamp.toLong()).atZone(ZoneId.systemDefault())
-                                        .format(dfs).escapeMarkdownChar()
+                                        .format(dfs).escapeMarkdown()
                                 }`"
                             )
                             list.add(
                                 "最后发言: `${
                                     Instant.ofEpochSecond(member.lastSpeakTimestamp.toLong())
-                                        .atZone(ZoneId.systemDefault()).format(dfs).escapeMarkdownChar()
+                                        .atZone(ZoneId.systemDefault()).format(dfs).escapeMarkdown()
                                 }`"
                             )
                             if (config?.status?.isNotEmpty() == true)
-                                list.add("状态: ${config.status.toString().escapeMarkdownChar()}")
+                                list.add("状态: ${config.status.toString().escapeMarkdown()}")
 
                             val path = withIO {
                                 BotUtil.downloadImg(
@@ -83,7 +84,7 @@ class InfoCommand : AbstractTelegramCommand() {
                                     overwrite = true
                                 )
                             }
-                            bot.tg.execute {
+                            bot.tg.send {
                                 messagePhoto(
                                     message.chatId,
                                     path.pathString,
@@ -100,14 +101,14 @@ class InfoCommand : AbstractTelegramCommand() {
                 val list = ArrayList<String>()
                 val user = bot.tg.getUser(sender.userId)
                 list.add("id: `${sender.userId}`")
-                list.add("username: `${user.username().escapeMarkdownChar()}`")
-                list.add("firstName: `${user.firstName.escapeMarkdownChar()}`")
-                list.add("lastName: `${user.lastName?.escapeMarkdownChar()}`")
+                list.add("username: `${user.username().escapeMarkdown()}`")
+                list.add("firstName: `${user.firstName.escapeMarkdown()}`")
+                list.add("lastName: `${user.lastName?.escapeMarkdown()}`")
                 list.add("isBot: ${user.type.constructor == UserTypeBot.CONSTRUCTOR}")
                 bot.userConfigService.configs.firstOrNull {
                     it.tg == sender.userId
                 }?.let {
-                    list.add("status: ${it.status.toString().escapeMarkdownChar()}")
+                    list.add("status: ${it.status.toString().escapeMarkdown()}")
                 }
                 list.joinToString("\n")
             }
@@ -119,14 +120,14 @@ class InfoCommand : AbstractTelegramCommand() {
                 val list = ArrayList<String>()
                 val config = bot.groupConfigService.configs.firstOrNull { it.telegramGroupId == message.chatId }
                 list.add("绑定群id: `${group.id}`")
-                list.add("绑定群名称: `${group.name.escapeMarkdownChar()}`")
-                list.add("绑定群群主: `${group.owner.nick.escapeMarkdownChar()}`\\(`${group.owner.id}`\\)")
+                list.add("绑定群名称: `${group.name.escapeMarkdown()}`")
+                list.add("绑定群群主: `${group.owner.nick.escapeMarkdown()}`\\(`${group.owner.id}`\\)")
                 if (config?.status?.isNotEmpty() == true)
-                    list.add("状态: ${config.status.toString().escapeMarkdownChar()}")
+                    list.add("状态: ${config.status.toString().escapeMarkdown()}")
 
                 val path =
                     withIO { BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl, overwrite = true) }
-                bot.tg.execute {
+                bot.tg.send {
                     messagePhoto(message.chatId, path.pathString, list.joinToString("\n").fmt(ParseMode.MARKDOWN_V2))
                 }
                 null

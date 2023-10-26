@@ -3,9 +3,6 @@ package kurenai.imsyncbot.utils
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.runBlocking
 import kurenai.imsyncbot.bot.telegram.defaultTelegramBot
-import kurenai.imsyncbot.utils.TelegramUtil.messageId
-import kurenai.imsyncbot.utils.TelegramUtil.replyToMessageId
-import kurenai.imsyncbot.utils.TelegramUtil.setMessageId
 
 /**
  * @author Kurenai
@@ -15,7 +12,7 @@ object TelegramUtil {
 
     private val escapeChar = "_*[]()~`>#+-=|{}.!".toCharArray()
 
-    fun String.escapeMarkdownChar(): String {
+    fun String.escapeMarkdown(): String {
         var result = this
         for (c in escapeChar) {
             result = result.replace(c.toString(), "\\$c")
@@ -32,7 +29,7 @@ object TelegramUtil {
      */
     fun String.fmt(parseMode: ParseMode = ParseMode.MARKDOWN_V2): FormattedText = parseMode.ins?.let {
         runBlocking {
-            defaultTelegramBot.execute(ParseTextEntities(this@fmt, it))
+            defaultTelegramBot.send(ParseTextEntities(this@fmt, it))
         }
     } ?: this.asFmtText()
 
@@ -103,11 +100,24 @@ object TelegramUtil {
         }
     }
 
+    fun inputMessageDocument(chatId: Long, document: InputFile): InputMessageDocument {
+        return InputMessageDocument().apply {
+            this.document = document
+        }
+    }
+
     fun messageText(formattedText: FormattedText, chatId: Long) = SendMessage().apply {
         this.chatId = chatId
         inputMessageContent = InputMessageText().apply {
             this.text = formattedText
         }
+    }
+
+    fun messageReplayToMessage(message: Message) = messageReplayToMessage(message.chatId, message.id)
+
+    fun messageReplayToMessage(chatId: Long, messageId: Long) = MessageReplyToMessage().apply {
+        this.chatId = chatId
+        this.messageId = messageId
     }
 
     fun Message.sendUserId() = when (val sender = this.senderId) {

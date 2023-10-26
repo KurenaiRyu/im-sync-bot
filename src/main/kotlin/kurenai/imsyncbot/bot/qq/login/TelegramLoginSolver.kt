@@ -43,7 +43,7 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
 
             override fun onFetchQRCode(bot: Bot, data: ByteArray) {
                 runBlocking {
-                    telegram.execute {
+                    telegram.send {
                         val filename = "qrcode-${System.currentTimeMillis()}.png"
                         val path = Path.of(BotUtil.getImagePath(filename))
                         path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
@@ -76,7 +76,7 @@ class TelegramLoginSolver(private val imSyncBot: ImSyncBot) : LoginSolver() {
 
     override suspend fun onSolvePicCaptcha(bot: Bot, data: ByteArray): String? = loginSolverLock.withLock {
         runCatching {
-            telegram.execute {
+            telegram.send {
                 val filename = "captcha-${System.currentTimeMillis()}.png"
                 val path = Path.of(BotUtil.getImagePath(filename))
                 path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)

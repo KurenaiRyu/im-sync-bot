@@ -3,6 +3,7 @@ package kurenai.imsyncbot.bot.qq
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -10,15 +11,15 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kurenai.imsyncbot.ImSyncBot
+import kurenai.imsyncbot.bot.telegram.TgMessageHandler
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.service.FileService
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.BotUtil.formatUsername
 import kurenai.imsyncbot.utils.TelegramUtil.asFmtText
-import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
+import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdown
 import kurenai.imsyncbot.utils.TelegramUtil.fmt
-import kurenai.imsyncbot.utils.TelegramUtil.setMessageId
 import kurenai.imsyncbot.utils.TelegramUtil.setReplyToMessageId
 import kurenai.imsyncbot.utils.toHex
 import kurenai.imsyncbot.utils.withIO
@@ -59,14 +60,18 @@ sealed class MessageContext(
      * @return
      */
     protected fun String.formatMsg(senderId: Long, senderName: String? = null): String {
-        return tgMsgFormat.escapeMarkdownChar().replace(BotUtil.NEWLINE_PATTERN.escapeMarkdownChar(), "\n", true)
-            .replace(BotUtil.ID_PATTERN.escapeMarkdownChar(), senderId.toString(), true)
+        return tgMsgFormat.escapeMarkdown().replace(BotUtil.NEWLINE_PATTERN.escapeMarkdown(), "\n", true)
+            .replace(BotUtil.ID_PATTERN.escapeMarkdown(), senderId.toString(), true)
             .let {
                 if (senderName?.isNotBlank() == true)
-                    it.replace(BotUtil.NAME_PATTERN.escapeMarkdownChar(), senderName.escapeMarkdownChar(), true)
+                    it.replace(
+                        BotUtil.NAME_PATTERN.escapeMarkdown(),
+                        senderName.replace('-', '_').escapeMarkdown(),
+                        true
+                    )
                 else
-                    it.replace(BotUtil.NAME_PATTERN.escapeMarkdownChar(), "", true)
-            }.replace(BotUtil.MSG_PATTERN.escapeMarkdownChar(), this, true)
+                    it.replace(BotUtil.NAME_PATTERN.escapeMarkdown(), "", true)
+            }.replace(BotUtil.MSG_PATTERN.escapeMarkdown(), this, true)
     }
 
     protected fun String.handleUrl(): String {
@@ -206,7 +211,7 @@ class GroupMessageContext(
                 val id: Long?
                 content += if (target == group.bot.id && getReplayToMessageId() <= 0) {
                     bot.userConfigService.masterUsername.ifBlank { bot.userConfigService.masterTg.toString() }.let {
-                        "[${it.formatUsername().escapeMarkdownChar()}](tg://user?id=$it)"
+                        "[${it.formatUsername().escapeMarkdown()}](tg://user?id=$it)"
                     }
                 } else {
                     id = bot.userConfigService.links.find { it.qq == target }?.tg
@@ -218,11 +223,11 @@ class GroupMessageContext(
                                 ?: target.toString()
                         else
                             it
-                    }.formatUsername().escapeMarkdownChar()
+                    }.formatUsername().escapeMarkdown()
                     "[$bindName](tg://user?id=$id)"
                 }
             } else if (msg !is Image) {
-                content += msg.contentToString().escapeMarkdownChar()
+                content += msg.contentToString().escapeMarkdown()
             }
         }
         return if (content.startsWith("\n")) content.substring(1)
@@ -238,7 +243,7 @@ class GroupMessageContext(
 
         override suspend fun send(): Array<TdApi.Message> = arrayOf(
             bot.tg.sendMessageText(
-                url?.escapeMarkdownChar()?.formatMsg(senderId, senderName)?.fmt() ?: simpleContent.asFmtText(),
+                url?.escapeMarkdown()?.formatMsg(senderId, senderName)?.fmt() ?: simpleContent.asFmtText(),
                 chatId,
                 replayToMessageId = getReplayToMessageId(),
                 untilPersistent = true
@@ -251,7 +256,7 @@ class GroupMessageContext(
 
         override suspend fun send(): Array<TdApi.Message> = arrayOf(
             bot.tg.sendMessageText(
-                url?.escapeMarkdownChar()?.formatMsg(senderId, senderName)?.fmt() ?: simpleContent.asFmtText(),
+                url?.escapeMarkdown()?.formatMsg(senderId, senderName)?.fmt() ?: simpleContent.asFmtText(),
                 chatId,
                 replayToMessageId = getReplayToMessageId(),
                 untilPersistent = true
@@ -259,32 +264,75 @@ class GroupMessageContext(
         )
     }
 
-    inner class SingleImage(private val image: Image, private val onlyImage: Boolean = false) :
-        ReadyToSendMessage {
+    inner class SingleImage(private val image: Image, private val onlyImage: Boolean = false) : ReadyToSendMessage {
 
         private val shouldBeFile: Boolean = image.shouldBeFile()
 
         override suspend fun send(): Array<TdApi.Message> {
+            val inputFile = FileService.download(image)
+            return if (inputFile is InputFileLocal) {
+                val f = bot.tg.send(PreliminaryUploadFile().apply {
+                    this.file = inputFile
+                    this.fileType = if (shouldBeFile) FileTypeDocument() else FileTypePhoto()
+                    this.priority = 1
+                })
+                val deferred = bot.tg.messageHandler.addListener(matchBlock = { event ->
+                    event is UpdateFile && event.file.id == f.id && event.file.remote.isUploadingCompleted
+                }) { event: UpdateFile ->
+                    TgMessageHandler.ListenerResult.complete(event.file)
+                }
+                runCatching {
+//                    withTimeout(3.seconds) {
+                    val file = deferred.await()
+                    sendMessage(InputFileRemote(file.remote.id))
+//                    }
+                }.recover { ex ->
+                    if (ex !is TimeoutCancellationException) throw ex
+
+                    val messages =
+                        sendMessage(InputFileRemote("AgACAv7___8dBEqDOiEAAQGUXWUpby1uzGVg8oBeQUASzpcAAfjmzgACj70xG3SWSFZfHeKh_spbbgEAAwIAA2kAAzAE"))
+                    val message = messages[0]
+                    CoroutineScope(bot.qq.coroutineContext).launch {
+                        runCatching {
+                            log.debug("Wait for upload file...")
+                            val file = deferred.await()
+                            log.debug("Uploaded file: {}", file)
+                            bot.tg.send(EditMessageMedia().apply {
+                                this.chatId = message.chatId
+                                this.messageId = message.id
+                                this.inputMessageContent = buildContent(InputFileRemote(file.remote.id))
+                            })
+                        }.onFailure { ex ->
+                            log.warn("Send photo fail: {}", ex.message, ex)
+                            normalType.send()
+                        }
+                    }
+                    messages
+                }.getOrThrow()
+            } else {
+                sendMessage(inputFile)
+            }
+        }
+
+        private suspend fun sendMessage(inputFile: InputFile): Array<TdApi.Message> {
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
-                this.inputMessageContent = buildContent()
+                this.inputMessageContent = buildContent(inputFile)
             }
-            return arrayOf(bot.tg.execute(untilPersistent = true, function = func).also {
+            return arrayOf(bot.tg.send(untilPersistent = true, function = func).also {
                 CoroutineScope(bot.coroutineContext).launch {
-                    FileService.cache(image, it)
+                    FileService.cacheEmoji(image, it)
                 }
             })
         }
 
-        private suspend fun buildContent(): InputMessageContent {
+        private suspend fun buildContent(file: InputFile): InputMessageContent {
             val caption = if (onlyImage) {
                 "".formatMsg(senderId, senderName)
             } else {
                 getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
             }.fmt()
-            val file = FileService.download(image)
             return if (shouldBeFile) {
                 InputMessageDocument().apply {
                     this.caption = caption
@@ -331,9 +379,9 @@ class GroupMessageContext(
                     }
                 }
             }
-            return bot.tg.execute(func, untilPersistent = true).messages.also {
+            return bot.tg.send(func, untilPersistent = true).messages.also {
                 CoroutineScope(bot.coroutineContext).launch {
-                    FileService.cache(images, it)
+                    FileService.cacheEmoji(images, it)
                 }
             }
         }
@@ -359,9 +407,9 @@ class GroupMessageContext(
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
                 this.inputMessageContent = buildContent()
             }
-            return arrayOf(bot.tg.execute(func, untilPersistent = true).also {
+            return arrayOf(bot.tg.send(func, untilPersistent = true).also {
                 CoroutineScope(bot.coroutineContext).launch {
-                    FileService.cache(image, it)
+                    FileService.cacheEmoji(image, it)
                 }
             })
         }
@@ -385,11 +433,11 @@ class GroupMessageContext(
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
                 this.inputMessageContent = InputMessageVideo().apply {
                     this.caption = "${shortVideo.filename}.${shortVideo.fileFormat}"
-                        .escapeMarkdownChar().formatMsg(senderId, senderName).fmt()
+                        .escapeMarkdown().formatMsg(senderId, senderName).fmt()
                     this.video = InputFileLocal(BotUtil.downloadDoc(name, url).pathString)
                 }
             }
-            return arrayOf(bot.tg.execute(func, true))
+            return arrayOf(bot.tg.send(func, true))
         }
     }
 
@@ -406,7 +454,7 @@ class GroupMessageContext(
                     this.video = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
                 }
             }
-            return arrayOf(bot.tg.execute(func, true))
+            return arrayOf(bot.tg.send(func, true))
         }
     }
 
@@ -426,7 +474,7 @@ class GroupMessageContext(
                     this.document = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
                 }
             }
-            return arrayOf(bot.tg.execute(func, true))
+            return arrayOf(bot.tg.send(func, true))
         }
 
         private suspend fun getUrl(): String {

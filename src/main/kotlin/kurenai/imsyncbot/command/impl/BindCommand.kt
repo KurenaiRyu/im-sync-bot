@@ -5,7 +5,7 @@ import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.ParseMode
-import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
+import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdown
 import kurenai.imsyncbot.utils.TelegramUtil.replyInChatId
 import kurenai.imsyncbot.utils.TelegramUtil.replyToMessageId
 import kurenai.imsyncbot.utils.TelegramUtil.textOrCaption
@@ -39,10 +39,10 @@ class BindCommand : AbstractTelegramCommand() {
                         if (user.id == tg.getMe().id) {
                             val qqMsg = MessageService.findQQByTg(replyMessage) ?: return "找不到该qq信息"
                             bot.userConfigService.bindName(qq = qqMsg.source.fromId, bindingName = param)
-                            "qq`${qqMsg.source.fromId}` 绑定名称为 `${param.escapeMarkdownChar()}`"
+                            "qq`${qqMsg.source.fromId}` 绑定名称为 `${param.escapeMarkdown()}`"
                         } else {
                             bot.userConfigService.bindName(user.id, null, param)
-                            "`${user.firstName.escapeMarkdownChar()}` 绑定名称为 `${param.escapeMarkdownChar()}`"
+                            "`${user.firstName.escapeMarkdown()}` 绑定名称为 `${param.escapeMarkdown()}`"
                         }
                     } else {
                         "绑定名称不能为空"
@@ -56,8 +56,8 @@ class BindCommand : AbstractTelegramCommand() {
                             bot.groupConfigService.bind(chat.id, qq, it.name)
                             "绑定成功\n\n" +
                                     "绑定QQ群id: `${it.id}`\n" +
-                                    "绑定QQ群名称: `${it.name.escapeMarkdownChar()}`\n" +
-                                    "绑定QQ群主: `${it.owner.nick.escapeMarkdownChar()}`\\(`${it.owner.id}`\\)\n"
+                                    "绑定QQ群名称: `${it.name.escapeMarkdown()}`\n" +
+                                    "绑定QQ群主: `${it.owner.nick.escapeMarkdown()}`\\(`${it.owner.id}`\\)\n"
                         } ?: "没有找到qq群`$qq`"
                     } catch (e: NumberFormatException) {
                         "转换qq群组id错误"
@@ -72,13 +72,13 @@ class BindCommand : AbstractTelegramCommand() {
         ) {
             val usernameBinds =
                 bot.userConfigService.configs.filter { it.bindingName != null }
-                    .joinToString("\n") { "`${it.tg}` \\<\\=\\> `${it.bindingName!!.escapeMarkdownChar()}`" }
+                    .joinToString("\n") { "`${it.tg}` \\<\\=\\> `${it.bindingName!!.escapeMarkdown()}`" }
             val groupBindings =
                 bot.groupConfigService.configs.joinToString("\n") {
                     "`${it.telegramGroupId}` \\<\\=\\> `${it.qqGroupId}` \\#${
                         qqBot.getGroup(
                             it.qqGroupId
-                        )?.name?.escapeMarkdownChar() ?: "找不到该QQ群"
+                        )?.name?.escapeMarkdown() ?: "找不到该QQ群"
                     }"
                 }
             "用户名绑定：\n$usernameBinds\n\nQ群绑定：\n$groupBindings"

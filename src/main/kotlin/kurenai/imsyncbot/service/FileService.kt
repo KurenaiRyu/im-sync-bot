@@ -38,7 +38,7 @@ object FileService {
     }
 
     @OptIn(MiraiInternalApi::class)
-    suspend fun download(images: List<Image>) = channelFlow {
+    suspend fun download(images: Iterable<Image>) = channelFlow {
         val imgMap = images.associateBy { it.md5.toHex() }.toMutableMap()
         val caches = withIO { fileCacheRepository.findAllById(imgMap.keys) }
         caches.forEach {
@@ -46,14 +46,14 @@ object FileService {
             imgMap.remove(it.id)
         }
 
-        imgMap.entries.takeIf { it.isNotEmpty() }?.forEach { (key, img) ->
+        imgMap.entries.takeIf { it.isNotEmpty() }?.forEach { (_, img) ->
             val filename = "${img.imageId.substring(1..36).replace("-", "")}.${img.imageType.formatName}"
             send(InputFileLocal(BotUtil.downloadImg(filename, img.queryUrl()).pathString))
         }
     }
 
     @OptIn(MiraiInternalApi::class)
-    suspend fun cache(images: List<Image>, messages: Array<TdApi.Message>) {
+    suspend fun cacheEmoji(images: List<Image>, messages: Array<TdApi.Message>) {
         withIO {
             messages.mapIndexedNotNull { index, message ->
                 val image = images[index]
@@ -72,12 +72,12 @@ object FileService {
     }
 
     @OptIn(MiraiInternalApi::class)
-    suspend fun cache(image: Image, message: TdApi.Message) {
+    suspend fun cacheEmoji(image: Image, message: TdApi.Message) {
         if (image.isEmoji.not()) return
-        cache(image.md5.toHex(), message, image.imageType.formatName)
+        cacheEmoji(image.md5.toHex(), message, image.imageType.formatName)
     }
 
-    suspend fun cache(md5Hex: String, message: TdApi.Message, fileType: String? = null) {
+    private suspend fun cacheEmoji(md5Hex: String, message: TdApi.Message, fileType: String? = null) {
         withIO {
             message.content.file()?.remote?.id?.takeIf { it.isNotBlank() }?.let { fileId ->
                 val exist = fileCacheRepository.findById(md5Hex).orElse(null)

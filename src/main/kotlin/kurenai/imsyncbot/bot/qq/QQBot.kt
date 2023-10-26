@@ -7,6 +7,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -34,8 +35,6 @@ import net.mamoe.mirai.utils.BotConfiguration
 import net.mamoe.mirai.utils.ConcurrentHashMap
 import java.io.File
 import kotlin.coroutines.CoroutineContext
-import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 
 class QQBot(
     private val qqProperties: QQProperties,
@@ -67,13 +66,12 @@ class QQBot(
     }
 
     private val loginLock = Mutex()
-    private val groupLocks = ConcurrentHashMap<Long, Mutex>()
 
     lateinit var qqBot: Bot
 
     @OptIn(DelicateCoroutinesApi::class)
     private val workerScope = this + newFixedThreadPoolContext(10, "${qqProperties.account}-worker")
-    private val groupMessageLockMap = HashMap<Long, Semaphore>()
+    private val groupMessageLockMap = ConcurrentHashMap<Long, Semaphore>()
 
     private fun buildMiraiBot(qrCodeLogin: Boolean = false): Bot {
         val configuration = BotConfiguration().apply {
@@ -159,15 +157,11 @@ class QQBot(
                         Semaphore(1)
                     }
                     workerScope.launchWithPermit(semaphore, CoroutineName(event.idString())) {
-                        withTimeout(5.minutes) {
-                            handleEvent(event)
-                        }
+                        handleEvent(event)
                     }
                 } ?: run {
                     workerScope.launch(CoroutineName(event.idString())) {
-                        withTimeout(5.minutes) {
-                            handleEvent(event)
-                        }
+                        handleEvent(event)
                     }
                 }
             }
@@ -176,6 +170,33 @@ class QQBot(
         }
         if (waitForInit) initBot()
         else workerScope.launch { initBot() }
+        handleStatus()
+    }
+
+    private suspend fun handleStatus() {
+        var previous: BotStatus? = null
+        status.onEach {
+            if (bot.groupConfigService.defaultTgGroup < 0) return@onEach
+            when (it) {
+                Initializing -> {}
+                Running -> {
+                    if (previous == Stopped) {
+                        bot.tg.sendMessageText("#Status\nQQ bot rerunning.", bot.groupConfigService.defaultTgGroup)
+                    }
+                }
+
+                Stopped -> {
+                    when (previous) {
+                        Running -> {
+                            bot.tg.sendMessageText("#Status\nQQ bot stopped.", bot.groupConfigService.defaultTgGroup)
+                        }
+
+                        else -> {}
+                    }
+                }
+            }
+            previous = it
+        }
     }
 
     private suspend fun handleEvent(event: Event) {
@@ -249,17 +270,15 @@ class QQBot(
                             }
                             MessageService.save(message)
 
-                            groupLocks.computeIfAbsent(event.group.id) { Mutex() }.withLock {
-                                bot.qqMessageHandler.onGroupMessage(
-                                    GroupMessageContext(
-                                        message,
-                                        bot,
-                                        event,
-                                        event.group,
-                                        event.message
-                                    )
+                            bot.qqMessageHandler.onGroupMessage(
+                                GroupMessageContext(
+                                    message,
+                                    bot,
+                                    event,
+                                    event.group,
+                                    event.message
                                 )
-                            }
+                            )
                         }
 
                         else -> {

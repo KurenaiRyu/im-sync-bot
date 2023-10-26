@@ -2,8 +2,9 @@ package kurenai.imsyncbot.bot.telegram
 
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.Running
 import kurenai.imsyncbot.command.CommandDispatcher
@@ -21,9 +22,13 @@ import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.message.sourceIds
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
+import nl.adaptivity.xmlutil.core.impl.multiplatform.name
+import java.util.concurrent.TimeoutException
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class TgMessageHandler(
     val bot: ImSyncBot
@@ -36,6 +41,9 @@ class TgMessageHandler(
 
     private val traceEnabled = TelegramBot.log.isTraceEnabled
 
+    private val listenerLock = Mutex()
+    private val listeners: MutableList<Listener<out Object?, out Update>> = mutableListOf()
+
     init {
         if (bot.configProperties.bot.tgMsgFormat.contains("\$msg")) tgMsgFormat = bot.configProperties.bot.tgMsgFormat
         if (bot.configProperties.bot.qqMsgFormat.contains("\$msg")) qqMsgFormat = bot.configProperties.bot.qqMsgFormat
@@ -45,180 +53,24 @@ class TgMessageHandler(
         TelegramBot.log.trace("Incoming update: {}", update.toString().trim())
         val status = bot.tg.status.value
         if (status != Running) {
-            TelegramBot.log.trace("Telegram bot status {}, do not handle", status.javaClass.simpleName)
+            TelegramBot.log.debug(
+                "Telegram bot status {}, do not handle {}.",
+                status.javaClass.simpleName,
+                update::class.name
+            )
+            return@launch
         }
+        if (bot.qq.status.value != Running) {
+            TelegramBot.log.debug(
+                "QQ bot status {}, do not handle {}.",
+                status.javaClass.simpleName,
+                update::class.name
+            )
+            return@launch
+        }
+
         runCatching {
-            when (update) {
-                is UpdateNewInlineQuery -> {
-                    runCatching {
-                        if (traceEnabled.not()) TelegramBot.log.debug(
-                            "New inline query ({})[{}] from user {}, offset {}",
-                            update.id,
-                            update.query,
-                            update.senderUserId,
-                            update.offset
-                        )
-                    }.onFailure { it.printStackTrace() }
-                }
-
-                is UpdateNewMessage -> {
-                    runCatching {
-                        if (update.message.isOutgoing) {
-                            if (traceEnabled.not()) TelegramBot.log.debug(
-                                "New message(out going) {} from chat {}",
-                                update.message.id,
-                                update.message.chatId
-                            )
-                            return@launch
-                        } else {
-                            if (traceEnabled.not()) TelegramBot.log.debug(
-                                "New message {} from chat {}",
-                                update.message.id,
-                                update.message.chatId
-                            )
-                        }
-                    }.onFailure { it.printStackTrace() }
-
-                    bot.tg.disposableHandlers.forEach {
-                        if (it.handle(bot, update.message)) {
-                            bot.tg.disposableHandlers.remove(it)
-                            return@launch
-                        }
-                    }
-
-                    val content = update.message.content
-                    if (content is MessageText) {
-                        val commandEntity = content.text.entities.firstOrNull { it.type is TextEntityTypeBotCommand }
-                        if (commandEntity != null) {
-                            CommandDispatcher.execute(bot, update.message, commandEntity)
-                            return@launch
-                        }
-                    }
-
-                    onMessage(update.message)
-                }
-
-                is UpdateMessageEdited -> {
-                    runCatching {
-                        if (traceEnabled.not()) TelegramBot.log.debug(
-                            "Edited message {} from chat {}",
-                            update.messageId,
-                            update.chatId
-                        )
-                    }.onFailure { it.printStackTrace() }
-                    bot.tg.editedMessages["${update.chatId}:${update.messageId}"] = false
-                }
-
-                is UpdateMessageContent -> {
-                    runCatching {
-                        if (traceEnabled.not()) TelegramBot.log.debug(
-                            "Edited message content {} from chat {}",
-                            update.messageId,
-                            update.chatId
-                        )
-                    }.onFailure { it.printStackTrace() }
-                    val key = "${update.chatId}:${update.messageId}"
-                    if (bot.tg.editedMessages.contains(key)) {
-                        bot.tg.editedMessages.invalidate(key)
-                        onEditMessage(update)
-                    }
-                }
-
-                is UpdateDeleteMessages -> {
-                    runCatching {
-                        if (traceEnabled.not()) {
-                            TelegramBot.log.debug(
-                                "Deleted messages {} from chat {}",
-                                update.messageIds,
-                                update.chatId,
-                            )
-                        }
-                    }.onFailure { it.printStackTrace() }
-
-                    if (update.isPermanent) {
-                        MessageService.findQQMessageByDelete(update).map {
-                            MessageChain.deserializeFromJsonString(it.json)
-                        }.filter { //保证只撤回bot的
-                            it.source.fromId == bot.qq.qqBot.id
-                        }.forEach {
-                            it.recall()
-                        }
-                    }
-                }
-
-                is UpdateMessageSendSucceeded -> {
-                    runCatching {
-                        if (traceEnabled.not()) {
-                            TelegramBot.log.debug(
-                                "Sent message {} -> {} to chat {}",
-                                update.oldMessageId,
-                                update.message.id,
-                                update.message.chatId
-                            )
-                        }
-                    }.onFailure { it.printStackTrace() }
-                    bot.tg.pendingMessage.getIfPresent(update.oldMessageId)?.also {
-                        bot.tg.pendingMessage.invalidate(update.oldMessageId)
-                        if (it.isActive) {
-                            log.trace("Resume {}", it)
-                            it.resumeWith(Result.success(update.message))
-                        } else {
-                            qqTgRepository.findAllByTgMsgId(update.oldMessageId).forEach { old ->
-                                old.tgMsgId = update.message.id
-                                qqTgRepository.save(old)
-                            }
-                        }
-                    }
-                }
-
-                is UpdateMessageSendFailed -> {
-                    runCatching {
-                        TelegramBot.log.error(
-                            "Sent message {} -> {} to chat {} fail: {} {}",
-                            update.oldMessageId,
-                            update.message.id,
-                            update.message.chatId,
-                            update.errorCode,
-                            update.errorMessage
-                        )
-                    }
-                    bot.tg.pendingMessage.getIfPresent(update.oldMessageId)?.let {
-                        bot.tg.pendingMessage.invalidate(update.oldMessageId)
-                        if (it.isActive) {
-                            it.resumeWith(Result.failure(BotException("[${update.errorCode}] ${update.errorMessage}")))
-                        }
-                    }
-                }
-
-                is UpdateFile -> {
-                    val file = update.file
-                    val minSize = min(file.local.downloadedSize, file.remote.uploadedSize)
-                    val maxSize = max(file.local.downloadedSize, file.remote.uploadedSize)
-                    if (traceEnabled.not()) TelegramBot.log.debug(
-                        "Update file [{}] {} {}/{}({}%) : {}",
-                        file.id,
-                        if (file.local.isDownloadingActive) "downloading"
-                        else if (file.remote.isUploadingActive) "uploading"
-                        else "completed",
-                        minSize,
-                        maxSize,
-                        (minSize / maxSize * 100.0).roundToInt(),
-                        file.local.path
-                    )
-                }
-
-                is UpdateConnectionState -> {
-                    if (traceEnabled.not()) TelegramBot.log.debug(
-                        "Update connection state: {}",
-                        update.state::class.java
-                    )
-                }
-
-                else -> {
-                    if (traceEnabled.not()) TelegramBot.log.debug("Not handle {}", update::class.java)
-                }
-            }
-            update
+            doHandle(update)
         }.onFailure { ex ->
             TelegramBot.log.error("Command handle error: ${ex.message}", ex)
             when (update) {
@@ -229,6 +81,236 @@ class TgMessageHandler(
                 bot.tg.sendError(it, ex)
             }
         }
+    }
+
+    private suspend fun doHandle(update: Update) {
+
+        if (traceEnabled.not()) logSimpleLog(update)
+
+        handleListener(update)
+
+        when (update) {
+            is UpdateNewMessage -> {
+
+                bot.tg.disposableHandlers.forEach {
+                    if (it.handle(bot, update.message)) {
+                        bot.tg.disposableHandlers.remove(it)
+                        return
+                    }
+                }
+
+                val content = update.message.content
+                if (content is MessageText) {
+                    val commandEntity = content.text.entities.firstOrNull { it.type is TextEntityTypeBotCommand }
+                    if (commandEntity != null) {
+                        CommandDispatcher.execute(bot, update.message, commandEntity)
+                        return
+                    }
+                }
+
+                onMessage(update.message)
+            }
+
+            is UpdateMessageEdited -> {
+                bot.tg.editedMessages["${update.chatId}:${update.messageId}"] = false
+            }
+
+            is UpdateMessageContent -> {
+                val key = "${update.chatId}:${update.messageId}"
+                if (bot.tg.editedMessages.contains(key)) {
+                    bot.tg.editedMessages.invalidate(key)
+                    onEditMessage(update)
+                }
+            }
+
+            is UpdateDeleteMessages -> {
+
+                if (update.isPermanent) {
+                    MessageService.findQQMessageByDelete(update).map {
+                        MessageChain.deserializeFromJsonString(it.json)
+                    }.filter { //保证只撤回bot的
+                        it.source.fromId == bot.qq.qqBot.id
+                    }.forEach {
+                        it.recall()
+                    }
+                }
+            }
+
+            is UpdateMessageSendSucceeded -> {
+                bot.tg.pendingMessage.getIfPresent(update.oldMessageId)?.also {
+                    bot.tg.pendingMessage.invalidate(update.oldMessageId)
+                    if (it.isActive) {
+                        log.trace("Resume {}", it)
+                        it.resumeWith(Result.success(update.message))
+                    } else {
+                        qqTgRepository.findAllByTgMsgId(update.oldMessageId).forEach { old ->
+                            old.tgMsgId = update.message.id
+                            qqTgRepository.save(old)
+                        }
+                    }
+                }
+            }
+
+            is UpdateMessageSendFailed -> {
+                bot.tg.pendingMessage.getIfPresent(update.oldMessageId)?.let {
+                    bot.tg.pendingMessage.invalidate(update.oldMessageId)
+                    if (it.isActive) {
+                        it.resumeWith(Result.failure(BotException("[${update.errorCode}] ${update.errorMessage}")))
+                    }
+                }
+            }
+
+            else -> {}
+        }
+    }
+
+    private fun logSimpleLog(update: Update) {
+
+        when (update) {
+            is UpdateNewInlineQuery -> {
+                TelegramBot.log.debug(
+                    "New inline query ({})[{}] from user {}, offset {}",
+                    update.id,
+                    update.query,
+                    update.senderUserId,
+                    update.offset
+                )
+            }
+
+            is UpdateNewMessage -> {
+                if (update.message.isOutgoing) {
+                    TelegramBot.log.debug(
+                        "New message(out going) {} from chat {}",
+                        update.message.id,
+                        update.message.chatId
+                    )
+                    return
+                } else {
+                    TelegramBot.log.debug(
+                        "New message {} from chat {}",
+                        update.message.id,
+                        update.message.chatId
+                    )
+                }
+            }
+
+            is UpdateMessageEdited -> {
+                TelegramBot.log.debug(
+                    "Edited message {} from chat {}",
+                    update.messageId,
+                    update.chatId
+                )
+            }
+
+            is UpdateMessageContent -> {
+                TelegramBot.log.debug(
+                    "Edited message content {} from chat {}",
+                    update.messageId,
+                    update.chatId
+                )
+            }
+
+            is UpdateDeleteMessages -> {
+                TelegramBot.log.debug(
+                    "Deleted messages {} from chat {}",
+                    update.messageIds,
+                    update.chatId,
+                )
+            }
+
+            is UpdateMessageSendSucceeded -> {
+                TelegramBot.log.debug(
+                    "Sent message {} -> {} to chat {}",
+                    update.oldMessageId,
+                    update.message.id,
+                    update.message.chatId
+                )
+            }
+
+            is UpdateMessageSendFailed -> {
+                TelegramBot.log.error(
+                    "Sent message {} -> {} to chat {} fail: {} {}",
+                    update.oldMessageId,
+                    update.message.id,
+                    update.message.chatId,
+                    update.errorCode,
+                    update.errorMessage
+                )
+            }
+
+            is UpdateFile -> {
+                val file = update.file
+                val minSize = min(file.local.downloadedSize, file.remote.uploadedSize)
+                val maxSize = max(file.local.downloadedSize, file.remote.uploadedSize)
+                TelegramBot.log.debug(
+                    "Update file [{}] {} {}/{}({}%) : {}",
+                    file.id,
+                    if (file.local.isDownloadingActive) "downloading"
+                    else if (file.remote.isUploadingActive) "uploading"
+                    else "completed",
+                    minSize,
+                    maxSize,
+                    (minSize * 100.0 / maxSize).roundToInt(),
+                    file.local.path
+                )
+            }
+
+            is UpdateConnectionState -> {
+                TelegramBot.log.debug(
+                    "Update connection state: {}",
+                    update.state::class.java
+                )
+            }
+
+            else -> {
+                TelegramBot.log.debug("Not handle {}", update::class.java)
+            }
+        }
+
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun handleListener(update: Update) = listenerLock.withLock {
+        listeners.removeIf { listener ->
+            listener as Listener<Object?, Update>
+            if (listener.match(update)) {
+                val res = listener.onEvent(update)
+                if (res.complete) {
+                    log.debug("Resuming listener.")
+                    listener.con.resumeWith(Result.success(res.result))
+                    log.debug("Resumed listener.")
+                    return@removeIf true
+                }
+            }
+            false
+        }
+    }
+
+    fun <R : Object?, Event : Update> addListener(
+        timeout: Duration? = null,
+        matchBlock: ((Update) -> Boolean)? = null,
+        handleBlock: (Event) -> ListenerResult<R>
+    ): Deferred<R> {
+        return CoroutineScope(bot.tg.coroutineContext).async {
+            return@async suspendCancellableCoroutine { con ->
+                val listener = Listener(con, timeout, matchBlock, handleBlock)
+                listeners.add(listener)
+                timeout?.let {
+                    launch {
+                        delay(timeout)
+                        if (con.isActive) con.cancel(TimeoutException("Listener time out: $timeout"))
+                    }
+                }
+            }
+        }
+    }
+
+    fun <R : Object?, Event : Update> TelegramBot.addListener(
+        timeout: Duration? = 5L.seconds,
+        matchBlock: ((Update) -> Boolean)? = null,
+        handleBlock: (Event) -> ListenerResult<R>
+    ): Deferred<R> {
+        return this.bot.tg.messageHandler.addListener(timeout, matchBlock, handleBlock)
     }
 
     private suspend fun onEditMessage(update: UpdateMessageContent): Int {
@@ -598,15 +680,6 @@ class TgMessageHandler(
         }
     }
 
-//    private suspend fun getTgFile(fileId: String, fileUniqueId: String): TelegramFile {
-//        try {
-//            return GetFile(fileId).send()
-//        } catch (e: TelegramApiException) {
-//            log.error(e.message, e)
-//        }
-//        return TelegramFile(fileId, fileUniqueId)
-//    }
-
     private suspend fun getSenderName(message: TdApi.Message): String {
 
         if (message.authorSignature?.isNotBlank() == true) return message.authorSignature
@@ -629,6 +702,38 @@ class TgMessageHandler(
             }
 
             else -> ""
+        }
+    }
+
+    private data class Listener<R : Object?, Event : Update>(
+        val con: CancellableContinuation<R>,
+        val timeout: Duration? = 5L.seconds,
+        private val matchBlock: ((Update) -> Boolean)? = null,
+        private val handleBlock: (Event) -> ListenerResult<R>
+    ) {
+
+        @Suppress("UNCHECKED_CAST")
+        fun match(event: Update): Boolean {
+            return matchBlock?.let { it(event) } ?: (event as? Event)?.let { true } ?: false
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        fun onEvent(event: Update): ListenerResult<R> {
+
+            return if ((event as? Event) == null) ListenerResult.unComplete<Event>() as ListenerResult<R>
+            else handleBlock(event)
+        }
+
+    }
+
+    data class ListenerResult<R : Object?>(
+        val result: R? = null,
+        val complete: Boolean
+    ) {
+        companion object {
+            fun <R : Object> complete(obj: R) = ListenerResult(obj, true)
+            fun <R : Object> unComplete(): ListenerResult<R> = ListenerResult(complete = false)
+            fun <R : Object> fail(): ListenerResult<R> = ListenerResult(complete = true)
         }
     }
 }
