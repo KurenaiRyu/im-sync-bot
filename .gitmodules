@@ -1,0 +1,3 @@
+[submodule "cq-sdk"]
+	path = cq-sdk
+	url = https://github.com/KurenaiRyu/cq-sdk.git

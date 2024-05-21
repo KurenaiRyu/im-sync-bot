@@ -1,8 +1,8 @@
 package kurenai.imsyncbot.domain;
 
 import jakarta.persistence.*;
-import kurenai.imsyncbot.service.UserStatus;
 import kurenai.imsyncbot.configuration.annotation.SnowFlakeGenerator;
+import kurenai.imsyncbot.service.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -20,6 +20,11 @@ import java.util.HashSet;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@FieldNameConstants
+@NamedEntityGraph(
+        name = "user",
+        includeAllAttributes = true
+)
 public class UserConfig {
 
     @Id

@@ -5,13 +5,13 @@ plugins {
     id("org.springframework.boot") version "3.1.0"
     id("io.spring.dependency-management") version "1.1.0"
     id("io.freefair.lombok") version "8.1.0"
-    kotlin("jvm") version "1.9.0"
-    kotlin("plugin.spring") version "1.9.0"
-    kotlin("plugin.lombok") version "1.9.0"
-    kotlin("plugin.serialization") version "1.9.0"
-    kotlin("plugin.allopen") version "1.9.0"
-    kotlin("plugin.noarg") version "1.9.0"
-    kotlin("plugin.jpa") version "1.9.0"
+    kotlin("jvm") version "1.9.10"
+    kotlin("plugin.spring") version "1.9.10"
+    kotlin("plugin.lombok") version "1.9.10"
+    kotlin("plugin.serialization") version "1.9.10"
+    kotlin("plugin.allopen") version "1.9.10"
+    kotlin("plugin.noarg") version "1.9.10"
+    kotlin("plugin.jpa") version "1.9.10"
     jacoco
 }
 
@@ -51,6 +51,7 @@ object Versions {
     const val LOMBOK = "1.18.28"
 }
 dependencies {
+    implementation(project(":cq-sdk"))
 
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
