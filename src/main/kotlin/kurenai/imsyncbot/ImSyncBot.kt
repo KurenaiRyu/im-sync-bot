@@ -5,6 +5,7 @@ import kurenai.imsyncbot.service.GroupConfigService
 import kurenai.imsyncbot.service.UserConfigService
 import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.bot.qq.QQMessageHandler
+import kurenai.imsyncbot.bot.qq.SatoriBot
 import kurenai.imsyncbot.bot.qq.login.qsign.UnidbgFetchQSignFactory
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import net.mamoe.mirai.internal.spi.EncryptService
@@ -47,9 +48,10 @@ class ImSyncBot(
     internal val proxy: Proxy? = configProxy()
     internal val userConfigService: UserConfigService = UserConfigService(configPath, configProperties)
     internal val groupConfigService: GroupConfigService = GroupConfigService(this, configPath)
-    var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
-    internal val qq: QQBot = QQBot(configProperties.bot.qq, this)
     internal val tg: TelegramBot = TelegramBot(configProperties.bot.telegram, this)
+    //    var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
+//    internal val qq: QQBot = QQBot(configProperties.bot.qq, this)
+    internal val satori: SatoriBot = SatoriBot(tg, configProperties)
 //    internal val discord: DiscordBot = DiscordBot(this)
 //    internal val privateHandle = PrivateChatHandler(configProperties)
 
@@ -72,9 +74,10 @@ class ImSyncBot(
         withContext(this@ImSyncBot.coroutineContext) {
             log.info("Start im-sync-bot $name ...")
             log.info("Telegram bot ${configProperties.bot.telegram.username}")
-            log.info("QQ bot ${configProperties.bot.qq.account}")
+//            log.info("QQ bot ${configProperties.bot.qq.account}")
             tg.start()
-            qq.start()
+            satori.start()
+//            qq.start()
 //            discord.start()
         }
     }

@@ -20,8 +20,18 @@ version = "0.0.1-SNAPSHOT"
 
 repositories {
     mavenCentral()
-    maven("https://jitpack.io")
-    maven("https://mvn.mchv.eu/repository/mchv/")
+    maven {
+        url = uri("https://jitpack.io")
+        content {
+            includeGroup("com.github.Nyayurn.Yutori-Next")
+        }
+    }
+    maven {
+        url = uri("https://mvn.mchv.eu/repository/mchv/")
+        content {
+            includeGroup("it.tdlight")
+        }
+    }
 }
 
 configurations {
@@ -63,6 +73,8 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.21")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.2")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2")
+
+    implementation("com.github.Nyayurn.Yutori-Next:Yutori-Next:13696108b7")
 
 //    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
     implementation(files("libs/unidbg-fix.jar"))
