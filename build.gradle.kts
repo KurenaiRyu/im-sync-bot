@@ -83,6 +83,9 @@ dependencies {
 //    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
     implementation(files("libs/unidbg-fix.jar"))
 
+    //exif
+    implementation("com.ashampoo:kim:0.18.2")
+
     compileOnly("org.projectlombok:lombok:${Versions.LOMBOK}")
     annotationProcessor("org.projectlombok:lombok:${Versions.LOMBOK}")
 

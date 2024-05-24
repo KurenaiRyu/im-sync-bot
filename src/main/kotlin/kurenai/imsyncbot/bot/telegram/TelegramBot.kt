@@ -198,6 +198,26 @@ class TelegramBot(
         }
     }
 
+    suspend fun sendMessageVideo(
+        data: ByteArray,
+        formattedText: FormattedText,
+        chatId: Long,
+        filename: String = "${System.currentTimeMillis()}",
+        replayToMessageId: Long? = null,
+        untilPersistent: Boolean = false,
+    ) = send(untilPersistent = untilPersistent) {
+        val path = Path.of(BotUtil.getDocumentPath(filename))
+        path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+        SendMessage().apply {
+            this.chatId = chatId
+            this.setReplyToMessageId(replayToMessageId)
+            this.inputMessageContent = InputMessageVideo().apply {
+                this.caption = formattedText
+                this.video = InputFileLocal(path.pathString)
+            }
+        }
+    }
+
     suspend fun deleteMessages(chatId: Long, vararg messageIds: Long) {
         require(messageIds.isNotEmpty()) { "message id cannot be null" }
         send {
