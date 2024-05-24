@@ -1,9 +1,6 @@
 package kurenai.imsyncbot.bot.qq
 
-import com.github.nyayurn.yutori.MessageEvent
-import com.github.nyayurn.yutori.RootActions
-import com.github.nyayurn.yutori.Satori
-import com.github.nyayurn.yutori.nick
+import com.github.nyayurn.yutori.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.coroutines.Dispatchers
@@ -21,8 +18,8 @@ class SatoriHandler(val configProperties: ConfigProperties) {
 
     val tgMsgFormat = configProperties.bot.tgMsgFormat
 
-    suspend fun onMessage(actions: RootActions, event: MessageEvent, satori: Satori, telegramBot: TelegramBot) {
-        val groupId = event.guild?.id?.toLongOrNull() ?: return
+    suspend fun onMessage(actions: RootActions, event: Event<MessageEvent>, satori: Satori, telegramBot: TelegramBot) {
+        val groupId = event.message.guild?.id?.toLongOrNull() ?: return
         val config = withContext(Dispatchers.IO) {
             groupConfigRepository.findByQqGroupId(groupId)
         } ?: return
