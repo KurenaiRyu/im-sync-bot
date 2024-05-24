@@ -3,15 +3,15 @@ package kurenai.imsyncbot.bot.qq
 import com.github.nyayurn.yutori.MessageEvent
 import com.github.nyayurn.yutori.RootActions
 import com.github.nyayurn.yutori.Satori
+import com.github.nyayurn.yutori.nick
+import io.ktor.client.call.*
+import io.ktor.client.request.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.groupConfigRepository
-import kurenai.imsyncbot.utils.BotUtil
-import kurenai.imsyncbot.utils.ParseMode
-import kurenai.imsyncbot.utils.escapeMarkdown
-import kurenai.imsyncbot.utils.getLogger
+import kurenai.imsyncbot.utils.*
 
 class SatoriHandler(val configProperties: ConfigProperties) {
 
@@ -27,10 +27,25 @@ class SatoriHandler(val configProperties: ConfigProperties) {
             groupConfigRepository.findByQqGroupId(groupId)
         } ?: return
 
+        if (event.message.content.contains("<img")) {
+            val url = event.message.content.substringAfter("src=\"").substringBefore("\"")
+            telegramBot.sendMessagePhoto(
+                data = httpClient.get(url).body<ByteArray>(),
+                formattedText = "".formatMsg(
+                    event.user.id.toLongOrNull() ?: -1L,
+                    event.nick() ?: "Unknown"
+                ).fmt(),
+                chatId = config.telegramGroupId
+            ).also {
+                log.info("Sent {}", it)
+            }
+            return
+        }
+
         telegramBot.sendMessageText(
             text = event.message.content.formatMsg(
                 event.user.id.toLongOrNull() ?: -1L,
-                event.user.nick ?: event.user.name ?: "Unknown"
+                event.nick() ?: "Unknown"
             ),
             chatId = config.telegramGroupId,
             parseMode = ParseMode.MARKDOWN_V2
