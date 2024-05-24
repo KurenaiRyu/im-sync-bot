@@ -1,30 +1,41 @@
 package kurenai.imsyncbot.bot.qq
 
-import com.github.nyayurn.yutori.Event
 import com.github.nyayurn.yutori.MessageEvent
 import com.github.nyayurn.yutori.RootActions
 import com.github.nyayurn.yutori.Satori
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.groupConfigRepository
 import kurenai.imsyncbot.utils.BotUtil
-import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdownChar
+import kurenai.imsyncbot.utils.ParseMode
+import kurenai.imsyncbot.utils.escapeMarkdown
+import kurenai.imsyncbot.utils.getLogger
 
 class SatoriHandler(val configProperties: ConfigProperties) {
 
+    companion object {
+        val log = getLogger()
+    }
+
     val tgMsgFormat = configProperties.bot.tgMsgFormat
 
-    suspend fun <T: Event> onGroup(actions: RootActions, event: T, satori: Satori, telegramBot: TelegramBot) {
-        val groupId = actions.guild.self_id?.toLongOrNull()?: return
-        val config = groupConfigRepository.findByQqGroupId(groupId)?:return
+    suspend fun onMessage(actions: RootActions, event: MessageEvent, satori: Satori, telegramBot: TelegramBot) {
+        val groupId = event.guild?.id?.toLongOrNull() ?: return
+        val config = withContext(Dispatchers.IO) {
+            groupConfigRepository.findByQqGroupId(groupId)
+        } ?: return
 
-        when (event) {
-            is MessageEvent -> {
-                    telegramBot.sendMessageText(
-                        text = event.message.content.formatMsg(event.member?.user?.id?.toLongOrNull()?: -1L, event.member?.user?.nick?:event.member?.user?.name?:"Unknown"),
-                        chatId = config.telegramGroupId,
-                    )
-            }
+        telegramBot.sendMessageText(
+            text = event.message.content.formatMsg(
+                event.user.id.toLongOrNull() ?: -1L,
+                event.user.nick ?: event.user.name ?: "Unknown"
+            ),
+            chatId = config.telegramGroupId,
+            parseMode = ParseMode.MARKDOWN_V2
+        ).also {
+            log.info("Sent {}", it)
         }
 
         config.telegramGroupId
@@ -40,13 +51,13 @@ class SatoriHandler(val configProperties: ConfigProperties) {
      * @return
      */
     private fun String.formatMsg(senderId: Long, senderName: String? = null): String {
-        return tgMsgFormat.escapeMarkdownChar().replace(BotUtil.NEWLINE_PATTERN.escapeMarkdownChar(), "\n", true)
-            .replace(BotUtil.ID_PATTERN.escapeMarkdownChar(), senderId.toString(), true)
+        return tgMsgFormat.escapeMarkdown().replace(BotUtil.NEWLINE_PATTERN.escapeMarkdown(), "\n", true)
+            .replace(BotUtil.ID_PATTERN.escapeMarkdown(), senderId.toString(), true)
             .let {
                 if (senderName?.isNotBlank() == true)
-                    it.replace(BotUtil.NAME_PATTERN.escapeMarkdownChar(), senderName.escapeMarkdownChar(), true)
+                    it.replace(BotUtil.NAME_PATTERN.escapeMarkdown(), senderName.escapeMarkdown(), true)
                 else
-                    it.replace(BotUtil.NAME_PATTERN.escapeMarkdownChar(), "", true)
-            }.replace(BotUtil.MSG_PATTERN.escapeMarkdownChar(), this, true)
+                    it.replace(BotUtil.NAME_PATTERN.escapeMarkdown(), "", true)
+            }.replace(BotUtil.MSG_PATTERN.escapeMarkdown(), this, true)
     }
 }

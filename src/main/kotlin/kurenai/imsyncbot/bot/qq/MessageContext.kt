@@ -15,14 +15,8 @@ import kurenai.imsyncbot.bot.telegram.TgMessageHandler
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.service.FileService
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.BotUtil
+import kurenai.imsyncbot.utils.*
 import kurenai.imsyncbot.utils.BotUtil.formatUsername
-import kurenai.imsyncbot.utils.TelegramUtil.asFmtText
-import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdown
-import kurenai.imsyncbot.utils.TelegramUtil.fmt
-import kurenai.imsyncbot.utils.TelegramUtil.setReplyToMessageId
-import kurenai.imsyncbot.utils.toHex
-import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.contact.*
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.GroupTempMessageEvent

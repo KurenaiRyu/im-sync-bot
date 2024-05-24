@@ -5,13 +5,13 @@ plugins {
     id("org.springframework.boot") version "3.1.0"
     id("io.spring.dependency-management") version "1.1.0"
     id("io.freefair.lombok") version "8.1.0"
-    kotlin("jvm") version "2.0.0"
-    kotlin("plugin.spring") version "2.0.0"
-    kotlin("plugin.lombok") version "2.0.0"
-    kotlin("plugin.serialization") version "2.0.0"
-    kotlin("plugin.allopen") version "2.0.0"
-    kotlin("plugin.noarg") version "2.0.0"
-    kotlin("plugin.jpa") version "2.0.0"
+    kotlin("jvm") version "1.9.24"
+    kotlin("plugin.spring") version "1.9.24"
+    kotlin("plugin.lombok") version "1.9.24"
+    kotlin("plugin.serialization") version "1.9.24"
+    kotlin("plugin.allopen") version "1.9.24"
+    kotlin("plugin.noarg") version "1.9.24"
+    kotlin("plugin.jpa") version "1.9.24"
     jacoco
 }
 
@@ -19,7 +19,11 @@ group = "moe.kurenai.bot"
 version = "0.0.1-SNAPSHOT"
 
 repositories {
-    mavenCentral()
+    mavenLocal {
+        content {
+            includeGroup("com.github.Nyayurn")
+        }
+    }
     maven {
         url = uri("https://jitpack.io")
         content {
@@ -32,6 +36,7 @@ repositories {
             includeGroup("it.tdlight")
         }
     }
+    mavenCentral()
 }
 
 configurations {
@@ -46,7 +51,7 @@ lombok {
 
 kotlin {
     compilerOptions {
-        languageVersion.set(KotlinVersion.KOTLIN_2_0)
+        languageVersion.set(KotlinVersion.KOTLIN_1_9)
     }
 }
 
@@ -72,7 +77,8 @@ dependencies {
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.2")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2")
 
-    implementation("com.github.Nyayurn.Yutori-Next:Yutori-Next:13696108b7")
+    implementation("com.github.Nyayurn.Yutori-Next:Yutori-Next:master-SNAPSHOT")
+//    implementation("com.github.Nyayurn:Yutori-Next-jvm:master-SNAPSHOT")
 
 //    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
     implementation(files("libs/unidbg-fix.jar"))

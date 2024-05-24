@@ -12,11 +12,7 @@ import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.qqTgRepository
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.BotUtil
-import kurenai.imsyncbot.utils.TelegramUtil.idString
-import kurenai.imsyncbot.utils.TelegramUtil.replyToMessageId
-import kurenai.imsyncbot.utils.TelegramUtil.userSender
-import kurenai.imsyncbot.utils.getLogger
+import kurenai.imsyncbot.utils.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
@@ -49,7 +45,8 @@ class TgMessageHandler(
         if (bot.configProperties.bot.qqMsgFormat.contains("\$msg")) qqMsgFormat = bot.configProperties.bot.qqMsgFormat
     }
 
-    fun handle(update: Update) = bot.tg.launch(CoroutineName(update.idString())) {
+    //TODO: Save telegram message
+    fun handle(update: Update) = bot.tg.launch(CoroutineName(update.idString())) {//TODO: 看起来这里每次都new一个 coroutine ？
         TelegramBot.log.trace("Incoming update: {}", update.toString().trim())
         val status = bot.tg.status.value
         if (status != Running) {

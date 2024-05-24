@@ -4,13 +4,7 @@ import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.ParseMode
-import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdown
-import kurenai.imsyncbot.utils.TelegramUtil.replyInChatId
-import kurenai.imsyncbot.utils.TelegramUtil.replyToMessageId
-import kurenai.imsyncbot.utils.TelegramUtil.textOrCaption
-import kurenai.imsyncbot.utils.TelegramUtil.userSender
-import kurenai.imsyncbot.utils.getLogger
+import kurenai.imsyncbot.utils.*
 import net.mamoe.mirai.message.data.source
 
 private val log = getLogger()

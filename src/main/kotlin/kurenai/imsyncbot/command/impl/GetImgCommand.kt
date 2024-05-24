@@ -9,8 +9,8 @@ import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.service.FileService
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.TelegramUtil.inputMessageDocument
-import kurenai.imsyncbot.utils.TelegramUtil.messageReplayToMessage
+import kurenai.imsyncbot.utils.inputMessageDocument
+import kurenai.imsyncbot.utils.messageReplayToMessage
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 

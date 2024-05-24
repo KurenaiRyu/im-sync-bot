@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.channelFlow
 import kurenai.imsyncbot.domain.FileCache
 import kurenai.imsyncbot.fileCacheRepository
 import kurenai.imsyncbot.utils.BotUtil
-import kurenai.imsyncbot.utils.TelegramUtil.file
+import kurenai.imsyncbot.utils.file
 import kurenai.imsyncbot.utils.toHex
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.message.data.Image
@@ -66,7 +66,7 @@ object FileService {
                     }
                 }
             }.filter {
-                it.fileId?.isNotBlank() ?: false && it.id?.isNotBlank() ?: false
+                it.fileId?.isNotBlank() == true && it.id?.isNotBlank() == true
             }.let(fileCacheRepository::saveAll)
         }
     }

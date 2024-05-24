@@ -8,9 +8,9 @@ import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.configuration.AbstractConfig
 import kurenai.imsyncbot.domain.UserConfig
 import kurenai.imsyncbot.userConfigRepository
-import kurenai.imsyncbot.utils.TelegramUtil.isBot
-import kurenai.imsyncbot.utils.TelegramUtil.username
+import kurenai.imsyncbot.utils.isBot
 import kurenai.imsyncbot.utils.json
+import kurenai.imsyncbot.utils.username
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.moveTo

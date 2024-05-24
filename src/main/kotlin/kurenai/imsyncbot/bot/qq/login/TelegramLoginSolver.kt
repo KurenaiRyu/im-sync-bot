@@ -10,7 +10,7 @@ import kotlinx.coroutines.withTimeout
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.bot.telegram.TelegramDisposableHandler
 import kurenai.imsyncbot.utils.BotUtil
-import kurenai.imsyncbot.utils.TelegramUtil.asFmtText
+import kurenai.imsyncbot.utils.asFmtText
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.auth.QRCodeLoginListener

@@ -105,8 +105,11 @@ data class QQProperties(
     val account: Long = 0L,
     val password: String = "",
     val protocol: BotConfiguration.MiraiProtocol = BotConfiguration.MiraiProtocol.ANDROID_PAD,
-    val host: String = "",
-    val port: Int = 0,
+    val host: String? = null,
+    val port: Int? = null,
+    val path: String? = null,
+    val version: String? = null,
+    val token: String? = null,
 )
 
 @Serializable

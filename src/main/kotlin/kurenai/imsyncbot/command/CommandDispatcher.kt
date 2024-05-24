@@ -7,11 +7,7 @@ import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.qqCommands
 import kurenai.imsyncbot.service.Permission
 import kurenai.imsyncbot.tgCommands
-import kurenai.imsyncbot.utils.ParseMode
-import kurenai.imsyncbot.utils.TelegramUtil.replyToMessageId
-import kurenai.imsyncbot.utils.TelegramUtil.text
-import kurenai.imsyncbot.utils.TelegramUtil.userSender
-import kurenai.imsyncbot.utils.getLogger
+import kurenai.imsyncbot.utils.*
 import net.mamoe.mirai.event.events.MessageEvent
 
 object CommandDispatcher {

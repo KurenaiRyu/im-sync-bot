@@ -3,28 +3,41 @@ package kurenai.imsyncbot.bot.qq
 import com.github.nyayurn.yutori.Adapter
 import com.github.nyayurn.yutori.Satori
 import com.github.nyayurn.yutori.module.adapter.satori.Satori
-import com.github.nyayurn.yutori.module.adapter.satori.SatoriAdapter
-import com.github.nyayurn.yutori.module.chronocat.ChronocatModule
 import com.github.nyayurn.yutori.satori
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kurenai.imsyncbot.BotStatus
-import kurenai.imsyncbot.ConfigProperties
-import kurenai.imsyncbot.Initializing
-import kurenai.imsyncbot.Running
-import kurenai.imsyncbot.Stopped
+import kurenai.imsyncbot.*
 import kurenai.imsyncbot.bot.telegram.TelegramBot
+import kurenai.imsyncbot.utils.getLogger
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.cancellation.CancellationException
 
 //TODO: satori 貌似是一个链接拿到多个账号消息，需要做改变，目前为单账号
 class SatoriBot(
-    val telegramBot: TelegramBot,
+    val bot: ImSyncBot,
     val configProperties: ConfigProperties
-) {
+) : CoroutineScope {
 
+    companion object {
+        val log = getLogger()
+    }
+
+    override val coroutineContext: CoroutineContext = bot.coroutineContext
+        .plus(SupervisorJob(bot.coroutineContext[Job]))
+        .plus(CoroutineExceptionHandler { context, exception ->
+            when (exception) {
+                is CancellationException -> {
+                    log.warn("{} was cancelled", context[CoroutineName])
+                }
+
+                else -> {
+                    log.warn("with {}", context[CoroutineName], exception)
+                }
+            }
+        })
+
+    val telegramBot: TelegramBot = bot.tg
     var satori: Satori? = null
     val handle = SatoriHandler(configProperties)
 
@@ -55,27 +68,29 @@ class SatoriBot(
     @OptIn(DelicateCoroutinesApi::class)
     fun buildSatori() = satori {
         install(Adapter.Companion.Satori) {
-            host = "localhost"
-            port = 6700
+            host = configProperties.bot.qq.host ?: "localhost"
+            port = configProperties.bot.qq.port ?: 5500
+            configProperties.bot.qq.token?.let { token = it }
+            configProperties.bot.qq.path?.let { path = it }
 
-            onConnect { _,_,_ ->
-                status.update {  Running }
+            onConnect { _, _, _ ->
+                status.update { Running }
                 restartCount = 0
             }
 
             onError {
                 status.update { Stopped }
 
-                GlobalScope.launch {
+                launch {
                     restart()
                 }
             }
         }
 
         listening {
-            any {
-                runBlocking {
-                    handle.onGroup(actions, event, satori, telegramBot)
+            message.created {
+                launch {
+                    handle.onMessage(actions, event, satori, telegramBot)
                 }
             }
         }

@@ -7,12 +7,7 @@ import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.TelegramUtil.escapeMarkdown
-import kurenai.imsyncbot.utils.TelegramUtil.fmt
-import kurenai.imsyncbot.utils.TelegramUtil.sendUserId
-import kurenai.imsyncbot.utils.TelegramUtil.textOrCaption
-import kurenai.imsyncbot.utils.TelegramUtil.userSender
-import kurenai.imsyncbot.utils.getLogger
+import kurenai.imsyncbot.utils.*
 import net.mamoe.mirai.contact.remarkOrNameCardOrNick
 import net.mamoe.mirai.event.events.*
 

@@ -1,13 +1,13 @@
 package kurenai.imsyncbot
 
 import kotlinx.coroutines.*
-import kurenai.imsyncbot.service.GroupConfigService
-import kurenai.imsyncbot.service.UserConfigService
 import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.bot.qq.QQMessageHandler
 import kurenai.imsyncbot.bot.qq.SatoriBot
 import kurenai.imsyncbot.bot.qq.login.qsign.UnidbgFetchQSignFactory
 import kurenai.imsyncbot.bot.telegram.TelegramBot
+import kurenai.imsyncbot.service.GroupConfigService
+import kurenai.imsyncbot.service.UserConfigService
 import net.mamoe.mirai.internal.spi.EncryptService
 import net.mamoe.mirai.utils.LoggerAdapters
 import net.mamoe.mirai.utils.Services
@@ -49,9 +49,9 @@ class ImSyncBot(
     internal val userConfigService: UserConfigService = UserConfigService(configPath, configProperties)
     internal val groupConfigService: GroupConfigService = GroupConfigService(this, configPath)
     internal val tg: TelegramBot = TelegramBot(configProperties.bot.telegram, this)
-    //    var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
-//    internal val qq: QQBot = QQBot(configProperties.bot.qq, this)
-    internal val satori: SatoriBot = SatoriBot(tg, configProperties)
+    internal var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
+    internal val qq: QQBot = QQBot(configProperties.bot.qq, this)
+    internal val satori: SatoriBot = SatoriBot(this, configProperties)
 //    internal val discord: DiscordBot = DiscordBot(this)
 //    internal val privateHandle = PrivateChatHandler(configProperties)
 
@@ -66,6 +66,7 @@ class ImSyncBot(
 
         if (configProperties.debug) {
             Configurator.setLevel("kurenai.imsyncbot", Level.DEBUG)
+            Configurator.setLevel("com.github.nyayurn.yutori", Level.DEBUG)
         }
         configProxy()
     }
