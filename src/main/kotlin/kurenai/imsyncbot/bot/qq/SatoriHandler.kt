@@ -24,7 +24,7 @@ class SatoriHandler(val configProperties: ConfigProperties) {
     val tgMsgFormat = configProperties.bot.tgMsgFormat
 
     suspend fun onMessage(actions: RootActions, event: Event<MessageEvent>, satori: Satori, telegramBot: TelegramBot) {
-        val groupId = event.message.guild?.id?.toLongOrNull() ?: return
+        val groupId = event.channel.id.toLongOrNull() ?: return
         val config = withContext(Dispatchers.IO) {
             groupConfigRepository.findByQqGroupId(groupId)
         } ?: return
