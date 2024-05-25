@@ -17,6 +17,7 @@ class SatoriHandler(val configProperties: ConfigProperties) {
         val log = getLogger()
 
         private val NAME_PATTERN = BotUtil.NAME_PATTERN.escapeMarkdown()
+        private val ID_PATTERN = BotUtil.ID_PATTERN.escapeMarkdown()
         private val MSG_PATTERN = BotUtil.MSG_PATTERN.escapeMarkdown()
         private val NEWLINE_PATTERN = BotUtil.NEWLINE_PATTERN.escapeMarkdown()
     }
@@ -31,9 +32,18 @@ class SatoriHandler(val configProperties: ConfigProperties) {
 
         val content = event.message.content
         val body = Jsoup.parse(content).body()
-        val text = body.text()
+        var text = body.text().escapeMarkdown()
         val imgUrl = body.getElementsByTag("img").attr("src")
         val videoUrl = body.getElementsByTag("video").attr("src")
+
+        val at = body.getElementsByTag("at")
+        at.attr("id").toLongOrNull()?.let { atId ->
+            val atName = at.attr("name")
+            val atTgId =
+                if (atId == configProperties.bot.masterOfQq) configProperties.bot.masterOfTg else atId  //TODO: find bind user telegram id
+            text = "[$atName](https://t.me/$atTgId) $text"
+        }
+
 
         if (imgUrl.isNotEmpty()) {
             telegramBot.sendMessagePhoto(
@@ -46,7 +56,7 @@ class SatoriHandler(val configProperties: ConfigProperties) {
             )
         } else if (videoUrl.isNotEmpty()) {
             telegramBot.sendMessageVideo(
-                data = httpClient.get(imgUrl).body<ByteArray>(),
+                data = httpClient.get(videoUrl).body<ByteArray>(),
                 formattedText = text.formatMsg(
                     event.user.id.toLongOrNull() ?: -1L,
                     event.nick() ?: "Unknown"
@@ -55,7 +65,7 @@ class SatoriHandler(val configProperties: ConfigProperties) {
             )
         } else {
             telegramBot.sendMessageText(
-                text = event.message.content.formatMsg(
+                text = event.message.content.escapeMarkdown().formatMsg(
                     event.user.id.toLongOrNull() ?: -1L,
                     event.nick() ?: "Unknown"
                 ),
@@ -78,10 +88,10 @@ class SatoriHandler(val configProperties: ConfigProperties) {
      */
     private fun String.formatMsg(senderId: Long, senderName: String? = null): String {
         return tgMsgFormat.escapeMarkdown().replace(NEWLINE_PATTERN, "\n", true)
-            .replace(NAME_PATTERN, senderId.toString(), true)
+            .replace(ID_PATTERN, senderId.toString(), true)
             .let {
                 if (senderName?.isNotBlank() == true)
-                    it.replace(NAME_PATTERN, senderName.escapeMarkdown(), true)
+                    it.replace(NAME_PATTERN, "`${senderName.escapeMarkdown()}`", true)
                 else
                     it.replace(NAME_PATTERN, "", true)
             }.replace(MSG_PATTERN, this, true)

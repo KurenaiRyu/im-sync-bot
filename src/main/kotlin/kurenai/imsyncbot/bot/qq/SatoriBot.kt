@@ -65,7 +65,6 @@ class SatoriBot(
         satori!!.start()
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
     fun buildSatori() = satori {
         install(Adapter.Companion.Satori) {
             host = configProperties.bot.qq.host ?: "localhost"
@@ -82,6 +81,7 @@ class SatoriBot(
                 status.update { Stopped }
 
                 launch {
+                    log.info("Restart satori...")
                     restart()
                 }
             }

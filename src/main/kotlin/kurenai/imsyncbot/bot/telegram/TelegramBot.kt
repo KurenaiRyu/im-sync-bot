@@ -318,7 +318,13 @@ class TelegramBot(
                                         con.resumeWith(Result.success(obj!!))
                                     }
                                 } else {
-                                    con.resumeWith(runCatching { result.get() })
+                                    con.resumeWith(
+                                        runCatching {
+                                            result.get()
+                                        }.onFailure {
+                                            log.warn("{}: {}: \n{}", result.error.code, result.error.message, params)
+                                        }
+                                    )
                                 }
                             }
                         }
