@@ -54,17 +54,6 @@ class SatoriBot(
         satori!!.start()
     }
 
-    fun restart() {
-        if (restartCount >= 3) error("Restart fail over 3 times!")
-        else restartCount++
-
-        satori?.stop()
-
-        satori = buildSatori()
-
-        satori!!.start()
-    }
-
     fun buildSatori() = satori {
         install(Adapter.Companion.Satori) {
             host = configProperties.bot.qq.host ?: "localhost"
@@ -79,11 +68,6 @@ class SatoriBot(
 
             onError {
                 status.update { Stopped }
-
-                launch {
-                    log.info("Restart satori...")
-                    restart()
-                }
             }
         }
 
