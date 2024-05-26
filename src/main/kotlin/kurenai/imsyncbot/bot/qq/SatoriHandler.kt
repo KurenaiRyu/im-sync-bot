@@ -36,7 +36,8 @@ class SatoriHandler(val configProperties: ConfigProperties) {
         val imgUrl = body.getElementsByTag("img").attr("src")
         val videoUrl = body.getElementsByTag("video").attr("src")
 
-        val at = body.getElementsByTag("at")
+        val at = body.getElementsByAttribute("at")  //TODO: don't work
+
         at.attr("id").toLongOrNull()?.let { atId ->
             val atName = at.attr("name")
             val atTgId =
