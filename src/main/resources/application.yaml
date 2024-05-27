@@ -5,3 +5,18 @@ spring:
     url: jdbc:h2:file:./db/im-sync-bot;AUTO_SERVER=TRUE
     hikari:
       auto-commit: false
+im-sync-bot:
+  bot:
+    telegram:
+      token: 1234567:adgcgasdfadf # tg机器人token
+      username: your_bot_name  # tg机器人用户名
+    #    base-url: http://api:8081  # 本地api
+  satori:
+
+
+  handler:
+    forward:
+      master-of-tg: 12345678 #主人 tg id
+      master-of-qq: 87654321 #主人 qq 账号
+      tgMsgFormat: "$name$newline$newline$msg"  #tg消息格式化
+      qqMsgFormat: "$name: $msg" # qq消息格式化

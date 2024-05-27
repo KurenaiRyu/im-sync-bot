@@ -45,22 +45,10 @@ internal lateinit var instants: MutableList<ImSyncBot>
 //}
 
 suspend fun start() {
-    Init.init()
-    instants = loadInstants()
+    Init.init() //td-lib
+    ImSyncBot(configProperties)
     commonInit()
-    instants.forEach { it.start() }
 }
-
-fun loadInstants() = File("./config")
-    .walk()
-    .mapNotNull { file ->
-        if ((file.name == "config.yaml" || file.name == "config.yml") && !file.parentFile.name.startsWith('.')) {
-            loadConfig(file)?.takeIf { it.enable }?.let { file.parentFile.path to it }
-        } else null
-    }
-    .map { (path, props) -> ImSyncBot(path, props) }
-    .toMutableList()
-    .takeIf { it.isNotEmpty() } ?: throw IllegalStateException("找不到配置文件，请确认配置文件配置是否正确并且开启，或者路径是否在 ./config/config.yaml")
 
 fun commonInit() {
     registerTgCommand()

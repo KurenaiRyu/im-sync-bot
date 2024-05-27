@@ -1,4 +1,4 @@
-package kurenai.imsyncbot.bot.qq
+package kurenai.imsyncbot.bot.satori
 
 import com.github.nyayurn.yutori.*
 import io.ktor.client.call.*

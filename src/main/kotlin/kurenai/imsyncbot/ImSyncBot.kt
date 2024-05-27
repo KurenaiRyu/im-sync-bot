@@ -3,7 +3,7 @@ package kurenai.imsyncbot
 import kotlinx.coroutines.*
 import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.bot.qq.QQMessageHandler
-import kurenai.imsyncbot.bot.qq.SatoriBot
+import kurenai.imsyncbot.bot.satori.SatoriBot
 import kurenai.imsyncbot.bot.qq.login.qsign.UnidbgFetchQSignFactory
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.service.GroupConfigService
@@ -13,7 +13,6 @@ import net.mamoe.mirai.utils.LoggerAdapters
 import net.mamoe.mirai.utils.Services
 import org.apache.logging.log4j.Level
 import org.apache.logging.log4j.core.config.Configurator
-import java.io.File
 import java.net.InetSocketAddress
 import java.net.Proxy
 import kotlin.coroutines.AbstractCoroutineContextElement
@@ -26,14 +25,12 @@ import kotlin.coroutines.coroutineContext
  */
 
 class ImSyncBot(
-    internal val configPath: String,
     internal val configProperties: ConfigProperties
 ) : CoroutineScope, AbstractCoroutineContextElement(ImSyncBot) {
 
     companion object Key : CoroutineContext.Key<ImSyncBot>
 
-    internal val name: String = File(configPath).name.let { if (it == "config") "root" else it }
-    override val coroutineContext: CoroutineContext = this.plus(CoroutineName(name))
+    override val coroutineContext: CoroutineContext = this.plus(CoroutineName("im-sync-bot"))
         .plus(SupervisorJob())
         .apply {
             job.invokeOnCompletion {
@@ -45,13 +42,12 @@ class ImSyncBot(
             }
         }
 
-    internal val proxy: Proxy? = configProxy()
-    internal val userConfigService: UserConfigService = UserConfigService(configPath, configProperties)
-    internal val groupConfigService: GroupConfigService = GroupConfigService(this, configPath)
+    internal val userConfigService: UserConfigService = UserConfigService(configProperties)
+    internal val groupConfigService: GroupConfigService = GroupConfigService(this, "./config")
     internal val tg: TelegramBot = TelegramBot(configProperties.bot.telegram, this)
     internal var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
     internal val qq: QQBot = QQBot(configProperties.bot.qq, this)
-    internal val satori: SatoriBot = SatoriBot(this, configProperties)
+    internal val satori: SatoriBot = SatoriBot(this)
 //    internal val discord: DiscordBot = DiscordBot(this)
 //    internal val privateHandle = PrivateChatHandler(configProperties)
 
@@ -73,7 +69,7 @@ class ImSyncBot(
 
     suspend fun start() {
         withContext(this@ImSyncBot.coroutineContext) {
-            log.info("Start im-sync-bot $name ...")
+            log.info("Start im-sync-bot ...")
             log.info("Telegram bot ${configProperties.bot.telegram.username}")
 //            log.info("QQ bot ${configProperties.bot.qq.account}")
             tg.start()

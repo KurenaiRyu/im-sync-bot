@@ -76,7 +76,7 @@ class QQBot(
     private fun buildMiraiBot(qrCodeLogin: Boolean = false): Bot {
         val configuration = BotConfiguration().apply {
             cacheDir = File("./mirai/${qqProperties.account}")
-            fileBasedDeviceInfo("${bot.configPath}/device.json") // 使用 device.json 存储设备信息
+            fileBasedDeviceInfo("./config/device.json") // 使用 device.json 存储设备信息
             protocol = qqProperties.protocol // 切换协议
             highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
             parentCoroutineContext = this@QQBot.coroutineContext

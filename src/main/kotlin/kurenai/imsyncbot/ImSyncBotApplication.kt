@@ -4,13 +4,11 @@ import com.linecorp.kotlinjdsl.spring.data.SpringDataQueryFactory
 import jakarta.persistence.EntityManager
 import kurenai.imsyncbot.repository.*
 import org.springframework.boot.Banner
-import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication
 import org.springframework.context.ApplicationContext
-import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.Scope
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 
 
@@ -21,6 +19,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 
 @SpringBootApplication
 @EnableJpaRepositories
+@EnableConfigurationProperties(ConfigProperties::class)
 class ImSyncBotApplication
 
 lateinit var qqMessageRepository: QQMessageRepository
@@ -31,6 +30,7 @@ lateinit var userConfigRepository: UserConfigRepository
 lateinit var qqDiscordRepository: QqDiscordRepository
 lateinit var applicationContext: ApplicationContext
 lateinit var queryFactory: SpringDataQueryFactory
+lateinit var configProperties: ConfigProperties
 
 suspend fun main(args: Array<String>) {
     applicationContext = runApplication<ImSyncBotApplication>(*args) {
@@ -43,6 +43,7 @@ suspend fun main(args: Array<String>) {
     userConfigRepository = applicationContext.getBean(UserConfigRepository::class.java)
     qqDiscordRepository = applicationContext.getBean(QqDiscordRepository::class.java)
     queryFactory = applicationContext.getBean(SpringDataQueryFactory::class.java)
+    configProperties = applicationContext.getBean(ConfigProperties::class.java)
     start()
 }
 

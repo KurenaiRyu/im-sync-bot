@@ -1,4 +1,4 @@
-package kurenai.imsyncbot.bot.qq
+package kurenai.imsyncbot.bot.satori
 
 import com.github.nyayurn.yutori.Adapter
 import com.github.nyayurn.yutori.Satori
@@ -15,13 +15,14 @@ import kotlin.coroutines.cancellation.CancellationException
 
 //TODO: satori 貌似是一个链接拿到多个账号消息，需要做改变，目前为单账号
 class SatoriBot(
-    val bot: ImSyncBot,
-    val configProperties: ConfigProperties
+    val bot: ImSyncBot
 ) : CoroutineScope {
 
     companion object {
         val log = getLogger()
     }
+
+    private val satoriConfig = bot.configProperties.bot.satori
 
     override val coroutineContext: CoroutineContext = bot.coroutineContext
         .plus(SupervisorJob(bot.coroutineContext[Job]))
@@ -56,10 +57,10 @@ class SatoriBot(
 
     fun buildSatori() = satori {
         install(Adapter.Companion.Satori) {
-            host = configProperties.bot.qq.host ?: "localhost"
-            port = configProperties.bot.qq.port ?: 5500
-            configProperties.bot.qq.token?.let { token = it }
-            configProperties.bot.qq.path?.let { path = it }
+            host = satoriConfig.host ?: "localhost"
+            port = satoriConfig.port ?: 5500
+            satoriConfig.token?.let { token = it }
+            satoriConfig.path?.let { path = it }
 
             onConnect { _, _, _ ->
                 status.update { Running }

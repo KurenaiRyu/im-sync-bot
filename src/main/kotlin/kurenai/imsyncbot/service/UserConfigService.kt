@@ -23,7 +23,6 @@ import kotlin.io.path.readText
  * @param configProperties 配置文件
  */
 class UserConfigService(
-    configPath: String,
     configProperties: ConfigProperties
 ) : AbstractConfig<UserConfig>() {
 
@@ -44,7 +43,7 @@ class UserConfigService(
     var admins = emptyList<Long>()
     var superAdmins = emptyList<Long>()
     override lateinit var configs: MutableList<UserConfig>
-    override val path: Path = Path.of(configPath, "user.json")
+    override val path: Path = Path.of("./config", "user.json")
 
     init {
         migration()
