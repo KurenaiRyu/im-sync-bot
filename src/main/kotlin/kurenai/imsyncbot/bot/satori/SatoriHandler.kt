@@ -32,39 +32,50 @@ class SatoriHandler(val configProperties: ConfigProperties) {
 
         val content = event.message.content
         val body = Jsoup.parse(content).body()
-        var text = body.text().escapeMarkdown()
+        val text = body.text().escapeMarkdown()
         val imgUrl = body.getElementsByTag("img").attr("src")
         val videoUrl = body.getElementsByTag("video").attr("src")
 
-        val at = body.getElementsByAttribute("at")  //TODO: don't work
+//        val at = body.getElementsByAttribute("at")  //TODO: don't work
+//
+//        at.attr("id").toLongOrNull()?.let { atId ->
+//            val atName = at.attr("name")
+//            val atTgId =
+//                if (atId == configProperties.bot.masterOfQq) configProperties.bot.masterOfTg else atId  //TODO: find bind user telegram id
+//            text = "[$atName](https://t.me/$atTgId) $text"
+//        }
 
-        at.attr("id").toLongOrNull()?.let { atId ->
-            val atName = at.attr("name")
-            val atTgId =
-                if (atId == configProperties.bot.masterOfQq) configProperties.bot.masterOfTg else atId  //TODO: find bind user telegram id
-            text = "[$atName](https://t.me/$atTgId) $text"
-        }
 
-
-        if (imgUrl.isNotEmpty()) {
-            telegramBot.sendMessagePhoto(
-                data = httpClient.get(imgUrl).body<ByteArray>(),
-                formattedText = text.formatMsg(
-                    event.user.id.toLongOrNull() ?: -1L,
-                    event.nick() ?: "Unknown"
-                ).fmt(),
-                chatId = config.telegramGroupId
-            )
-        } else if (videoUrl.isNotEmpty()) {
-            telegramBot.sendMessageVideo(
-                data = httpClient.get(videoUrl).body<ByteArray>(),
-                formattedText = text.formatMsg(
-                    event.user.id.toLongOrNull() ?: -1L,
-                    event.nick() ?: "Unknown"
-                ).fmt(),
-                chatId = config.telegramGroupId
-            )
-        } else {
+        kotlin.runCatching {
+            if (imgUrl.isNotEmpty()) {
+                telegramBot.sendMessagePhoto(
+                    data = httpClient.get(imgUrl).body<ByteArray>(),
+                    formattedText = text.formatMsg(
+                        event.user.id.toLongOrNull() ?: -1L,
+                        event.nick() ?: "Unknown"
+                    ).fmt(),
+                    chatId = config.telegramGroupId
+                )
+            } else if (videoUrl.isNotEmpty()) {
+                telegramBot.sendMessageVideo(
+                    data = httpClient.get(videoUrl).body<ByteArray>(),
+                    formattedText = text.formatMsg(
+                        event.user.id.toLongOrNull() ?: -1L,
+                        event.nick() ?: "Unknown"
+                    ).fmt(),
+                    chatId = config.telegramGroupId
+                )
+            } else {
+                telegramBot.sendMessageText(
+                    text = event.message.content.escapeMarkdown().formatMsg(
+                        event.user.id.toLongOrNull() ?: -1L,
+                        event.nick() ?: "Unknown"
+                    ),
+                    chatId = config.telegramGroupId,
+                    parseMode = ParseMode.MARKDOWN_V2
+                )
+            }
+        }.recoverCatching {
             telegramBot.sendMessageText(
                 text = event.message.content.escapeMarkdown().formatMsg(
                     event.user.id.toLongOrNull() ?: -1L,
@@ -73,7 +84,7 @@ class SatoriHandler(val configProperties: ConfigProperties) {
                 chatId = config.telegramGroupId,
                 parseMode = ParseMode.MARKDOWN_V2
             )
-        }.also {
+        }.getOrThrow().also {
             log.info("Sent {}", it)
         }
     }

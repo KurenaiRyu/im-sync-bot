@@ -1,10 +1,12 @@
 package kurenai.imsyncbot.bot.satori
 
 import com.github.nyayurn.yutori.Adapter
+import com.github.nyayurn.yutori.GlobalLoggerFactory
 import com.github.nyayurn.yutori.Satori
 import com.github.nyayurn.yutori.module.adapter.satori.Satori
 import com.github.nyayurn.yutori.satori
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kurenai.imsyncbot.*
@@ -20,6 +22,10 @@ class SatoriBot(
 
     companion object {
         val log = getLogger()
+    }
+
+    init {
+        GlobalLoggerFactory.factory = SatoriLoggerFactory()
     }
 
     private val satoriConfig = bot.configProperties.bot.satori
@@ -44,6 +50,7 @@ class SatoriBot(
 
     val status = MutableStateFlow<BotStatus>(Initializing)
     var restartCount = 0
+    val messageChannel = Channel<suspend () -> Unit>(capacity = Channel.Factory.UNLIMITED)
 
     fun start() {
         if (satori != null) {
@@ -51,6 +58,14 @@ class SatoriBot(
         }
 
         satori = buildSatori()
+
+        launch {
+            for (func in messageChannel) {
+                kotlin.runCatching { func() }.onFailure {
+                    log.error("{}", it.localizedMessage)
+                }
+            }
+        }
 
         satori!!.start()
     }
@@ -75,7 +90,9 @@ class SatoriBot(
         listening {
             message.created {
                 launch {
-                    handle.onMessage(actions, event, satori, telegramBot)
+                    messageChannel.send {
+                        handle.onMessage(actions, event, satori, telegramBot)
+                    }
                 }
             }
         }
