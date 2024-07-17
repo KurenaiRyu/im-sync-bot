@@ -64,8 +64,14 @@ object Versions {
     const val KORD = "0.9.0"
     const val COROUTINE_TEST = "1.7.1"
     const val LOMBOK = "1.18.28"
+    const val vertx = "4.5.8"
 }
 dependencies {
+    implementation(project(":onebot-sdk"))
+
+    implementation("io.vertx:vertx-core:${Versions.vertx}")
+    implementation("io.vertx:vertx-lang-kotlin-coroutines:${Versions.vertx}")
+
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
     implementation("org.jetbrains.kotlin:kotlin-reflect")

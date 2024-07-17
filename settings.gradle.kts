@@ -1,7 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
 rootProject.name = "im-sync-bot"
-
+include(":onebot-sdk")
 pluginManagement {
     repositories {
         google()
