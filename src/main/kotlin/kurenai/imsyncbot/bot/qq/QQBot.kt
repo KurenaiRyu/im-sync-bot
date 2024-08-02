@@ -13,31 +13,23 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
-import kurenai.imsyncbot.bot.qq.login.qsign.UnidbgFetchQSignFactory
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.domain.QQMessageType
 import kurenai.imsyncbot.domain.getLocalDateTime
+import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.FixProtocolVersion
-import kurenai.imsyncbot.utils.FixProtocolVersion.fetch
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.launchWithPermit
 import net.mamoe.mirai.Bot
-import net.mamoe.mirai.BotFactory
-import net.mamoe.mirai.auth.BotAuthorization
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
-import net.mamoe.mirai.internal.spi.EncryptService
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
 import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.message.data.ids
-import net.mamoe.mirai.utils.BotConfiguration
 import net.mamoe.mirai.utils.ConcurrentHashMap
-import net.mamoe.mirai.utils.LoggerAdapters
-import net.mamoe.mirai.utils.Services
-import java.io.File
+import top.mrxiaom.overflow.BotBuilder
 import kotlin.coroutines.CoroutineContext
 
 class QQBot(
@@ -46,17 +38,6 @@ class QQBot(
 ) : CoroutineScope {
 
     companion object {
-
-        init {
-            Services.register(
-                EncryptService.Factory::class.qualifiedName!!,
-                UnidbgFetchQSignFactory::class.qualifiedName!!,
-                ::UnidbgFetchQSignFactory
-            )
-            //mirai使用log4j2
-            LoggerAdapters.useLog4j2()
-        }
-
         private val log = getLogger()
     }
 
@@ -88,28 +69,12 @@ class QQBot(
     private val workerScope = this + newFixedThreadPoolContext(10, "${qqProperties.account}-worker")
     private val groupMessageLockMap = ConcurrentHashMap<Long, Semaphore>()
 
-    private fun buildMiraiBot(qrCodeLogin: Boolean = false): Bot {
-        val configuration = BotConfiguration().apply {
-            cacheDir = File("./mirai/${qqProperties.account}")
-            fileBasedDeviceInfo("./config/device.json") // 使用 device.json 存储设备信息
-            protocol = qqProperties.protocol // 切换协议
-            highwayUploadCoroutineCount = Runtime.getRuntime().availableProcessors() * 2
-            parentCoroutineContext = this@QQBot.coroutineContext
-//            loginSolver = MultipleLoginSolver(bot)
-        }
-        log.info("协议版本检查更新...")
-        try {
-//            FixProtocolVersion.update()
-            fetch(protocol = configuration.protocol, version = "latest")
-            log.info("当前协议\n{}", FixProtocolVersion.info())
-        } catch (cause: Throwable) {
-            log.error("协议版本升级失败", cause)
-        }
-        return if (qrCodeLogin || qqProperties.password.isBlank()) {
-            BotFactory.newBot(qqProperties.account, BotAuthorization.byQRCode(), configuration)
-        } else {
-            BotFactory.newBot(qqProperties.account, qqProperties.password, configuration)
-        }
+    private suspend fun buildBot(): Bot {
+        val url = "ws://${qqProperties.host}:${qqProperties.port}"
+        return BotBuilder.positive(url)
+            .token(qqProperties.token)
+            .overrideLogger(log)
+            .connect()?:throw BotException("Connect to $url fail!")
     }
 
     suspend fun start(waitForInit: Boolean = false) = loginLock.withLock {
@@ -117,7 +82,7 @@ class QQBot(
             if (qqBot.isOnline) return@withLock
             if (qqBot.isActive) qqBot.close()
         }
-        qqBot = buildMiraiBot()
+        qqBot = buildBot()
         log.info("Login qq ${qqProperties.account}...")
 
         qqBot.login()

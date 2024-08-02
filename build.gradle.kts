@@ -30,13 +30,23 @@ repositories {
             includeGroup("com.github.Nyayurn.Yutori-Next")
         }
     }
-    maven {
-        url = uri("https://mvn.mchv.eu/repository/mchv/")
-        content {
+    mavenCentral()
+    exclusiveContent {
+        forRepository {
+            maven("https://mvn.mchv.eu/repository/mchv/")
+        }
+        filter {
             includeGroup("it.tdlight")
         }
     }
-    mavenCentral()
+    exclusiveContent {
+        forRepository {
+            maven("https://s01.oss.sonatype.org/content/repositories/snapshots")
+        }
+        filter {
+            includeGroup("top.mrxiaom")
+        }
+    }
 }
 
 configurations {
@@ -66,6 +76,7 @@ object Versions {
     const val LOMBOK = "1.18.32"
 }
 dependencies {
+
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
@@ -83,7 +94,8 @@ dependencies {
     implementation("com.github.Nyayurn:Yutori-Next-jvm:master-SNAPSHOT")
 
 //    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
-    implementation(files("libs/unidbg-fix.jar"))
+//    implementation(files("libs/unidbg-fix.jar"))
+//    implementation(fileTree("libs"))
 
     //exif
     implementation("com.ashampoo:kim:0.18.2")
@@ -107,9 +119,7 @@ dependencies {
     implementation(platform("net.mamoe:mirai-bom:${Versions.MIRAI}"))
     implementation("net.mamoe:mirai-core")
     implementation("net.mamoe:mirai-core-utils")
-//    implementation("net.mamoe", "mirai-core", miraiVersion)
-//    implementation("net.mamoe", "mirai-core-api", miraiVersion)
-//    implementation("net.mamoe", "mirai-core-utils", miraiVersion)
+    implementation("top.mrxiaom:overflow-core:2.16.0+")
 
     //tdlib
     implementation(platform("it.tdlight:tdlight-java-bom:${Versions.TD_LIGHT}"))
@@ -199,12 +209,12 @@ tasks.withType<JavaCompile> {
 }
 
 tasks.register<Delete>("clearLib") {
-    delete("$buildDir/libs/lib")
+    delete("${layout.buildDirectory}/libs/lib")
 }
 
 tasks.register<Copy>("copyLib") {
     from(configurations.runtimeClasspath)
-    into("$buildDir/libs/lib")
+    into("${layout.buildDirectory}/libs/lib")
 }
 
 tasks.bootJar {

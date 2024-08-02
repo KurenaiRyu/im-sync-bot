@@ -48,6 +48,9 @@ data class BotProperties(
 @Serializable
 @Deprecated("No longer needed")
 data class QQProperties(
+    val host: String = "localhost",
+    val port: Int = 9000,
+    val token: String = "",
     val account: Long = 0L,
     val password: String = "",
     val protocol: BotConfiguration.MiraiProtocol = BotConfiguration.MiraiProtocol.ANDROID_PAD,

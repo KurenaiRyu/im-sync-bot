@@ -7,6 +7,7 @@ import kurenai.imsyncbot.bot.satori.SatoriBot
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.service.GroupConfigService
 import kurenai.imsyncbot.service.UserConfigService
+import net.mamoe.mirai.utils.LoggerAdapters
 import org.apache.logging.log4j.Level
 import org.apache.logging.log4j.core.config.Configurator
 import java.net.InetSocketAddress
@@ -48,6 +49,9 @@ class ImSyncBot(
 //    internal val privateHandle = PrivateChatHandler(configProperties)
 
     init {
+        //mirai使用log4j2
+        LoggerAdapters.useLog4j2()
+
         if (configProperties.debug) {
             Configurator.setLevel("kurenai.imsyncbot", Level.DEBUG)
         }
@@ -60,8 +64,8 @@ class ImSyncBot(
             log.info("Telegram bot ${configProperties.bot.telegram.username}")
 //            log.info("QQ bot ${configProperties.bot.qq.account}")
             tg.start()
-            satori.start()
-//            qq.start()
+            qq.start()
+//            satori.start()
 //            discord.start()
         }
     }
