@@ -36,6 +36,7 @@ internal val inlineCommands = HashMap<String, AbstractInlineCommand>()
 internal val qqHandlers = ArrayList<QQHandler>()
 
 internal lateinit var instants: MutableList<ImSyncBot>
+internal lateinit var imSyncBot: ImSyncBot
 
 //suspend fun main() {
 //    instants = loadInstants()
@@ -46,16 +47,17 @@ internal lateinit var instants: MutableList<ImSyncBot>
 
 suspend fun start() {
     Init.init() //td-lib
-    ImSyncBot(configProperties)
+    imSyncBot = ImSyncBot(configProperties)
+    imSyncBot.start()
     commonInit()
 }
 
 fun commonInit() {
-    registerTgCommand()
-    registerQQCommand()
+//    registerTgCommand()
+//    registerQQCommand()
     //TODO: 设置 inline 命令
 //    registerInlineCommand()
-    registerQQHandler()
+//    registerQQHandler()
     setUpTimer()
 }
 

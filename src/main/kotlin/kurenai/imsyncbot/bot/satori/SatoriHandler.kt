@@ -32,17 +32,31 @@ class SatoriHandler(val configProperties: ConfigProperties) {
 
         val content = event.message.content
         val body = Jsoup.parse(content).body()
-        val text = body.text().escapeMarkdown()
+        var text = body.textNodes().joinToString().escapeMarkdown()
         val imgUrl = body.getElementsByTag("img").attr("src")
         val videoUrl = body.getElementsByTag("video").attr("src")
+        val quote = body.getElementsByTag("quote")
+
+        val author = quote.first()?.getElementsByTag("author")
+        val quoteName = author?.attr("name")?.escapeMarkdown() ?: ""
+        val quoteId = author?.attr("id") ?: ""
+        val quoteTitle = if (quoteId.isNotBlank()) "$quoteName($quoteId)" else ""
+        quote.takeIf { it.isNotEmpty() }?.let {
+            text = """
+                ```
+                $quoteTitle
+                ${quote.text()}
+                ```
+                $text
+            """.trimIndent()
+        }
 
 //        val at = body.getElementsByAttribute("at")  //TODO: don't work
 //
 //        at.attr("id").toLongOrNull()?.let { atId ->
 //            val atName = at.attr("name")
-//            val atTgId =
-//                if (atId == configProperties.bot.masterOfQq) configProperties.bot.masterOfTg else atId  //TODO: find bind user telegram id
-//            text = "[$atName](https://t.me/$atTgId) $text"
+//            val atTgId = if (atId == configProperties.bot.masterOfQq) configProperties.bot.masterOfTg else atId  //TODO: find bind user telegram id
+//            text = "[$atName](tg://user?id=$atTgId) $text"
 //        }
 
 

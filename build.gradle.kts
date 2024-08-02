@@ -63,7 +63,7 @@ object Versions {
     const val MIRAI = "2.16.0-RC"
     const val KORD = "0.9.0"
     const val COROUTINE_TEST = "1.7.1"
-    const val LOMBOK = "1.18.28"
+    const val LOMBOK = "1.18.32"
 }
 dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
@@ -71,14 +71,16 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-configuration-processor")
+
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
     implementation("org.jetbrains.kotlinx:atomicfu:0.20.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.21")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.2")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2")
 
-    implementation("com.github.Nyayurn.Yutori-Next:Yutori-Next:master-SNAPSHOT")
-//    implementation("com.github.Nyayurn:Yutori-Next-jvm:master-SNAPSHOT")
+//    implementation("com.github.Nyayurn.Yutori-Next:Yutori-Next:master-SNAPSHOT")
+    implementation("com.github.Nyayurn:Yutori-Next-jvm:master-SNAPSHOT")
 
 //    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
     implementation(files("libs/unidbg-fix.jar"))

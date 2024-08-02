@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.update
 import kurenai.imsyncbot.*
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.utils.getLogger
+import org.apache.logging.log4j.Level
+import org.apache.logging.log4j.core.config.Configurator
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -26,6 +28,9 @@ class SatoriBot(
 
     init {
         GlobalLoggerFactory.factory = SatoriLoggerFactory()
+        if (configProperties.debug) {
+            Configurator.setLevel("com.github.nyayurn.yutori", Level.DEBUG)
+        }
     }
 
     private val satoriConfig = bot.configProperties.bot.satori

@@ -6,7 +6,7 @@ import com.github.nyayurn.yutori.LoggerFactory
 import kurenai.imsyncbot.utils.getLogger
 
 class SatoriLogger(
-    private val clazz: Class<*>
+    clazz: Class<*>
 ) : Logger {
 
     val log = getLogger(clazz.name)

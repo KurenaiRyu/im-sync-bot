@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
+import kurenai.imsyncbot.bot.qq.login.qsign.UnidbgFetchQSignFactory
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.domain.QQMessageType
 import kurenai.imsyncbot.domain.getLocalDateTime
@@ -27,12 +28,15 @@ import net.mamoe.mirai.auth.BotAuthorization
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
+import net.mamoe.mirai.internal.spi.EncryptService
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
 import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.message.data.ids
 import net.mamoe.mirai.utils.BotConfiguration
 import net.mamoe.mirai.utils.ConcurrentHashMap
+import net.mamoe.mirai.utils.LoggerAdapters
+import net.mamoe.mirai.utils.Services
 import java.io.File
 import kotlin.coroutines.CoroutineContext
 
@@ -42,6 +46,17 @@ class QQBot(
 ) : CoroutineScope {
 
     companion object {
+
+        init {
+            Services.register(
+                EncryptService.Factory::class.qualifiedName!!,
+                UnidbgFetchQSignFactory::class.qualifiedName!!,
+                ::UnidbgFetchQSignFactory
+            )
+            //mirai使用log4j2
+            LoggerAdapters.useLog4j2()
+        }
+
         private val log = getLogger()
     }
 
