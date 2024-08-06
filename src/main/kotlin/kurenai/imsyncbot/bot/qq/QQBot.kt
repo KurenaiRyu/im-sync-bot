@@ -25,7 +25,6 @@ import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.At
-import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
 import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.message.data.ids
 import net.mamoe.mirai.utils.ConcurrentHashMap
@@ -70,7 +69,8 @@ class QQBot(
     private val groupMessageLockMap = ConcurrentHashMap<Long, Semaphore>()
 
     private suspend fun buildBot(): Bot {
-        val url = "ws://${qqProperties.host}:${qqProperties.port}"
+        val url = "ws://${qqProperties.host}:${qqProperties.port}/"
+        log.info("Connecting to $url")
         return BotBuilder.positive(url)
             .token(qqProperties.token)
             .overrideLogger(log)
@@ -183,23 +183,24 @@ class QQBot(
         try {
             when (event) {
                 is MessageEvent -> {
-                    val json = event.message.serializeToJsonString()
+                    val json = event.message.toString()
                     when (event) {
                         is FriendMessageEvent -> {
-                            MessageService.save(
-                                QQMessage().apply {
-
-                                    messageId = event.message.ids[0]
-                                    botId = event.bot.id
-                                    objId = event.subject.id
-                                    sender = event.sender.id
-                                    target = event.source.targetId
-                                    type = QQMessageType.FRIEND
-                                    this.json = json
-                                    handled = false
-                                    msgTime = event.source.getLocalDateTime()
-                                }
-                            )
+                            CoroutineScope(Dispatchers.IO).launch {
+                                MessageService.save(
+                                    QQMessage().apply {
+                                        messageId = event.message.ids[0]
+                                        botId = event.bot.id
+                                        objId = event.subject.id
+                                        sender = event.sender.id
+                                        target = event.source.targetId
+                                        type = QQMessageType.FRIEND
+                                        this.json = json
+                                        handled = false
+                                        msgTime = event.source.getLocalDateTime()
+                                    }
+                                )
+                            }
 
 //                            bot.qqMessageHandler.onFriendMessage(
 //                                PrivateMessageContext(
@@ -223,7 +224,9 @@ class QQBot(
                                 this.handled = false
                                 this.msgTime = event.source.getLocalDateTime()
                             }
-                            MessageService.save(message)
+                            CoroutineScope(Dispatchers.IO).launch {
+                                MessageService.save(message)
+                            }
 
                             bot.qqMessageHandler.onGroupMessage(
                                 GroupMessageContext(
@@ -248,7 +251,10 @@ class QQBot(
                                 this.handled = false
                                 this.msgTime = event.source.getLocalDateTime()
                             }
-                            MessageService.save(message)
+
+                            CoroutineScope(Dispatchers.IO).launch {
+                                MessageService.save(message)
+                            }
 
                             bot.qqMessageHandler.onGroupMessage(
                                 GroupMessageContext(

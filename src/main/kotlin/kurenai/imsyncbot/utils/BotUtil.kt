@@ -5,6 +5,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.exception.BotException
+import kurenai.imsyncbot.snowFlake
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
@@ -78,6 +80,20 @@ object BotUtil {
     ): Path {
         val image = Path.of(getImagePath(filename))
         return download(image, url, onlyCache, overwrite)
+    }
+
+    suspend fun downloadImg(
+        url: String,
+        ext: String? = null,
+        onlyCache: Boolean = false,
+    ): Path {
+        val image = Path.of(getImagePath(snowFlake.nextAlpha()))
+        val tmpPath = download(image, url, onlyCache, false)
+        val path = Path.of(getImagePath(tmpPath.crc32c() + if (ext?.isNotBlank() == true) ".$ext" else ""))
+        withContext(Dispatchers.IO) {
+            Files.move(tmpPath, path)
+        }
+        return path
     }
 
     private suspend fun download(path: Path, url: String, onlyCache: Boolean, overwrite: Boolean): Path {

@@ -46,7 +46,6 @@ data class BotProperties(
 )
 
 @Serializable
-@Deprecated("No longer needed")
 data class QQProperties(
     val host: String = "localhost",
     val port: Int = 9000,

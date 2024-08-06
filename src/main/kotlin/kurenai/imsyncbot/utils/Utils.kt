@@ -9,13 +9,11 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.kotlinModule
 import io.ktor.client.*
-import io.ktor.util.*
-import it.tdlight.jni.TdApi
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
-import okio.ByteString.Companion.decodeHex
+import okhttp3.internal.toHexString
 import org.reflections.Reflections
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -27,7 +25,10 @@ import java.text.StringCharacterIterator
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.util.HexFormat
+import java.util.*
+import java.util.zip.CRC32
+import java.util.zip.CRC32C
+import java.util.zip.Checksum
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.io.path.inputStream
@@ -138,6 +139,36 @@ fun String?.suffix(): String {
 
 fun Long.toLocalDateTime(): LocalDateTime {
     return LocalDateTime.ofInstant(Instant.ofEpochMilli(this), ZoneId.systemDefault())
+}
+
+fun ByteArray.crc32c(): String {
+    val checksum = CRC32C()
+    checksum.update(this)
+    return checksum.value.toHexString()
+}
+
+fun ByteArray.crc32(): String {
+    val checksum = CRC32()
+    checksum.update(this)
+    return checksum.value.toHexString()
+}
+
+fun Path.crc32c(): String {
+    return checksum(this, CRC32C())
+}
+
+fun Path.crc32(): String {
+    return checksum(this, CRC32())
+}
+
+private fun checksum(path: Path, checksum: Checksum): String {
+    path.inputStream().use { input ->
+        val buff = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (input.read(buff) != -1) {
+            checksum.update(buff)
+        }
+    }
+    return checksum.value.toHexString()
 }
 
 fun ByteArray.md5(): String {

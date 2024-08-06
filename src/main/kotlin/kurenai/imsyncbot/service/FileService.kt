@@ -2,7 +2,6 @@ package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.InputFileLocal
-import it.tdlight.jni.TdApi.InputFileRemote
 import kotlinx.coroutines.flow.channelFlow
 import kurenai.imsyncbot.domain.FileCache
 import kurenai.imsyncbot.fileCacheRepository
@@ -14,7 +13,6 @@ import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.utils.MiraiInternalApi
 import kotlin.io.path.pathString
-import kotlin.jvm.optionals.getOrNull
 
 /**
  * @author Kurenai
@@ -25,30 +23,35 @@ object FileService {
 
     @OptIn(MiraiInternalApi::class)
     suspend fun download(image: Image) = withIO {
-        fileCacheRepository.findById(image.md5.toHex()).getOrNull()?.let {
-            InputFileRemote(it.fileId)
-        } ?: run {
-            InputFileLocal(
-                BotUtil.downloadImg(
-                    "${image.imageId.substring(1..36).replace("-", "")}.${image.imageType.formatName}",
-                    image.queryUrl()
-                ).pathString
-            )
-        }
+//        fileCacheRepository.findById(image.md5.toHex()).getOrNull()?.let {
+//            InputFileRemote(it.fileId)
+//        } ?: run {
+//            InputFileLocal(
+//                BotUtil.downloadImg(
+//                    "${image.imageId.substring(1..36).replace("-", "")}.${image.imageType.formatName}",
+//                    image.queryUrl()
+//                ).pathString
+//            )
+//        }
+        InputFileLocal(BotUtil.downloadImg(image.queryUrl()).pathString)
     }
 
     @OptIn(MiraiInternalApi::class)
     suspend fun download(images: Iterable<Image>) = channelFlow {
-        val imgMap = images.associateBy { it.md5.toHex() }.toMutableMap()
-        val caches = withIO { fileCacheRepository.findAllById(imgMap.keys) }
-        caches.forEach {
-            send(InputFileRemote(it.fileId))
-            imgMap.remove(it.id)
-        }
+//        val imgMap = images.associateBy { it.md5.toHex() }.toMutableMap()
+//        val caches = withIO { fileCacheRepository.findAllById(imgMap.keys) }
+//        caches.forEach {
+//            send(InputFileRemote(it.fileId))
+//            imgMap.remove(it.id)
+//        }
+//
+//        imgMap.entries.takeIf { it.isNotEmpty() }?.forEach { (_, img) ->
+//            val filename = "${img.imageId.substring(1..36).replace("-", "")}.${img.imageType.formatName}"
+//            send(InputFileLocal(BotUtil.downloadImg(filename, img.queryUrl()).pathString))
+//        }
 
-        imgMap.entries.takeIf { it.isNotEmpty() }?.forEach { (_, img) ->
-            val filename = "${img.imageId.substring(1..36).replace("-", "")}.${img.imageType.formatName}"
-            send(InputFileLocal(BotUtil.downloadImg(filename, img.queryUrl()).pathString))
+        images.forEach {
+            send(InputFileLocal(BotUtil.downloadImg(it.queryUrl()).pathString))
         }
     }
 

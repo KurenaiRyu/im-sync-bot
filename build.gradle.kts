@@ -22,6 +22,7 @@ repositories {
     mavenLocal {
         content {
             includeGroup("com.github.Nyayurn")
+            includeGroup("top.mrxiaom")
         }
     }
     maven {
@@ -119,7 +120,7 @@ dependencies {
     implementation(platform("net.mamoe:mirai-bom:${Versions.MIRAI}"))
     implementation("net.mamoe:mirai-core")
     implementation("net.mamoe:mirai-core-utils")
-    implementation("top.mrxiaom:overflow-core:2.16.0+")
+    implementation("top.mrxiaom:overflow-core:2.16+")
 
     //tdlib
     implementation(platform("it.tdlight:tdlight-java-bom:${Versions.TD_LIGHT}"))
