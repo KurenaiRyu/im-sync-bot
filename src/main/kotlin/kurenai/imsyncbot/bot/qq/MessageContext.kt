@@ -29,6 +29,7 @@ import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 import java.nio.file.Path
 import kotlin.io.path.fileSize
+import kotlin.io.path.inputStream
 import kotlin.io.path.pathString
 
 /**
@@ -40,6 +41,10 @@ sealed class MessageContext(
     val entity: QQMessage?,
     val bot: ImSyncBot
 ) {
+
+    companion object {
+        val GIF_BYTEARRAY = byteArrayOf(0x47, 0x49, 0x46, 0x38)
+    }
 
     private var tgMsgFormat =
         if (bot.configProperties.bot.tgMsgFormat.contains("\$msg")) bot.configProperties.bot.tgMsgFormat else "\$name: \$msg"
@@ -166,6 +171,7 @@ class GroupMessageContext(
             val images = messageChain.filterIsInstance<Image>()
             if (images.size == 1) {
                 val image = images.first()
+                image.imageId
                 if (image.imageType == ImageType.GIF ||
                     image.imageType == ImageType.APNG ||
                     (image.imageType == ImageType.UNKNOWN && image.isEmoji)
@@ -315,13 +321,26 @@ class GroupMessageContext(
 
         private suspend fun sendFileMessage(inputFile: InputFile): Array<TdApi.Message> {
             val content = buildFileMessageContent(inputFile)
+            val file = content.photo
+            val isGif: Boolean = if (file is InputFileLocal) {
+                val buff = ByteArray(4)
+                Path.of(file.path).inputStream().read(buff, 0, buff.size)
+                GIF_BYTEARRAY.contentEquals(buff)
+            } else false
+
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
-                this.inputMessageContent = content
+                this.inputMessageContent = if (isGif) {
+                    InputMessageAnimation().apply {
+                        this.caption = content.caption
+                        this.animation = content.photo
+                    }
+                } else content
             }
             return arrayOf(bot.tg.send(untilPersistent = true, function = func).also {
-                if (shouldBeFile && fileSize > 500 * 1024) {
+
+                if (!isGif && shouldBeFile && fileSize > 800 * 1024) {
                     CoroutineScope(bot.coroutineContext).launch {
                         func.apply {
                             this.replyTo = MessageReplyToMessage().apply {
@@ -329,7 +348,6 @@ class GroupMessageContext(
                                 this.messageId = it.id
                             }
                             this.inputMessageContent = InputMessageDocument().apply {
-                                this.caption = content.caption
                                 this.document = content.photo
                             }
                         }
