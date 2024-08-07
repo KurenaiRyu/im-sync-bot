@@ -208,7 +208,7 @@ class GroupMessageContext(
                 val id: Long?
                 content += if (target == group.bot.id && getReplayToMessageId() <= 0) {
                     bot.userConfigService.masterUsername.ifBlank { bot.userConfigService.masterTg.toString() }.let {
-                        "[${it.formatUsername().escapeMarkdown()}](tg://user?id=$it)"
+                        "[${it.formatUsername().escapeMarkdown()}](tg://user?id=${bot.configProperties.bot.masterOfTg})"
                     }
                 } else {
                     id = bot.userConfigService.links.find { it.qq == target }?.tg
