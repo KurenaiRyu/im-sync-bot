@@ -321,8 +321,7 @@ class GroupMessageContext(
                 this.inputMessageContent = content
             }
             return arrayOf(bot.tg.send(untilPersistent = true, function = func).also {
-                // reply a file if necessary
-                if (shouldBeFile && fileSize > 300 * 1024) {
+                if (shouldBeFile && fileSize > 500 * 1024) {
                     CoroutineScope(bot.coroutineContext).launch {
                         func.apply {
                             this.replyTo = MessageReplyToMessage().apply {
@@ -349,10 +348,21 @@ class GroupMessageContext(
             } else {
                 getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
             }.fmt()
+//            return if (shouldBeFile && fileSize > 300 * 1024) {
+//                InputMessageDocument().apply {
+//                    this.caption = caption
+//                    document = file
+//                }
+//            } else {
+//                InputMessagePhoto().apply {
+//                    this.caption = caption
+//                    photo = file
+//                }
+//            }
             return InputMessagePhoto().apply {
-                this.caption = caption
-                photo = file
-            }
+                    this.caption = caption
+                    photo = file
+                }
         }
 
 
@@ -425,7 +435,7 @@ class GroupMessageContext(
 
         private suspend fun buildContent(): InputMessageContent {
             getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
-            val file = FileService.download(image)
+            val file = FileService.download(image, "gif")
             return InputMessageAnimation().apply {
                 this.caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
                 animation = file

@@ -27,6 +27,7 @@ import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.message.data.ids
+import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.utils.ConcurrentHashMap
 import top.mrxiaom.overflow.BotBuilder
 import kotlin.coroutines.CoroutineContext
@@ -183,7 +184,7 @@ class QQBot(
         try {
             when (event) {
                 is MessageEvent -> {
-                    val json = event.message.toString()
+                    val json = MessageService.serializeToJson(event.message.source)
                     when (event) {
                         is FriendMessageEvent -> {
                             CoroutineScope(Dispatchers.IO).launch {

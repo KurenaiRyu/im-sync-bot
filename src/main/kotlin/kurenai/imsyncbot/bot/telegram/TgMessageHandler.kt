@@ -124,9 +124,9 @@ class TgMessageHandler(
 
                 if (update.isPermanent) {
                     MessageService.findQQMessageByDelete(update).map {
-                        MessageChain.deserializeFromJsonString(it.json)
+                        MessageService.deserializeFromJson(it.json)
                     }.filter { //保证只撤回bot的
-                        it.source.fromId == bot.qq.qqBot.id
+                        it.fromId == bot.qq.qqBot.id
                     }.forEach {
                         it.recall()
                     }
@@ -316,7 +316,7 @@ class TgMessageHandler(
         }
 
         MessageService.findQQByTg(update.chatId, update.messageId)
-            ?.takeIf { it.source.fromId == bot.qq.qqBot.id } //只撤回bot消息
+            ?.takeIf { it.fromId == bot.qq.qqBot.id } //只撤回bot消息
             ?.recall()
 
         val message = bot.tg.getMessage(update.messageId, update.chatId)
@@ -344,10 +344,10 @@ class TgMessageHandler(
             return CONTINUE
         }
 
-        val quoteMsgChain = message.replyToMessageId()?.let {
+        val quoteMsgSource = message.replyToMessageId()?.let {
             MessageService.findQQByTg(message.chatId, it)
         }
-        val groupId = quoteMsgChain?.source?.targetId ?: bot.groupConfigService.tgQQ.getOrDefault(
+        val groupId = quoteMsgSource?.targetId ?: bot.groupConfigService.tgQQ.getOrDefault(
             message.chatId,
             bot.groupConfigService.defaultQQGroup
         )
@@ -361,7 +361,7 @@ class TgMessageHandler(
         val senderName = getSenderName(message)
 
         val builder = MessageChainBuilder()
-        quoteMsgChain?.let { builder.append(quoteMsgChain.quote()) }
+        quoteMsgSource?.let { builder.append(quoteMsgSource.quote()) }
 
         //TODO: 添加发送人前缀
         when (val content = message.content) {

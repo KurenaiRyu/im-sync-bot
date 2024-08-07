@@ -5,14 +5,12 @@ import it.tdlight.jni.TdApi.InputFileLocal
 import kotlinx.coroutines.flow.channelFlow
 import kurenai.imsyncbot.domain.FileCache
 import kurenai.imsyncbot.fileCacheRepository
-import kurenai.imsyncbot.utils.BotUtil
-import kurenai.imsyncbot.utils.file
-import kurenai.imsyncbot.utils.toHex
-import kurenai.imsyncbot.utils.withIO
+import kurenai.imsyncbot.utils.*
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.utils.MiraiInternalApi
 import kotlin.io.path.pathString
+import kotlin.jvm.optionals.getOrNull
 
 /**
  * @author Kurenai
@@ -22,7 +20,7 @@ import kotlin.io.path.pathString
 object FileService {
 
     @OptIn(MiraiInternalApi::class)
-    suspend fun download(image: Image) = withIO {
+    suspend fun download(image: Image, ext: String = "png") = withIO {
 //        fileCacheRepository.findById(image.md5.toHex()).getOrNull()?.let {
 //            InputFileRemote(it.fileId)
 //        } ?: run {
@@ -33,7 +31,12 @@ object FileService {
 //                ).pathString
 //            )
 //        }
-        InputFileLocal(BotUtil.downloadImg(image.queryUrl()).pathString)
+        val path = BotUtil.downloadImg(image.queryUrl(), ext)
+        fileCacheRepository.findById(path.crc32c()).getOrNull()?.let {
+            TdApi.InputFileRemote(it.fileId)
+        } ?: run {
+            InputFileLocal(path.pathString)
+        }
     }
 
     @OptIn(MiraiInternalApi::class)

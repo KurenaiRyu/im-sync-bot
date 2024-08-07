@@ -7,7 +7,6 @@ import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.dfs
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
-import net.mamoe.mirai.message.data.source
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.io.path.pathString
@@ -30,9 +29,9 @@ class InfoCommand : AbstractTelegramCommand() {
         return if (replyToMessageId != null) {
             val replyMessage = bot.tg.getMessage(message.chatId, replyToMessageId)
             if (sender.userId == bot.tg.getMe().id) {
-                val qqMsg = MessageService.findQQByTg(replyMessage)
-                if (qqMsg != null) {
-                    val userId = qqMsg.source.fromId
+                val qqMsgSource = MessageService.findQQByTg(replyMessage)
+                if (qqMsgSource != null) {
+                    val userId = qqMsgSource.fromId
                     val qqGroup = bot.groupConfigService.tgQQ[message.chatId]?.let { qqBot.getGroup(it) }
                     if (qqGroup == null) {
                         return "找不到绑定的qq群"

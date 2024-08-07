@@ -1,10 +1,12 @@
 package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
+import kotlinx.serialization.json.Json
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.domain.QQMessageType
 import kurenai.imsyncbot.domain.QQTg
 import kurenai.imsyncbot.domain.getLocalDateTime
+import kurenai.imsyncbot.imSyncBot
 import kurenai.imsyncbot.qqMessageRepository
 import kurenai.imsyncbot.qqTgRepository
 import kurenai.imsyncbot.utils.getLogger
@@ -12,7 +14,8 @@ import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.event.events.MessageRecallEvent
 import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.message.data.MessageChain
-import net.mamoe.mirai.message.data.MessageChain.Companion.serializeToJsonString
+import net.mamoe.mirai.message.data.MessageSource
+import net.mamoe.mirai.message.data.MessageSourceBuilder
 import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.message.sourceMessage
 import kotlin.jvm.optionals.getOrNull
@@ -21,6 +24,20 @@ import kotlin.jvm.optionals.getOrNull
 object MessageService {
 
     private val log = getLogger()
+    private val messageJson = Json {
+        ignoreUnknownKeys = true
+    }
+
+    fun serializeToJson(origin: MessageSource): String {
+        val source = MessageSourceBuilder()
+            .metadata(origin)
+            .build(imSyncBot.qq.qqBot.id, origin.kind)
+        return messageJson.encodeToString(MessageSource.serializer(), source)
+    }
+
+    fun deserializeFromJson(json: String): MessageSource {
+        return messageJson.decodeFromString(MessageSource.serializer(), json)
+    }
 
     suspend fun save(message: QQMessage) = runCatching {
         withIO {
@@ -48,7 +65,7 @@ object MessageService {
                         target = messageChain.source.targetId
                         sender = messageChain.source.fromId
                         type = QQMessageType.GROUP
-                        json = messageChain.serializeToJsonString()
+                        json = serializeToJson(messageChain.source)
                         handled = true
                         msgTime = messageChain.source.getLocalDateTime()
                     }
@@ -97,14 +114,24 @@ object MessageService {
         return findTgIdByQQ(event.bot.id, event.group.id, event.messageIds[0])
     }
 
+    suspend fun findQQMessageByTg(message: TdApi.Message) = findQQMessageByTg(message.chatId, message.id)
+
+    suspend fun findQQMessageByTg(chatId: Long, messageId: Long): QQMessage? {
+        return withIO {
+            qqTgRepository.findByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
+                qqMessageRepository.findById(it.qqId).getOrNull()
+            }
+        }
+    }
+
     suspend inline fun findQQByTg(message: TdApi.Message) = findQQByTg(message.chatId, message.id)
 
-    suspend fun findQQByTg(chatId: Long, messageId: Long): MessageChain? {
+    suspend fun findQQByTg(chatId: Long, messageId: Long): MessageSource? {
         return withIO {
             qqTgRepository.findByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
                 qqMessageRepository.findById(it.qqId).getOrNull()
             }?.let {
-                MessageChain.deserializeFromJsonString(it.json)
+                deserializeFromJson(it.json)
             }
         }
     }

@@ -5,7 +5,6 @@ import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
-import net.mamoe.mirai.message.data.source
 
 private val log = getLogger()
 
@@ -31,9 +30,9 @@ class BindCommand : AbstractTelegramCommand() {
                     if (param.isNotBlank()) {
                         val user = tg.getUser(replyMessage) ?: return "找不到用户"
                         if (user.id == tg.getMe().id) {
-                            val qqMsg = MessageService.findQQByTg(replyMessage) ?: return "找不到该qq信息"
-                            bot.userConfigService.bindName(qq = qqMsg.source.fromId, bindingName = param)
-                            "qq`${qqMsg.source.fromId}` 绑定名称为 `${param.escapeMarkdown()}`"
+                            val qqMsgSource = MessageService.findQQByTg(replyMessage) ?: return "找不到该qq信息"
+                            bot.userConfigService.bindName(qq = qqMsgSource.fromId, bindingName = param)
+                            "qq`${qqMsgSource.fromId}` 绑定名称为 `${param.escapeMarkdown()}`"
                         } else {
                             bot.userConfigService.bindName(user.id, null, param)
                             "`${user.firstName.escapeMarkdown()}` 绑定名称为 `${param.escapeMarkdown()}`"
@@ -102,10 +101,10 @@ class UnbindCommand : AbstractTelegramCommand() {
                 bot.tg.getMessage(message.replyInChatId()!!, message.replyToMessageId()!!)?.let { reply ->
                     val userId = reply.userSender()?.userId!!
                     if (userId == bot.tg.getMe().id) {
-                        val qqMsg = MessageService.findQQByTg(reply)
-                        if (qqMsg != null) {
-                            bot.userConfigService.unbindNameByQQ(qqMsg.source.fromId)
-                            "qq[${qqMsg.source.fromId}] 解绑名称成功"
+                        val qqMsgSource = MessageService.findQQByTg(reply)
+                        if (qqMsgSource != null) {
+                            bot.userConfigService.unbindNameByQQ(qqMsgSource.fromId)
+                            "qq[${qqMsgSource.fromId}] 解绑名称成功"
                         } else "找不到该qq信息"
                     } else {
                         if (bot.userConfigService.superAdmins.contains(message.userSender()?.userId)) {

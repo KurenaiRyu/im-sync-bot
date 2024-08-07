@@ -8,10 +8,7 @@ import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.snowFlake
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.createDirectories
-import kotlin.io.path.exists
-import kotlin.io.path.fileSize
-import kotlin.io.path.pathString
+import kotlin.io.path.*
 
 
 object BotUtil {
@@ -84,14 +81,17 @@ object BotUtil {
 
     suspend fun downloadImg(
         url: String,
-        ext: String? = null,
+        ext: String = "png",
         onlyCache: Boolean = false,
     ): Path {
         val image = Path.of(getImagePath(snowFlake.nextAlpha()))
         val tmpPath = download(image, url, onlyCache, false)
-        val path = Path.of(getImagePath(tmpPath.crc32c() + if (ext?.isNotBlank() == true) ".$ext" else ""))
-        withContext(Dispatchers.IO) {
-            Files.move(tmpPath, path)
+        val path = Path.of(getImagePath(tmpPath.crc32c() + if (ext.isNotBlank()) ".$ext" else ""))
+        if (path.exists()) tmpPath.deleteExisting()
+        else {
+            withContext(Dispatchers.IO) {
+                Files.move(tmpPath, path)
+            }
         }
         return path
     }
