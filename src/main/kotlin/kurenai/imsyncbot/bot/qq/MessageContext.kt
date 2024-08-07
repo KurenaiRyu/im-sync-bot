@@ -314,34 +314,44 @@ class GroupMessageContext(
         }
 
         private suspend fun sendFileMessage(inputFile: InputFile): Array<TdApi.Message> {
+            val content = buildFileMessageContent(inputFile)
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
-                this.inputMessageContent = buildFileMessageContent(inputFile)
+                this.inputMessageContent = content
             }
             return arrayOf(bot.tg.send(untilPersistent = true, function = func).also {
+                // reply a file if necessary
+                if (shouldBeFile && fileSize > 300 * 1024) {
+                    CoroutineScope(bot.coroutineContext).launch {
+                        func.apply {
+                            this.replyTo = MessageReplyToMessage().apply {
+                                this.chatId = it.chatId
+                                this.messageId = it.id
+                            }
+                            this.inputMessageContent = InputMessageDocument().apply {
+                                this.caption = content.caption
+                                this.document = content.photo
+                            }
+                        }
+                        bot.tg.send(function = func)
+                    }
+                }
                 CoroutineScope(bot.coroutineContext).launch {
                     FileService.cacheEmoji(image, it)
                 }
             })
         }
 
-        private suspend fun buildFileMessageContent(file: InputFile): InputMessageContent {
+        private suspend fun buildFileMessageContent(file: InputFile): InputMessagePhoto {
             val caption = if (onlyImage) {
                 "".formatMsg(senderId, senderName)
             } else {
                 getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
             }.fmt()
-            return if (shouldBeFile && fileSize > 300 * 1024) {
-                InputMessageDocument().apply {
-                    this.caption = caption
-                    document = file
-                }
-            } else {
-                InputMessagePhoto().apply {
-                    this.caption = caption
-                    photo = file
-                }
+            return InputMessagePhoto().apply {
+                this.caption = caption
+                photo = file
             }
         }
 
