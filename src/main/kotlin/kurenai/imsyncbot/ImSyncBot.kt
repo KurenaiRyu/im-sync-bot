@@ -3,11 +3,9 @@ package kurenai.imsyncbot
 import kotlinx.coroutines.*
 import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.bot.qq.QQMessageHandler
-import kurenai.imsyncbot.bot.satori.SatoriBot
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.service.GroupConfigService
 import kurenai.imsyncbot.service.UserConfigService
-import net.mamoe.mirai.utils.LoggerAdapters
 import org.apache.logging.log4j.Level
 import org.apache.logging.log4j.core.config.Configurator
 import java.net.InetSocketAddress
@@ -44,14 +42,11 @@ class ImSyncBot(
     internal val tg: TelegramBot = TelegramBot(configProperties.bot.telegram, this)
     internal var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
     internal val qq: QQBot = QQBot(configProperties.bot.qq, this)
-    internal val satori: SatoriBot = SatoriBot(this)
+//    internal val satori: SatoriBot = SatoriBot(this)
 //    internal val discord: DiscordBot = DiscordBot(this)
 //    internal val privateHandle = PrivateChatHandler(configProperties)
 
     init {
-        //mirai使用log4j2
-        LoggerAdapters.useLog4j2()
-
         if (configProperties.debug) {
             Configurator.setLevel("kurenai.imsyncbot", Level.DEBUG)
         }

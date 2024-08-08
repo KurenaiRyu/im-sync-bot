@@ -8,6 +8,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kurenai.imsyncbot.*
+import kurenai.imsyncbot.service.FileService
 import kurenai.imsyncbot.utils.*
 import okhttp3.internal.toHexString
 import java.nio.file.Path
@@ -166,7 +167,7 @@ class TelegramBot(
             replayToMessageId?.let { this.setReplyToMessageId(it) }
             messageThreadId?.let { this.messageThreadId = it }
             this.inputMessageContent = InputMessagePhoto().apply {
-                this.photo = InputFileLocal(BotUtil.downloadImg(filename, url).pathString)
+                this.photo = FileService.download(url)
                 this.caption = formattedText
             }
         }

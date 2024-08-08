@@ -1,57 +1,15 @@
-package kurenai.imsyncbot.bot.satori
-
-import com.github.nyayurn.yutori.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kurenai.imsyncbot.ConfigProperties
-import kurenai.imsyncbot.bot.telegram.TelegramBot
-import kurenai.imsyncbot.groupConfigRepository
-import kurenai.imsyncbot.utils.*
-import org.jsoup.Jsoup
-
-class SatoriHandler(val configProperties: ConfigProperties) {
-
-    companion object {
-        val log = getLogger()
-
-        private val NAME_PATTERN = BotUtil.NAME_PATTERN.escapeMarkdown()
-        private val ID_PATTERN = BotUtil.ID_PATTERN.escapeMarkdown()
-        private val MSG_PATTERN = BotUtil.MSG_PATTERN.escapeMarkdown()
-        private val NEWLINE_PATTERN = BotUtil.NEWLINE_PATTERN.escapeMarkdown()
-    }
-
-    val tgMsgFormat = configProperties.bot.tgMsgFormat
-
-    suspend fun onMessage(actions: RootActions, event: Event<MessageEvent>, satori: Satori, telegramBot: TelegramBot) {
-        val groupId = event.channel.id.toLongOrNull() ?: return
-        val config = withContext(Dispatchers.IO) {
-            groupConfigRepository.findByQqGroupId(groupId)
-        } ?: return
-
-        val content = event.message.content
-        val body = Jsoup.parse(content).body()
-        var text = body.textNodes().joinToString().escapeMarkdown()
-        val imgUrl = body.getElementsByTag("img").attr("src")
-        val videoUrl = body.getElementsByTag("video").attr("src")
-        val quote = body.getElementsByTag("quote")
-
-        val author = quote.first()?.getElementsByTag("author")
-        val quoteName = author?.attr("name")?.escapeMarkdown() ?: ""
-        val quoteId = author?.attr("id") ?: ""
-        val quoteTitle = if (quoteId.isNotBlank()) "$quoteName($quoteId)" else ""
-        quote.takeIf { it.isNotEmpty() }?.let {
-            text = """
-                ```
-                $quoteTitle
-                ${quote.text()}
-                ```
-                $text
-            """.trimIndent()
-        }
-
-//        val at = body.getElementsByAttribute("at")  //TODO: don't work
+//package kurenai.imsyncbot.bot.satori
+//
+//import com.github.nyayurn.yutori.*
+//import io.ktor.client.call.*
+//import io.ktor.client.request.*
+//import kotlinx.coroutines.Dispatchers
+//import kotlinx.coroutines.withContext
+//import kurenai.imsyncbot.ConfigProperties
+//import kurenai.imsyncbot.bot.telegram.TelegramBot
+//import kurenai.imsyncbot.groupConfigRepository
+//import kurenai.imsyncbot.utils.*
+//import org.jsoup.Jsoup
 //
 //        at.attr("id").toLongOrNull()?.let { atId ->
 //            val atName = at.attr("name")

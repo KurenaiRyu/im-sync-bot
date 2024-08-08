@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -19,6 +20,8 @@ import net.mamoe.mirai.contact.*
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.GroupTempMessageEvent
 import net.mamoe.mirai.message.data.*
+import net.mamoe.mirai.message.data.Image.Key.queryUrl
+import net.mamoe.mirai.message.data.ImageType
 import net.mamoe.mirai.utils.MiraiExperimentalApi
 import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
 import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
@@ -125,7 +128,15 @@ class GroupMessageContext(
 
     private lateinit var readyToSendMessage: ReadyToSendMessage
     private val isTempMessage = event is GroupTempMessageEvent
-    private var _replayToMessageId: Long = -1
+    private val replayToMessageId by lazy {
+        messageChain[QuoteReply.Key]?.let {
+            runBlocking {
+                withIO {
+                    MessageService.findTgIdByQQ(bot.qq.qqBot.id, it.source.targetId, it.source.ids.first())
+                }
+            }
+        }?.tgMsgId ?: 0
+    }
 
     val infoString by lazy { "[${group.name}(${this.group.id})]" }
     val simpleContent: String = messageChain.contentToString()
@@ -135,17 +146,6 @@ class GroupMessageContext(
         bot.groupConfigService.qqTg[group.id] ?: bot.groupConfigService.defaultTgGroup
     }
     val normalType: Normal by lazy { Normal() }
-
-    suspend fun getReplayToMessageId(): Long {
-        if (_replayToMessageId < 0) {
-            _replayToMessageId = messageChain[QuoteReply.Key]?.let {
-                withIO {
-                    MessageService.findTgIdByQQ(bot.qq.qqBot.id, it.source.targetId, it.source.ids.first())
-                }
-            }?.tgMsgId ?: 0
-        }
-        return _replayToMessageId
-    }
 
     fun getReadyToSendMessage() = if (::readyToSendMessage.isInitialized) readyToSendMessage
     else handleType(messageChain).also { readyToSendMessage = it }
@@ -208,11 +208,11 @@ class GroupMessageContext(
         for (msg in messageChain) {
             if (msg is At) {
                 val target = msg.target
-                if (getReplayToMessageId() > 0 && target == group.bot.id) continue
+                if (replayToMessageId > 0 && target == group.bot.id) continue
                 if (target == lastAt) continue
                 else lastAt = target
                 val id: Long?
-                content += if (target == group.bot.id && getReplayToMessageId() <= 0) {
+                content += if (target == group.bot.id && replayToMessageId <= 0) {
                     bot.userConfigService.masterUsername.ifBlank { bot.userConfigService.masterTg.toString() }.let {
                         "[${it.formatUsername().escapeMarkdown()}](tg://user?id=${bot.configProperties.bot.masterOfTg})"
                     }
@@ -248,7 +248,7 @@ class GroupMessageContext(
             bot.tg.sendMessageText(
                 url?.escapeMarkdown()?.formatMsg(senderId, senderName)?.fmt() ?: simpleContent.asFmtText(),
                 chatId,
-                replayToMessageId = getReplayToMessageId(),
+                replayToMessageId = replayToMessageId,
                 untilPersistent = true
             )
         )
@@ -261,7 +261,7 @@ class GroupMessageContext(
             bot.tg.sendMessageText(
                 url?.escapeMarkdown()?.formatMsg(senderId, senderName)?.fmt() ?: simpleContent.asFmtText(),
                 chatId,
-                replayToMessageId = getReplayToMessageId(),
+                replayToMessageId = replayToMessageId,
                 untilPersistent = true
             )
         )
@@ -273,7 +273,7 @@ class GroupMessageContext(
         private var fileSize: Long = 0L
 
         override suspend fun send(): Array<TdApi.Message> {
-            val inputFile = FileService.download(image)
+            val inputFile = FileService.download(image.queryUrl())
 
 
             return if (inputFile is InputFileLocal) {
@@ -330,7 +330,7 @@ class GroupMessageContext(
 
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
+                this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
                 this.inputMessageContent = if (isGif) {
                     InputMessageAnimation().apply {
                         this.caption = content.caption
@@ -355,7 +355,7 @@ class GroupMessageContext(
                     }
                 }
                 CoroutineScope(bot.coroutineContext).launch {
-                    FileService.cacheEmoji(image, it)
+                    FileService.cacheImage(image, it)
                 }
             })
         }
@@ -401,7 +401,7 @@ class GroupMessageContext(
             val formattedText = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
             val func = SendMessageAlbum().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
+                this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
                 this.inputMessageContents = buildContents().also {
                     when (val last = it.last()) {
                         is InputMessageDocument -> {
@@ -418,7 +418,7 @@ class GroupMessageContext(
             }
             return bot.tg.send(func, untilPersistent = true).messages.also {
                 CoroutineScope(bot.coroutineContext).launch {
-                    FileService.cacheEmoji(images, it)
+                    FileService.cacheImage(images, it)
                 }
             }
         }
@@ -441,18 +441,17 @@ class GroupMessageContext(
         override suspend fun send(): Array<TdApi.Message> {
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
+                this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
                 this.inputMessageContent = buildContent()
             }
             return arrayOf(bot.tg.send(func, untilPersistent = true).also {
                 CoroutineScope(bot.coroutineContext).launch {
-                    FileService.cacheEmoji(image, it)
+                    FileService.cacheImage(image, it)
                 }
             })
         }
 
         private suspend fun buildContent(): InputMessageContent {
-            getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
             val file = FileService.download(image, "gif")
             return InputMessageAnimation().apply {
                 this.caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
@@ -467,7 +466,7 @@ class GroupMessageContext(
             val url = shortVideo.urlForDownload
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
+                this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
                 this.inputMessageContent = InputMessageVideo().apply {
                     this.caption = "${shortVideo.filename}.${shortVideo.fileFormat}"
                         .escapeMarkdown().formatMsg(senderId, senderName).fmt()
@@ -485,7 +484,7 @@ class GroupMessageContext(
             require(url != null) { "获取视频地址失败" }
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this@GroupMessageContext.getReplayToMessageId().takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
+                this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
                 this.inputMessageContent = InputMessageVideo().apply {
                     this.caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
                     this.video = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
@@ -558,7 +557,7 @@ class GroupMessageContext(
             bot.tg.sendMessageText(
                 getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt(),
                 chatId,
-                getReplayToMessageId(),
+                replayToMessageId,
                 untilPersistent = true
             )
         )

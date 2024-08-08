@@ -28,8 +28,8 @@ import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.PlainText
 import net.mamoe.mirai.message.data.ids
 import net.mamoe.mirai.message.data.source
-import net.mamoe.mirai.utils.ConcurrentHashMap
 import top.mrxiaom.overflow.BotBuilder
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
 
 class QQBot(

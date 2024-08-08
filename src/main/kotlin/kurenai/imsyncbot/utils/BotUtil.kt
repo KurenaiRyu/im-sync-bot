@@ -75,8 +75,8 @@ object BotUtil {
         onlyCache: Boolean = false,
         overwrite: Boolean = false
     ): Path {
-        val image = Path.of(getImagePath(filename))
-        return download(image, url, onlyCache, overwrite)
+        val path = Path.of(getImagePath(filename))
+        return download(path, url, onlyCache, overwrite)
     }
 
     suspend fun downloadImg(
@@ -86,7 +86,12 @@ object BotUtil {
     ): Path {
         val image = Path.of(getImagePath(snowFlake.nextAlpha()))
         val tmpPath = download(image, url, onlyCache, false)
-        val path = Path.of(getImagePath(tmpPath.crc32c() + if (ext.isNotBlank()) ".$ext" else ""))
+        val type = ImageUtil.determineImageType(tmpPath)
+        val e = if (type != ImageUtil.ImageType.UNKNOWN) {
+            type.ext
+        } else ext
+
+        val path = Path.of(getImagePath(tmpPath.crc32c() + if (e.isNotBlank()) ".$e" else ""))
         if (path.exists()) tmpPath.deleteExisting()
         else {
             withContext(Dispatchers.IO) {

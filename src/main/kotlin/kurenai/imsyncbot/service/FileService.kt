@@ -1,15 +1,22 @@
 package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
+import it.tdlight.jni.TdApi.InputFile
 import it.tdlight.jni.TdApi.InputFileLocal
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.domain.FileCache
 import kurenai.imsyncbot.fileCacheRepository
 import kurenai.imsyncbot.utils.*
+import kurenai.imsyncbot.utils.BotUtil.getImagePath
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.utils.MiraiInternalApi
-import kotlin.io.path.pathString
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.*
 import kotlin.jvm.optionals.getOrNull
 
 /**
@@ -19,7 +26,6 @@ import kotlin.jvm.optionals.getOrNull
 
 object FileService {
 
-    @OptIn(MiraiInternalApi::class)
     suspend fun download(image: Image, ext: String = "png") = withIO {
 //        fileCacheRepository.findById(image.md5.toHex()).getOrNull()?.let {
 //            InputFileRemote(it.fileId)
@@ -31,15 +37,9 @@ object FileService {
 //                ).pathString
 //            )
 //        }
-        val path = BotUtil.downloadImg(image.queryUrl(), ext)
-        fileCacheRepository.findById(path.crc32c()).getOrNull()?.let {
-            TdApi.InputFileRemote(it.fileId)
-        } ?: run {
-            InputFileLocal(path.pathString)
-        }
+        download(image.queryUrl())
     }
 
-    @OptIn(MiraiInternalApi::class)
     suspend fun download(images: Iterable<Image>) = channelFlow {
 //        val imgMap = images.associateBy { it.md5.toHex() }.toMutableMap()
 //        val caches = withIO { fileCacheRepository.findAllById(imgMap.keys) }
@@ -54,19 +54,52 @@ object FileService {
 //        }
 
         images.forEach {
-            send(InputFileLocal(BotUtil.downloadImg(it.queryUrl()).pathString))
+            send(download(it.queryUrl()))
         }
     }
 
+    suspend fun download(url: String, ext: String = "png") = withIO {
+        val localFile = !url.startsWith("http")
+
+        val tmpPath =
+            if (localFile) URI.create(url).toPath()
+            else BotUtil.downloadImg(url, ext)
+        val crc32c = tmpPath.crc32c()
+
+        fileCacheRepository.findById(crc32c).getOrNull()?.let {
+            return@withIO ImageInfo(crc32c, url, TdApi.InputFileRemote(it.fileId), ImageUtil.ImageType.valueOf(it.fileType))
+        }
+
+        // return if image has extension
+        val tmpExt = tmpPath.name.substringAfterLast(".")
+        if (tmpExt.isNotEmpty()) {
+            val type = ImageUtil.ImageType.values().find { it.ext == tmpExt }?: ImageUtil.ImageType.UNKNOWN
+            return@withIO ImageInfo(crc32c, url, InputFileLocal(tmpPath.pathString), type)
+        }
+
+        val type = ImageUtil.determineImageType(tmpPath)
+        val extension =
+            if (type != ImageUtil.ImageType.UNKNOWN) type.ext
+            else tmpExt.ifBlank { "png" }
+
+
+        val path = Path.of(getImagePath("$crc32c.$extension"))
+        if (!path.exists()) {
+            withContext(Dispatchers.IO) {
+                Files.move(tmpPath, path)
+            }
+        }
+        ImageInfo(crc32c, url, InputFileLocal(path.pathString), type)
+    }
+
     @OptIn(MiraiInternalApi::class)
-    suspend fun cacheEmoji(images: List<Image>, messages: Array<TdApi.Message>) {
+    suspend fun cacheImage(images: List<Image>, messages: Array<TdApi.Message>) {
         withIO {
             messages.mapIndexedNotNull { index, message ->
                 val image = images[index]
-                if (image.isEmoji.not()) return@mapIndexedNotNull null
                 message.content.file()?.let {
                     FileCache().apply {
-                        this.id = image.md5.toHex()
+                        this.id = image.imageId
                         this.fileId = it.remote.id
                         this.fileType = image.imageType.formatName
                     }
@@ -78,12 +111,12 @@ object FileService {
     }
 
     @OptIn(MiraiInternalApi::class)
-    suspend fun cacheEmoji(image: Image, message: TdApi.Message) {
+    suspend fun cacheImage(image: Image, message: TdApi.Message) {
         if (image.isEmoji.not()) return
-        cacheEmoji(image.md5.toHex(), message, image.imageType.formatName)
+        cacheImage(image.md5.toHex(), message, image.imageType.formatName)
     }
 
-    private suspend fun cacheEmoji(md5Hex: String, message: TdApi.Message, fileType: String? = null) {
+    private suspend fun cacheImage(md5Hex: String, message: TdApi.Message, fileType: String? = null) {
         withIO {
             message.content.file()?.remote?.id?.takeIf { it.isNotBlank() }?.let { fileId ->
                 val exist = fileCacheRepository.findById(md5Hex).orElse(null)
@@ -104,4 +137,10 @@ object FileService {
         }
     }
 
+    data class ImageInfo(
+        val id: String,
+        val url: String,
+        val inputFile: InputFile,
+        val type: ImageUtil.ImageType
+    )
 }

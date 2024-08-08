@@ -1,7 +1,6 @@
 package kurenai.imsyncbot
 
 import kotlinx.serialization.Serializable
-import net.mamoe.mirai.utils.BotConfiguration
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.net.Proxy
 
@@ -52,7 +51,6 @@ data class QQProperties(
     val token: String = "",
     val account: Long = 0L,
     val password: String = "",
-    val protocol: BotConfiguration.MiraiProtocol = BotConfiguration.MiraiProtocol.ANDROID_PAD,
 )
 
 @Serializable

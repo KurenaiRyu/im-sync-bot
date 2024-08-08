@@ -5,13 +5,13 @@ plugins {
     id("org.springframework.boot") version "3.1.0"
     id("io.spring.dependency-management") version "1.1.0"
     id("io.freefair.lombok") version "8.1.0"
-    kotlin("jvm") version "1.9.24"
-    kotlin("plugin.spring") version "1.9.24"
-    kotlin("plugin.lombok") version "1.9.24"
-    kotlin("plugin.serialization") version "1.9.24"
-    kotlin("plugin.allopen") version "1.9.24"
-    kotlin("plugin.noarg") version "1.9.24"
-    kotlin("plugin.jpa") version "1.9.24"
+    kotlin("jvm") version "2.0.0"
+    kotlin("plugin.spring") version "2.0.0"
+    kotlin("plugin.lombok") version "2.0.0"
+    kotlin("plugin.serialization") version "2.0.0"
+    kotlin("plugin.allopen") version "2.0.0"
+    kotlin("plugin.noarg") version "2.0.0"
+    kotlin("plugin.jpa") version "2.0.0"
     jacoco
 }
 
@@ -81,6 +81,7 @@ dependencies {
     implementation("org.jetbrains.kotlin", "kotlin-reflect")
     implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.5.1")
 
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-configuration-processor")
@@ -99,7 +100,7 @@ dependencies {
 //    implementation(fileTree("libs"))
 
     //exif
-    implementation("com.ashampoo:kim:0.18.2")
+    implementation("com.ashampoo:kim:0.18.4")
 
     compileOnly("org.projectlombok:lombok:${Versions.LOMBOK}")
     annotationProcessor("org.projectlombok:lombok:${Versions.LOMBOK}")
@@ -118,8 +119,9 @@ dependencies {
 
     //mirai
     implementation(platform("net.mamoe:mirai-bom:${Versions.MIRAI}"))
-    implementation("net.mamoe:mirai-core")
-    implementation("net.mamoe:mirai-core-utils")
+    implementation("net.mamoe:mirai-core-api")
+//    implementation("net.mamoe:mirai-core")
+//    implementation("net.mamoe:mirai-core-utils")
     implementation("top.mrxiaom:overflow-core:2.16+")
 
     //tdlib
