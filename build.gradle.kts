@@ -19,18 +19,6 @@ group = "moe.kurenai.bot"
 version = "0.0.1-SNAPSHOT"
 
 repositories {
-    mavenLocal {
-        content {
-            includeGroup("com.github.Nyayurn")
-            includeGroup("top.mrxiaom")
-        }
-    }
-    maven {
-        url = uri("https://jitpack.io")
-        content {
-            includeGroup("com.github.Nyayurn.Yutori-Next")
-        }
-    }
     mavenCentral()
     exclusiveContent {
         forRepository {
@@ -92,9 +80,6 @@ dependencies {
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.2")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2")
 
-//    implementation("com.github.Nyayurn.Yutori-Next:Yutori-Next:master-SNAPSHOT")
-    implementation("com.github.Nyayurn:Yutori-Next-jvm:master-SNAPSHOT")
-
 //    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
 //    implementation(files("libs/unidbg-fix.jar"))
 //    implementation(fileTree("libs"))
@@ -121,7 +106,7 @@ dependencies {
     implementation(platform("net.mamoe:mirai-bom:${Versions.MIRAI}"))
     implementation("net.mamoe:mirai-core-api")
 //    implementation("net.mamoe:mirai-core")
-//    implementation("net.mamoe:mirai-core-utils")
+    implementation("net.mamoe:mirai-core-utils")
     implementation("top.mrxiaom:overflow-core:2.16+")
 
     //tdlib
