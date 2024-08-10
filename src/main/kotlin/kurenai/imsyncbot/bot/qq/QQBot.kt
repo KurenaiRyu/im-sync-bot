@@ -38,6 +38,10 @@ class QQBot(
 ) : CoroutineScope {
 
     companion object {
+        init {
+            LocalFileService.register()
+        }
+
         private val log = getLogger()
     }
 
