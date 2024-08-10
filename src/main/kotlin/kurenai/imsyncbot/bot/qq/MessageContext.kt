@@ -21,7 +21,6 @@ import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.GroupTempMessageEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
-import net.mamoe.mirai.message.data.ImageType
 import net.mamoe.mirai.utils.MiraiExperimentalApi
 import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
 import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
@@ -32,7 +31,6 @@ import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 import java.nio.file.Path
 import kotlin.io.path.fileSize
-import kotlin.io.path.inputStream
 import kotlin.io.path.pathString
 
 /**
@@ -44,10 +42,6 @@ sealed class MessageContext(
     val entity: QQMessage?,
     val bot: ImSyncBot
 ) {
-
-    companion object {
-        val GIF_BYTEARRAY = byteArrayOf(0x47, 0x49, 0x46, 0x38)
-    }
 
     private var tgMsgFormat =
         if (bot.configProperties.bot.tgMsgFormat.contains("\$msg")) bot.configProperties.bot.tgMsgFormat else "\$name: \$msg"
@@ -273,7 +267,7 @@ class GroupMessageContext(
         private var fileSize: Long = 0L
 
         override suspend fun send(): Array<TdApi.Message> {
-            val inputFile = FileService.download(image.queryUrl())
+            val (id, url, inputFile, type) = FileService.download(image.queryUrl())
 
 
             return if (inputFile is InputFileLocal) {
@@ -289,7 +283,7 @@ class GroupMessageContext(
 //                }
                 runCatching {
                     fileSize = Path.of(inputFile.path).fileSize()
-                    sendFileMessage(inputFile)
+                    sendFileMessage(id, inputFile, type)
                 }.recover { ex ->
                     throw ex
 //                    log.warn("Send image failed", ex)
@@ -315,23 +309,22 @@ class GroupMessageContext(
 //                    messages
                 }.getOrThrow()
             } else {
-                sendFileMessage(inputFile)
+                sendFileMessage(id, inputFile, type)
             }
         }
 
-        private suspend fun sendFileMessage(inputFile: InputFile): Array<TdApi.Message> {
+        private suspend fun sendFileMessage(
+            id: String,
+            inputFile: InputFile,
+            type: ImageUtil.ImageType
+        ): Array<TdApi.Message> {
             val content = buildFileMessageContent(inputFile)
             val file = content.photo
-            val isGif: Boolean = if (file is InputFileLocal) {
-                val buff = ByteArray(4)
-                Path.of(file.path).inputStream().read(buff, 0, buff.size)
-                GIF_BYTEARRAY.contentEquals(buff)
-            } else false
 
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
-                this.inputMessageContent = if (isGif) {
+                this.inputMessageContent = if (type == ImageUtil.ImageType.GIF) {
                     InputMessageAnimation().apply {
                         this.caption = content.caption
                         this.animation = content.photo
@@ -339,23 +332,23 @@ class GroupMessageContext(
                 } else content
             }
             return arrayOf(bot.tg.send(untilPersistent = true, function = func).also {
-
-                if (!isGif && shouldBeFile && fileSize > 800 * 1024) {
-                    CoroutineScope(bot.coroutineContext).launch {
-                        func.apply {
-                            this.replyTo = MessageReplyToMessage().apply {
-                                this.chatId = it.chatId
-                                this.messageId = it.id
-                            }
-                            this.inputMessageContent = InputMessageDocument().apply {
-                                this.document = content.photo
-                            }
-                        }
-                        bot.tg.send(function = func)
-                    }
-                }
+                // Send file if necessary
+//                if (!isGif && shouldBeFile && fileSize > 800 * 1024) {
+//                    CoroutineScope(bot.coroutineContext).launch {
+//                        func.apply {
+//                            this.replyTo = MessageReplyToMessage().apply {
+//                                this.chatId = it.chatId
+//                                this.messageId = it.id
+//                            }
+//                            this.inputMessageContent = InputMessageDocument().apply {
+//                                this.document = content.photo
+//                            }
+//                        }
+//                        bot.tg.send(function = func)
+//                    }
+//                }
                 CoroutineScope(bot.coroutineContext).launch {
-                    FileService.cacheImage(image, it)
+                    FileService.cacheImage(id, it, type.toString())
                 }
             })
         }
@@ -366,17 +359,6 @@ class GroupMessageContext(
             } else {
                 getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
             }.fmt()
-//            return if (shouldBeFile && fileSize > 300 * 1024) {
-//                InputMessageDocument().apply {
-//                    this.caption = caption
-//                    document = file
-//                }
-//            } else {
-//                InputMessagePhoto().apply {
-//                    this.caption = caption
-//                    photo = file
-//                }
-//            }
             return InputMessagePhoto().apply {
                     this.caption = caption
                     photo = file
@@ -424,11 +406,11 @@ class GroupMessageContext(
         }
 
         private suspend fun buildContents(): Array<InputMessageContent> {
-            return FileService.download(images).map { file ->
+            return FileService.download(images).map { info ->
                 if (shouldBeFile) InputMessageDocument().apply {
-                    this.document = file
+                    this.document = info.inputFile
                 } else InputMessagePhoto().apply {
-                    this.photo = file
+                    this.photo = info.inputFile
                 }
             }.toList().toTypedArray()
         }
@@ -439,23 +421,23 @@ class GroupMessageContext(
     ) : ReadyToSendMessage {
 
         override suspend fun send(): Array<TdApi.Message> {
+            val info = FileService.download(image, "gif")
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
                 this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.setReplyToMessageId(it) }
-                this.inputMessageContent = buildContent()
+                this.inputMessageContent = buildGifContent(info.inputFile)
             }
             return arrayOf(bot.tg.send(func, untilPersistent = true).also {
                 CoroutineScope(bot.coroutineContext).launch {
-                    FileService.cacheImage(image, it)
+                    FileService.cacheImage(info.id, it, info.type.toString())
                 }
             })
         }
 
-        private suspend fun buildContent(): InputMessageContent {
-            val file = FileService.download(image, "gif")
+        private suspend fun buildGifContent(inputFile: InputFile): InputMessageContent {
             return InputMessageAnimation().apply {
                 this.caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
-                animation = file
+                animation = inputFile
             }
         }
     }

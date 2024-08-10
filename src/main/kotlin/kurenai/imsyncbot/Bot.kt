@@ -53,7 +53,7 @@ suspend fun start() {
 }
 
 fun commonInit() {
-//    registerTgCommand()
+    registerTgCommand()
 //    registerQQCommand()
     //TODO: 设置 inline 命令
 //    registerInlineCommand()

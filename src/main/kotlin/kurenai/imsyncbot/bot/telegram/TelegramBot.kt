@@ -167,7 +167,7 @@ class TelegramBot(
             replayToMessageId?.let { this.setReplyToMessageId(it) }
             messageThreadId?.let { this.messageThreadId = it }
             this.inputMessageContent = InputMessagePhoto().apply {
-                this.photo = FileService.download(url)
+                this.photo = FileService.download(url).inputFile
                 this.caption = formattedText
             }
         }

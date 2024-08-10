@@ -9,6 +9,7 @@ import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.Running
 import kurenai.imsyncbot.command.CommandDispatcher
 import kurenai.imsyncbot.exception.BotException
+import kurenai.imsyncbot.exception.CommandException
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.qqTgRepository
 import kurenai.imsyncbot.service.MessageService
@@ -75,7 +76,11 @@ class TgMessageHandler(
                 is UpdateMessageContent -> bot.tg.getMessage(update.chatId, update.messageId)
                 else -> null
             }?.let {
-                bot.tg.sendError(it, ex)
+                if (ex is CommandException) {
+                    bot.tg.sendError(it, ex, topic = "Command Error")
+                } else {
+                    bot.tg.sendError(it, ex)
+                }
             }
         }
     }

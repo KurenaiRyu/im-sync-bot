@@ -16,7 +16,10 @@ import net.mamoe.mirai.utils.MiraiInternalApi
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.*
+import kotlin.io.path.exists
+import kotlin.io.path.name
+import kotlin.io.path.pathString
+import kotlin.io.path.toPath
 import kotlin.jvm.optionals.getOrNull
 
 /**
@@ -110,27 +113,21 @@ object FileService {
         }
     }
 
-    @OptIn(MiraiInternalApi::class)
-    suspend fun cacheImage(image: Image, message: TdApi.Message) {
-        if (image.isEmoji.not()) return
-        cacheImage(image.md5.toHex(), message, image.imageType.formatName)
-    }
-
-    private suspend fun cacheImage(md5Hex: String, message: TdApi.Message, fileType: String? = null) {
+    suspend fun cacheImage(id: String, message: TdApi.Message, type: String? = null) {
         withIO {
             message.content.file()?.remote?.id?.takeIf { it.isNotBlank() }?.let { fileId ->
-                val exist = fileCacheRepository.findById(md5Hex).orElse(null)
-                if (exist != null && (exist.fileId != fileId || exist.fileType != fileType)) {
+                val exist = fileCacheRepository.findById(id).orElse(null)
+                if (exist != null && (exist.fileId != fileId || exist.fileType != type.toString())) {
                     exist.fileId = fileId
-                    exist.fileType = fileType
+                    exist.fileType = type.toString()
                     fileCacheRepository.save(exist)
                 }
                 if (exist == null) {
                     fileCacheRepository.save(
                         FileCache().apply {
-                            this.id = md5Hex
+                            this.id = id
                             this.fileId = fileId
-                            this.fileType = fileType
+                            this.fileType = type.toString()
                         })
                 }
             }
