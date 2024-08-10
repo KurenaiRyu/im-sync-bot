@@ -3,21 +3,16 @@ package kurenai.imsyncbot.service
 import it.tdlight.jni.TdApi
 import kotlinx.serialization.json.Json
 import kurenai.imsyncbot.domain.QQMessage
-import kurenai.imsyncbot.domain.QQMessageType
 import kurenai.imsyncbot.domain.QQTg
-import kurenai.imsyncbot.domain.getLocalDateTime
-import kurenai.imsyncbot.imSyncBot
 import kurenai.imsyncbot.qqMessageRepository
 import kurenai.imsyncbot.qqTgRepository
+import kurenai.imsyncbot.utils.BotUtil.toEntity
+import kurenai.imsyncbot.utils.BotUtil.toSource
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.event.events.MessageRecallEvent
 import net.mamoe.mirai.message.MessageReceipt
-import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageSource
-import net.mamoe.mirai.message.data.MessageSourceBuilder
-import net.mamoe.mirai.message.data.source
-import net.mamoe.mirai.message.sourceMessage
 import kotlin.jvm.optionals.getOrNull
 
 
@@ -26,17 +21,6 @@ object MessageService {
     private val log = getLogger()
     private val messageJson = Json {
         ignoreUnknownKeys = true
-    }
-
-    fun serializeToJson(origin: MessageSource): String {
-        val source = MessageSourceBuilder()
-            .metadata(origin)
-            .build(imSyncBot.qq.qqBot.id, origin.kind)
-        return messageJson.encodeToString(MessageSource.serializer(), source)
-    }
-
-    fun deserializeFromJson(json: String): MessageSource {
-        return messageJson.decodeFromString(MessageSource.serializer(), json)
     }
 
     suspend fun save(message: QQMessage) = runCatching {
@@ -53,22 +37,13 @@ object MessageService {
      * @param messageChain
      * @param messages
      */
-    suspend fun cache(entity: QQMessage?, messageChain: MessageChain, messages: Array<TdApi.Message>? = null) =
+    suspend fun cache(entity: QQMessage?, source: MessageSource, messages: Array<TdApi.Message>? = null) =
         runCatching {
             withIO {
                 val qqMsg = qqMessageRepository.save(
                     entity?.apply {
                         handled = true
-                    } ?: QQMessage().apply {
-                        messageId = messageChain.source.ids[0]
-                        botId = messageChain.source.botId
-                        target = messageChain.source.targetId
-                        sender = messageChain.source.fromId
-                        type = QQMessageType.GROUP
-                        json = serializeToJson(messageChain.source)
-                        handled = true
-                        msgTime = messageChain.source.getLocalDateTime()
-                    }
+                    } ?: source.toEntity(true)
                 )
                 messages?.map {
                     QQTg().apply {
@@ -91,7 +66,7 @@ object MessageService {
      * @param message
      */
     suspend fun cache(receipt: MessageReceipt<*>, message: TdApi.Message) {
-        cache(null, receipt.sourceMessage.plus(receipt.source), arrayOf(message))
+        cache(null, receipt.source, arrayOf(message))
     }
 
     suspend fun findTgIdByQQ(botId: Long, targetId: Long, msgId: Int): QQTg? {
@@ -130,9 +105,7 @@ object MessageService {
         return withIO {
             qqTgRepository.findByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
                 qqMessageRepository.findById(it.qqId).getOrNull()
-            }?.let {
-                deserializeFromJson(it.json)
-            }
+            }?.toSource()
         }
     }
 

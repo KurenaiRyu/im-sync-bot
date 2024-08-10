@@ -5,7 +5,8 @@ import kurenai.imsyncbot.configuration.annotation.SnowFlakeGenerator;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.FieldNameConstants;
+import net.mamoe.mirai.message.data.MessageSourceKind;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDateTime;
 
@@ -30,19 +31,18 @@ import java.time.LocalDateTime;
 public class QQMessage {
     @Id
     @SnowFlakeGenerator
-    Long id;
-    Integer messageId;
-    Long botId;
-    Long objId;
-    Long sender;
-    Long target;
-    QQMessageType type;
-    @Column(name = "JSON_TXT")
-    @Lob
-    String json;
-    Boolean handled;
-    LocalDateTime msgTime;
+    private Long id;
+    private Integer messageId;
+    private Long botId;
+    private Long objId;
+    private Long fromId;
+    private Long targetId;
+    @Enumerated(EnumType.STRING)
+    private MessageSourceKind type;
+    private Boolean handled;
+    private LocalDateTime time;
     @Version
-    @Column(columnDefinition = "default 0")
-    Integer version;
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private Integer version;
 }

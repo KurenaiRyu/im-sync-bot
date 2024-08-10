@@ -196,7 +196,7 @@ class GroupMessageContext(
      *
      * @return
      */
-    private suspend fun getContentWithAtAndWithoutImage(): String {
+    private fun getContentWithAtAndWithoutImage(): String {
         var lastAt: Long? = null
         var content = ""
         for (msg in messageChain) {

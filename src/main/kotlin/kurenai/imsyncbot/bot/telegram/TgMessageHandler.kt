@@ -14,6 +14,7 @@ import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.qqTgRepository
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
+import kurenai.imsyncbot.utils.BotUtil.toSource
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
@@ -47,7 +48,7 @@ class TgMessageHandler(
     }
 
     //TODO: Save telegram message
-    fun handle(update: Update) = bot.tg.launch(CoroutineName(update.idString())) {//TODO: 看起来这里每次都new一个 coroutine ？
+    fun handle(update: Update) = bot.tg.launch(CoroutineName(update.idString())) {
         TelegramBot.log.trace("Incoming update: {}", update.toString().trim())
         val status = bot.tg.status.value
         if (status != Running) {
@@ -87,7 +88,7 @@ class TgMessageHandler(
 
     private suspend fun doHandle(update: Update) {
 
-        if (traceEnabled.not()) logSimpleLog(update)
+        if (traceEnabled.not()) simpleLog(update)
 
         handleListener(update)
 
@@ -129,7 +130,7 @@ class TgMessageHandler(
 
                 if (update.isPermanent) {
                     MessageService.findQQMessageByDelete(update).map {
-                        MessageService.deserializeFromJson(it.json)
+                        it.toSource()
                     }.filter { //保证只撤回bot的
                         it.fromId == bot.qq.qqBot.id
                     }.forEach {
@@ -166,7 +167,7 @@ class TgMessageHandler(
         }
     }
 
-    private fun logSimpleLog(update: Update) {
+    private fun simpleLog(update: Update) {
 
         when (update) {
             is UpdateNewInlineQuery -> {
@@ -468,12 +469,10 @@ class TgMessageHandler(
             else -> null
         }?.let {
             runCatching {
-                if (it.sourceIds.isEmpty()) {
-                    throw BotException("回执消息为空，可能被风控")
-                } else {
-                    bot.tg.launch {
-                        MessageService.cache(it, message)
-                    }
+                if (it.sourceIds.isEmpty()) throw BotException("回执消息为空，可能被风控")
+
+                bot.tg.launch {
+                    MessageService.cache(it, message)
                 }
             }.onFailure {
                 log.warn("Cache message error", it)

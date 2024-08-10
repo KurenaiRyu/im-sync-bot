@@ -13,11 +13,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
-import kurenai.imsyncbot.domain.QQMessage
-import kurenai.imsyncbot.domain.QQMessageType
-import kurenai.imsyncbot.domain.getLocalDateTime
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.service.MessageService
+import kurenai.imsyncbot.utils.BotUtil.toEntity
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.launchWithPermit
 import net.mamoe.mirai.Bot
@@ -26,8 +24,6 @@ import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.PlainText
-import net.mamoe.mirai.message.data.ids
-import net.mamoe.mirai.message.data.source
 import top.mrxiaom.overflow.BotBuilder
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
@@ -188,25 +184,12 @@ class QQBot(
         try {
             when (event) {
                 is MessageEvent -> {
-                    val json = MessageService.serializeToJson(event.message.source)
+                    val message = event.source.toEntity()
+                    CoroutineScope(Dispatchers.IO).launch {
+                        MessageService.save(message)
+                    }
                     when (event) {
                         is FriendMessageEvent -> {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                MessageService.save(
-                                    QQMessage().apply {
-                                        messageId = event.message.ids[0]
-                                        botId = event.bot.id
-                                        objId = event.subject.id
-                                        sender = event.sender.id
-                                        target = event.source.targetId
-                                        type = QQMessageType.FRIEND
-                                        this.json = json
-                                        handled = false
-                                        msgTime = event.source.getLocalDateTime()
-                                    }
-                                )
-                            }
-
 //                            bot.qqMessageHandler.onFriendMessage(
 //                                PrivateMessageContext(
 //                                    message,
@@ -218,21 +201,6 @@ class QQBot(
                         }
 
                         is GroupTempMessageEvent -> {
-                            val message = QQMessage().apply {
-                                this.messageId = event.message.ids[0]
-                                this.botId = event.bot.id
-                                this.objId = event.subject.id
-                                this.sender = event.sender.id
-                                this.target = event.source.targetId
-                                this.type = QQMessageType.GROUP_TEMP
-                                this.json = json
-                                this.handled = false
-                                this.msgTime = event.source.getLocalDateTime()
-                            }
-                            CoroutineScope(Dispatchers.IO).launch {
-                                MessageService.save(message)
-                            }
-
                             bot.qqMessageHandler.onGroupMessage(
                                 GroupMessageContext(
                                     message,
@@ -245,22 +213,6 @@ class QQBot(
                         }
 
                         is GroupAwareMessageEvent -> {
-                            val message = QQMessage().apply {
-                                this.messageId = event.message.ids[0]
-                                this.botId = event.bot.id
-                                this.objId = event.subject.id
-                                this.sender = event.sender.id
-                                this.target = event.source.targetId
-                                this.type = QQMessageType.GROUP
-                                this.json = json
-                                this.handled = false
-                                this.msgTime = event.source.getLocalDateTime()
-                            }
-
-                            CoroutineScope(Dispatchers.IO).launch {
-                                MessageService.save(message)
-                            }
-
                             bot.qqMessageHandler.onGroupMessage(
                                 GroupMessageContext(
                                     message,

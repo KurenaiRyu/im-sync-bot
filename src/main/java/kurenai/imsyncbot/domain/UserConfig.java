@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.FieldNameConstants;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.util.HashSet;
 
@@ -33,10 +34,10 @@ public class UserConfig {
     private Long tg;
     private Long qq;
     private String bindingName;
-    //TODO: AttributeConverter 是否在Hibernate reactive 生效
     private HashSet<UserStatus> status;
     @Version
-    @Column(columnDefinition = "integer default 0")
+    @Column(nullable = false)
+    @ColumnDefault("0")
     private Integer version;
 
 }

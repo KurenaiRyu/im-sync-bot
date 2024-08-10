@@ -5,7 +5,7 @@ import kurenai.imsyncbot.configuration.annotation.SnowFlakeGenerator;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.FieldNameConstants;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * @author Kurenai
@@ -25,12 +25,13 @@ public class QQTg {
 
     @Id
     @SnowFlakeGenerator
-    Long id;
-    Long qqId;
-    Integer qqMsgId;
-    Long tgGrpId;
-    Long tgMsgId;
+    private Long id;
+    private Long qqId;
+    private Integer qqMsgId;
+    private Long tgGrpId;
+    private Long tgMsgId;
     @Version
-    @Column(columnDefinition = "default 0")
-    Integer version;
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private Integer version;
 }

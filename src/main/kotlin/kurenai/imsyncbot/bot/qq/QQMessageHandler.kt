@@ -10,6 +10,7 @@ import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
 import net.mamoe.mirai.contact.remarkOrNameCardOrNick
 import net.mamoe.mirai.event.events.*
+import net.mamoe.mirai.message.data.source
 
 class QQMessageHandler(
     configProperties: ConfigProperties,
@@ -78,7 +79,7 @@ class QQMessageHandler(
                 })
             if (context.entity == null) return@also
             CoroutineScope(bot.coroutineContext).launch {
-                MessageService.cache(context.entity, context.messageChain, messages)
+                MessageService.cache(context.entity, context.messageChain.source, messages)
             }
         }
     }

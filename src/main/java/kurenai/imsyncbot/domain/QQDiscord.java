@@ -10,8 +10,7 @@ import kurenai.imsyncbot.configuration.annotation.SnowFlakeGenerator;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.FieldNameConstants;
-import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(
@@ -29,13 +28,14 @@ public class QQDiscord {
 
     @Id
     @SnowFlakeGenerator
-    Long id;
-    Long qqGrpId;
-    Integer qqMsgId;
-    Long discordChannelId;
-    Long discordMsgId;
+    private Long id;
+    private Long qqGrpId;
+    private Integer qqMsgId;
+    private Long discordChannelId;
+    private Long discordMsgId;
     @Version
-    @Column(columnDefinition = "default 0")
-    Integer version;
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private Integer version;
 
 }

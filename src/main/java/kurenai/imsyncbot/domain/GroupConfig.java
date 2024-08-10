@@ -6,8 +6,7 @@ import kurenai.imsyncbot.service.GroupStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.FieldNameConstants;
-import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.util.HashSet;
 
@@ -32,7 +31,8 @@ public class GroupConfig {
     private Long discordChannelId;
     private HashSet<GroupStatus> status;
     @Version
-    @Column(columnDefinition = "default 0")
-    Integer version;
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private Integer version;
 
 }

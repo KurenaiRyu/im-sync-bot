@@ -4,10 +4,16 @@ import it.tdlight.jni.TdApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
+import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.snowFlake
+import net.mamoe.mirai.message.data.MessageSource
+import net.mamoe.mirai.message.data.MessageSourceBuilder
+import net.mamoe.mirai.utils.toIntOrFail
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import kotlin.io.path.*
 
 
@@ -184,5 +190,35 @@ object BotUtil {
             throw BotException("Mp4 to Gif error")
         }
     }
+
+    ///////////////////////////  message  ///////////////////////////
+
+    fun MessageSource.toEntity(handled: Boolean = false): QQMessage {
+        val source = this
+        return QQMessage().apply {
+            messageId = source.ids[0]
+            botId = source.botId
+            targetId = source.targetId
+            fromId = source.fromId
+            type = source.kind
+            this.handled = handled
+            time = source.localDateTime()
+        }
+    }
+
+    fun QQMessage.toSource(): MessageSource {
+        val entity = this
+        return MessageSourceBuilder().apply {
+            id(entity.messageId)
+            internalId(entity.messageId)
+            fromId = entity.fromId
+            targetId = entity.targetId
+            time = entity.time.atZone(ZoneOffset.ofHours(8)).toEpochSecond().toIntOrFail()
+
+        }.build(entity.botId, entity.type)
+    }
+
+    fun MessageSource.localDateTime(): LocalDateTime =
+        LocalDateTime.ofEpochSecond(this.time.toLong(), 0, ZoneOffset.ofHours(8))
 
 }

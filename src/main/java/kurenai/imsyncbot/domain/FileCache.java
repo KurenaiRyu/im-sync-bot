@@ -1,12 +1,10 @@
 package kurenai.imsyncbot.domain;
 
 import jakarta.persistence.*;
-import kurenai.imsyncbot.configuration.annotation.SnowFlakeGenerator;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.experimental.FieldNameConstants;
-import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.annotations.ColumnDefault;
 
 /**
  * @author Kurenai
@@ -22,10 +20,11 @@ import org.hibernate.annotations.GenericGenerator;
 public class FileCache {
 
     @Id
-    String id;
-    String fileId;
-    String fileType;
+    private String id;
+    private String fileId;
+    private String fileType;
     @Version
-    @Column(columnDefinition = "default 0")
-    Integer version;
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private Integer version;
 }
