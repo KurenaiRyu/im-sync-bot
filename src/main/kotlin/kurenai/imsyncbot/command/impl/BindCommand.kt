@@ -25,7 +25,7 @@ class BindCommand : AbstractTelegramCommand() {
         return if (chat.type.constructor == ChatTypeSupergroup.CONSTRUCTOR
             || chat.type.constructor == ChatTypeBasicGroup.CONSTRUCTOR
         ) {
-            if (message.replyToMessageId() != 0L) {
+            if (message.replyToMessageId() != null) {
                 tg.getMessage(message.replyInChatId()!!, message.replyToMessageId()!!)?.let { replyMessage ->
                     if (param.isNotBlank()) {
                         val user = tg.getUser(replyMessage) ?: return "找不到用户"

@@ -3,6 +3,7 @@ package kurenai.imsyncbot.command
 import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.exception.BotException
+import kurenai.imsyncbot.exception.CommandException
 import kurenai.imsyncbot.getBotOrThrow
 import kurenai.imsyncbot.qqCommands
 import kurenai.imsyncbot.service.Permission
@@ -63,7 +64,9 @@ object CommandDispatcher {
                             parseMode = cmd.parseMode
                         }
                     } catch (e: BotException) {
-                        e.message
+                        throw e
+                    } catch (e: Exception) {
+                        throw CommandException("Execute $command command fail", e)
                     }
                 }
                 break
