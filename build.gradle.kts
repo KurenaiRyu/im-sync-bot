@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -57,7 +58,7 @@ kotlin {
 object Versions {
     const val VERTX_VERSION = "4.2.3"
     const val LOG4J = "2.20.0"
-    const val KTOR = "2.3.0"
+    const val KTOR = "2.3.+"
     const val TD_LIGHT = "3.1.4+td.1.8.17"
     const val MIRAI = "2.16.0-RC"
     const val KORD = "0.9.0"
@@ -80,10 +81,6 @@ dependencies {
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.2")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2")
 
-//    implementation(files("libs/fix-protocol-version-1.8.0.mirai2.jar"))
-//    implementation(files("libs/unidbg-fix.jar"))
-//    implementation(fileTree("libs"))
-
     //exif
     implementation("com.ashampoo:kim:0.18.4")
 
@@ -97,7 +94,7 @@ dependencies {
 //    runtimeOnly("org.xerial:sqlite-jdbc")
 //    runtimeOnly("com.github.gwenn:sqlite-dialect")
 //    runtimeOnly("mysql:mysql-connector-java")
-//    runtimeOnly("org.postgresql:postgresql")
+    runtimeOnly("org.postgresql:postgresql")
 
     //discord
     implementation("dev.kord:kord-core:${Versions.KORD}")
@@ -107,7 +104,7 @@ dependencies {
     implementation("net.mamoe:mirai-core-api")
 //    implementation("net.mamoe:mirai-core")
     implementation("net.mamoe:mirai-core-utils")
-    implementation("top.mrxiaom:overflow-core:2.16+")
+    implementation("top.mrxiaom:overflow-core:2.16.+")
 
     //tdlib
     implementation(platform("it.tdlight:tdlight-java-bom:${Versions.TD_LIGHT}"))
@@ -175,19 +172,19 @@ noArg {
 //}
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions {
+    compilerOptions {
         freeCompilerArgs = listOf(
             "-Xjsr305=strict",
             "-opt-in=kotlin.contracts.ExperimentalContracts",
             "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
         )
-        jvmTarget = JavaVersion.VERSION_17.toString()
         javaParameters = true
+        jvmTarget = JvmTarget.JVM_21
     }
 }
 
