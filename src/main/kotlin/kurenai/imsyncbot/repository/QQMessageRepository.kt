@@ -10,6 +10,6 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface QQMessageRepository : JpaRepository<QQMessage, Long> {
 
-    fun findByBotIdAndObjIdAndMessageId(botId: Long, objId: Long, messageId: Int): QQMessage?
+    fun findByBotIdAndTargetIdAndMessageId(botId: Long, targetId: Long, messageId: Int): QQMessage?
 
 }

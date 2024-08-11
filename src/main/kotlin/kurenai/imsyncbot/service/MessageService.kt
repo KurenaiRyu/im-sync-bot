@@ -12,7 +12,10 @@ import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.event.events.MessageRecallEvent
 import net.mamoe.mirai.message.MessageReceipt
+import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageSource
+import net.mamoe.mirai.message.data.QuoteReply
+import net.mamoe.mirai.message.data.source
 import kotlin.jvm.optionals.getOrNull
 
 
@@ -69,9 +72,23 @@ object MessageService {
         cache(null, receipt.source, arrayOf(message))
     }
 
-    suspend fun findTgIdByQQ(botId: Long, targetId: Long, msgId: Int): QQTg? {
+    suspend fun findRelationByQuote(chain: MessageChain): QQTg? {
+        // QuoteReply's source not contain target info
+        return chain[QuoteReply.Key]?.let {
+            val source = chain.source
+            findRelationByQQ(source)
+        }
+    }
+
+    suspend fun findRelationByQQ(source: MessageSource) =
+        findRelationByQQ(source.botId, source.targetId, source.ids.first())
+
+    suspend fun findRelationByQQ(botId: Long, targetId: Long, msgId: Int): QQTg? {
+        require(botId > 0L) { "Bot id should be greater than to 0" }
+        require(targetId > 0L) { "Target id should be greater than to 0" }
+        require(msgId != 0) { "Message id should bot be 0" }
         return withIO {
-            qqMessageRepository.findByBotIdAndObjIdAndMessageId(botId, targetId, msgId)?.let {
+            qqMessageRepository.findByBotIdAndTargetIdAndMessageId(botId, targetId, msgId)?.let {
                 qqTgRepository.findByQqId(it.id)
             }
         }
@@ -86,7 +103,7 @@ object MessageService {
     }
 
     suspend fun findRelationByRecall(event: MessageRecallEvent.GroupRecall): QQTg? {
-        return findTgIdByQQ(event.bot.id, event.group.id, event.messageIds[0])
+        return findRelationByQQ(event.bot.id, event.group.id, event.messageIds[0])
     }
 
     suspend fun findQQMessageByTg(message: TdApi.Message) = findQQMessageByTg(message.chatId, message.id)

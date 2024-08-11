@@ -123,11 +123,14 @@ class GroupMessageContext(
     private lateinit var readyToSendMessage: ReadyToSendMessage
     private val isTempMessage = event is GroupTempMessageEvent
     private val replayToMessageId by lazy {
-        messageChain[QuoteReply.Key]?.let {
-            runBlocking {
-                withIO {
-                    MessageService.findTgIdByQQ(bot.qq.qqBot.id, it.source.targetId, it.source.ids.first())
-                }
+        runBlocking {
+            // QuoteReply's source not contain target info
+            MessageService.findRelationByQuote(messageChain)?.also {
+                log.info("Find relation: $it")
+                runCatching {
+                    val message = bot.tg.getMessage(it.tgGrpId, it.tgGrpId)
+                    log.info("Find telegram message: $message")
+                }.getOrNull()
             }
         }?.tgMsgId ?: 0
     }
@@ -360,9 +363,9 @@ class GroupMessageContext(
                 getContentWithAtAndWithoutImage().formatMsg(senderId, senderName)
             }.fmt()
             return InputMessagePhoto().apply {
-                    this.caption = caption
-                    photo = file
-                }
+                this.caption = caption
+                photo = file
+            }
         }
 
 
