@@ -7,15 +7,12 @@ import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.exception.BotException
-import kurenai.imsyncbot.getBotOrThrow
 import java.io.InputStream
+import java.net.URI
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.util.concurrent.TimeUnit
-import kotlin.io.path.createDirectories
-import kotlin.io.path.exists
-import kotlin.io.path.fileSize
-import kotlin.io.path.outputStream
+import kotlin.io.path.*
 
 object HttpUtil {
 
@@ -27,8 +24,11 @@ object HttpUtil {
 //        return download(path, tgFile.getFileUrl(getBotOrThrow().tg.token), true, false)
 //    }
 
-    suspend fun download(path: Path, url: String, enableProxy: Boolean = false, overwrite: Boolean) =
-        if (!overwrite && path.exists()) path else doDownload(path, url, enableProxy)
+    suspend fun download(path: Path, url: String, enableProxy: Boolean = false, overwrite: Boolean): Path {
+        return if (!overwrite && path.exists()) path
+        else if (!url.startsWith("http")) URI.create(url).toPath()
+        else doDownload(path, url, enableProxy)
+    }
 
     private suspend fun doDownload(path: Path, url: String, enableProxy: Boolean = false): Path {
         val start = System.nanoTime()
