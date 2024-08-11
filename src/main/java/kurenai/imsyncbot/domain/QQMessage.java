@@ -39,6 +39,9 @@ public class QQMessage {
     private Long targetId;
     @Enumerated(EnumType.STRING)
     private MessageSourceKind type;
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("NORMAL")
+    private MessageStatus status = MessageStatus.NORMAL;
     private Boolean handled;
     private LocalDateTime time;
     @Version
