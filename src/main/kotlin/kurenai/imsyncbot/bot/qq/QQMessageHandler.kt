@@ -79,7 +79,7 @@ class QQMessageHandler(
                 })
             if (context.entity == null) return@also
             CoroutineScope(bot.coroutineContext).launch {
-                MessageService.cache(context.entity, context.messageChain.source, messages)
+                MessageService.cache(context.entity, context.messageChain, messages)
             }
         }
     }

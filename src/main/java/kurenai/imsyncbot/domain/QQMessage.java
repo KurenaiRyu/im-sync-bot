@@ -42,6 +42,9 @@ public class QQMessage {
     @Enumerated(EnumType.STRING)
     @ColumnDefault("NORMAL")
     private MessageStatus status = MessageStatus.NORMAL;
+    @Column(name = "JSON_TXT")
+    @Lob
+    private String json;
     private Boolean handled;
     private LocalDateTime time;
     @Version

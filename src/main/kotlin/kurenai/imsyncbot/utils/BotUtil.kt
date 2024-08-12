@@ -4,12 +4,21 @@ import it.tdlight.jni.TdApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
+import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.snowFlake
+import net.mamoe.mirai.Bot
+import net.mamoe.mirai.event.Event
+import net.mamoe.mirai.event.events.BotEvent
+import net.mamoe.mirai.event.events.MessageEvent
+import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceBuilder
-import net.mamoe.mirai.utils.toIntOrFail
+import net.mamoe.mirai.message.data.source
+import top.mrxiaom.overflow.Overflow
+import top.mrxiaom.overflow.OverflowAPI
+import top.mrxiaom.overflow.contact.RemoteBot
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDateTime
@@ -193,14 +202,20 @@ object BotUtil {
 
     ///////////////////////////  message  ///////////////////////////
 
-    fun MessageSource.toEntity(handled: Boolean = false): QQMessage {
-        val source = this
+    fun MessageEvent.toEntity(handled: Boolean = false): QQMessage {
+        return this.message.toEntity(this.bot, handled)
+    }
+
+    fun MessageChain.toEntity(bot: Bot? = null, handled: Boolean = false): QQMessage {
+        val source = this.source
+        val jsonTxt = Overflow.serializeMessage(bot as? RemoteBot, this)
         return QQMessage().apply {
             messageId = source.ids[0]
             botId = source.botId
             targetId = source.targetId
             fromId = source.fromId
             type = source.kind
+            json = jsonTxt
             this.handled = handled
             time = source.localDateTime()
         }

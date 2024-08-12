@@ -16,6 +16,7 @@ import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.QuoteReply
 import net.mamoe.mirai.message.data.source
+import net.mamoe.mirai.message.sourceMessage
 import kotlin.jvm.optionals.getOrNull
 
 
@@ -40,13 +41,13 @@ object MessageService {
      * @param messageChain
      * @param messages
      */
-    suspend fun cache(entity: QQMessage?, source: MessageSource, messages: Array<TdApi.Message>? = null) =
+    suspend fun cache(entity: QQMessage?, chain: MessageChain, messages: Array<TdApi.Message>? = null) =
         runCatching {
             withIO {
                 val qqMsg = qqMessageRepository.save(
                     entity?.apply {
                         handled = true
-                    } ?: source.toEntity(true)
+                    } ?: chain.toEntity(handled = true)
                 )
                 messages?.map {
                     QQTg().apply {
@@ -69,7 +70,7 @@ object MessageService {
      * @param message
      */
     suspend fun cache(receipt: MessageReceipt<*>, message: TdApi.Message) {
-        cache(null, receipt.source, arrayOf(message))
+        cache(null, receipt.sourceMessage, arrayOf(message))
     }
 
     suspend fun findRelationByQuote(chain: MessageChain): QQTg? {

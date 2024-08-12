@@ -154,7 +154,7 @@ class QQBot(
         handleStatus()
     }
 
-    private suspend fun handleStatus() {
+    private fun handleStatus() {
         var previous: BotStatus? = null
         status.onEach {
             if (bot.groupConfigService.defaultTgGroup < 0) return@onEach
@@ -184,10 +184,8 @@ class QQBot(
         try {
             when (event) {
                 is MessageEvent -> {
-                    val message = event.source.toEntity()
-                    CoroutineScope(Dispatchers.IO).launch {
-                        MessageService.save(message)
-                    }
+                    val message = event.toEntity()
+                    MessageService.save(event.toEntity())
                     when (event) {
                         is FriendMessageEvent -> {
 //                            bot.qqMessageHandler.onFriendMessage(
@@ -250,37 +248,6 @@ class QQBot(
         }
     }
 
-    suspend fun restart() {
-        kotlin.runCatching {
-            qqBot.login()
-        }.recoverCatching { ex ->
-            log.error("Re login failed, try to create a new instance...", ex)
-            start(true)
-        }.getOrThrow()
-    }
-
-//    suspend fun reportError(group: Group, messageChain: MessageChain, throwable: Throwable) {
-//        log.error(throwable.message, throwable)
-//        try {
-////            val senderId = messageChain.source.fromId
-////            val master = bot.getFriend(imSyncBot.userConfig.masterQQ)
-////            master?.takeIf { it.id != 0L }?.sendMessage(
-////                master.sendMessage(messageChain).quote()
-////                    .plus("group: ${group.name}(${group.id}), sender: ${group[senderId]?.remarkOrNameCardOrNick}(${senderId})\n\n消息发送失败: (${throwable::class.simpleName}) ${throwable.message}")
-////            )
-//            kotlin.runCatching {
-//                SendMessage(
-//                    (bot.groupConfig.qqTg[group.id] ?: bot.groupConfig.defaultTgGroup).toString(),
-//                    messageChain.contentToString()
-//                ).send()
-//            }.onFailure {
-//                log.error("Report error fail.", it)
-//            }.getOrNull()
-//        } catch (e: Exception) {
-//            log.error("Report error fail: ${e.message}", e)
-//        }
-//    }
-
     private suspend fun sendRemindMsg(event: GroupAwareMessageEvent) {
         if (bot.userConfigService.masterUsername.isBlank()) return
         val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
@@ -302,7 +269,7 @@ class QQBot(
         }
     }
 
-    fun destroy() {
+    fun close() {
         try {
             log.info("Close qq bot...")
             qqBot.close()
