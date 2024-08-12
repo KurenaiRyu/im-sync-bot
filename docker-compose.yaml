@@ -30,6 +30,8 @@ services:
       options:
         max-size: "200m"
         max-file: "3"
+    ports:
+      - 6379:6379
     volumes:
       - ./redis-data:/usr/local/etc/redis
 

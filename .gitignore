@@ -42,6 +42,5 @@ cache
 logs
 
 ## config ##
-config/
-src/main/resources/application*
+./config/*
 *.db

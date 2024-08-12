@@ -1,137 +1,80 @@
 package kurenai.imsyncbot.command
 
-import com.google.common.base.CaseFormat
-import kurenai.imsyncbot.*
-import kurenai.imsyncbot.config.Permission
+import it.tdlight.jni.TdApi.*
+import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.exception.BotException
-import kurenai.imsyncbot.telegram.send
-import kurenai.imsyncbot.utils.reflections
-import moe.kurenai.tdlight.model.MessageEntityType
-import moe.kurenai.tdlight.model.inline.InlineQuery
-import moe.kurenai.tdlight.model.message.Message
-import moe.kurenai.tdlight.model.message.Update
-import moe.kurenai.tdlight.request.message.SendMessage
-import moe.kurenai.tdlight.util.getLogger
+import kurenai.imsyncbot.exception.CommandException
+import kurenai.imsyncbot.getBotOrThrow
+import kurenai.imsyncbot.qqCommands
+import kurenai.imsyncbot.service.Permission
+import kurenai.imsyncbot.tgCommands
+import kurenai.imsyncbot.utils.*
 import net.mamoe.mirai.event.events.MessageEvent
 
 object CommandDispatcher {
 
     private val log = getLogger()
 
-    suspend fun execute(update: Update, message: Message) {
-        val bot = getBotOrThrow()
-        val command = message.entities!!
-            .first { it.type == MessageEntityType.BOT_COMMAND }
-            .text!!
-            .replace("/", "")
-            .replace("@${bot.tg.username}", "")
-        if (command == "help") {
-            handleHelp(message)
-            return
-        }
+    suspend fun execute(bot: ImSyncBot, message: Message, commandEntity: TextEntity) {
+        val content = message.content
+        val sender = message.senderId
+        if (content !is MessageText || sender !is MessageSenderUser) return
+
+        val commandText = commandEntity.text(content.text.text)
+        val index = commandText.indexOf("@")
+        val chat = bot.tg.send { GetChat(message.chatId) }
+
+        if (chat.type !is ChatTypePrivate && (index != -1 && commandText.substring(index + 1) != bot.tg.getUsername())) return
+
+        val command = if (index == -1) commandText.substring(1) else commandText.substring(1, index)
+
         var reply = true
-        var parseMode: String? = null
-        var msg: String? = null
-        for (handler in tgCommands) {
-            if (handler.command.lowercase() == command.lowercase()) {
-                log.info("Match ${handler.name}")
-                val permission = bot.userConfig.getPermission(message.from)
+        var parseMode: ParseMode = ParseMode.TEXT
+
+        val typeConstructor = chat.type.constructor
+
+        var responseMsg: String? = null
+        for (cmd in tgCommands) {
+            if (cmd.command.lowercase() == command.lowercase()) {
+                log.info("Match ${cmd.name}")
+                val permission = bot.userConfigService.getPermission(
+                    bot.tg.getUser(
+                        message.userSender()?.userId ?: error("非用户无权限调用")
+                    )
+                )
                 val permissionLevel = permission.level
-                val param = message.text?.lowercase()?.replace(handler.command.lowercase(), "")?.trim()
-                msg = if (permissionLevel <= Permission.SUPPER_ADMIN.level && param == "ban") {
-                    handleBan(bot, message.chat.id, handler)
-                    "Banned command: ${handler.command}"
-                } else if (permissionLevel <= Permission.SUPPER_ADMIN.level && param == "unban") {
-                    handleUnban(bot, message.chat.id, handler)
-                    "Unbanned command: ${handler.command}"
-                } else if (bot.groupConfig.statusContain(message.chat.id, handler.getCommandBannedStatus())) {
-                    log.debug("Command was banned for group[${message.chat.title}(${message.chat.id})].")
-                    return
+                val isSupperAdmin = permissionLevel <= Permission.SUPPER_ADMIN.level
+                val input = content.text.text.substring(commandEntity.length).trim()
+                responseMsg = if (cmd.onlyMaster && permission != Permission.MASTER) {
+                    "该命令只允许主人执行"
+                } else if (cmd.onlySupperAdmin && !isSupperAdmin) {
+                    "该命令只允许超级管理员执行"
+                } else if (cmd.onlyAdmin && permissionLevel > Permission.ADMIN.level) {
+                    "该命令只允许管理员执行"
+                } else if (cmd.onlyUserMessage && typeConstructor != ChatTypePrivate.CONSTRUCTOR) {
+                    "该命令只允许私聊执行"
+                } else if (cmd.onlyGroupMessage && !(typeConstructor == ChatTypeBasicGroup.CONSTRUCTOR || typeConstructor == ChatTypeSupergroup.CONSTRUCTOR)) {
+                    "该命令只允许群组执行"
+                } else if (cmd.onlyReply && message.replyToMessageId() != 0L) {
+                    "需要引用一条消息"
                 } else {
-                    if (handler.onlyMaster && permission != Permission.MASTER) {
-                        "该命令只允许主人执行"
-                    } else if (handler.onlySupperAdmin && permissionLevel > Permission.SUPPER_ADMIN.level) {
-                        "该命令只允许超级管理员执行"
-                    } else if (handler.onlyAdmin && permissionLevel > Permission.ADMIN.level) {
-                        "该命令只允许管理员执行"
-                    } else if (handler.onlyUserMessage && !message.isUserMessage()) {
-                        "该命令只允许私聊执行"
-                    } else if (handler.onlyGroupMessage && !(message.isSuperGroupMessage() || message.isGroupMessage())) {
-                        "该命令只允许群组执行"
-                    } else if (handler.onlyReply && !(message.isReply())) {
-                        "需要引用一条消息"
-                    } else {
-                        try {
-                            handler.execute(update, message)?.also {
-                                reply = handler.reply
-                                parseMode = handler.parseMode
-                            }
-                        } catch (e: BotException) {
-                            e.message
+                    try {
+                        cmd.execute(bot, message, sender, input)?.also {
+                            reply = cmd.reply
+                            parseMode = cmd.parseMode
                         }
+                    } catch (e: BotException) {
+                        throw e
+                    } catch (e: Exception) {
+                        throw CommandException("Execute $command command fail", e)
                     }
                 }
                 break
             }
         }
-        msg?.let {
-            SendMessage(message.chatId, msg).apply {
-                parseMode?.let { this.parseMode = it }
-                if (reply) this.replyToMessageId = message.messageId
-            }.send()
-        }
-    }
 
-    private fun handleUnban(bot: ImSyncBot, groupId: Long, handler: AbstractTelegramCommand) {
-        bot.groupConfig.removeStatus(groupId, handler.getCommandBannedStatus())
-        log.info("Unbanned command: ${handler.command}")
-    }
-
-    private fun handleBan(bot: ImSyncBot, groupId: Long, handler: AbstractTelegramCommand) {
-        bot.groupConfig.addStatus(groupId, handler.getCommandBannedStatus())
-        log.info("Banned command: ${handler.command}")
-    }
-
-    private fun AbstractTelegramCommand.getCommandBannedStatus(): String {
-        return "${CaseFormat.UPPER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, this::class.simpleName!!)}_BANNED"
-    }
-
-    private fun AbstractQQCommand.getCommandBannedStatus(): String {
-        return "${
-            CaseFormat.UPPER_CAMEL.to(
-                CaseFormat.UPPER_UNDERSCORE,
-                this::class.simpleName!!.replace("QQ", "")
-            )
-        }_BANNED"
-    }
-
-    suspend fun handleInlineQuery(update: Update, inlineQuery: InlineQuery) {
-        if (inlineCommands.isEmpty()) return
-
-        if (inlineQuery.query.isBlank()) return
-        val query = inlineQuery.query.trim()
-        val offset = inlineQuery.offset.takeIf { it.isNotBlank() }?.toInt() ?: 0
-        if (offset < 0) return
-        try {
-            val args = query.split(' ', limit = 2)
-            log.info("Match command ${javaClass.name}")
-            when (args.size) {
-                0 -> return
-                1 -> {
-                    inlineCommands[query]?.run {
-                        execute(update, inlineQuery, emptyList())
-                    }
-                }
-
-                2 -> {
-                    inlineCommands[args[0]]?.run {
-                        execute(update, inlineQuery, args[1].split(' '))
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            log.error(e.message, e)
-//            BangumiBot.tdClient.sendSync(emptyAnswer(inlineQuery.id))
+        responseMsg?.takeIf { it.isNotBlank() }?.let {
+            bot.tg.sendMessageText(it, chat.id, parseMode, replayToMessageId = if (reply) message.id else null)
         }
     }
 
@@ -139,23 +82,13 @@ object CommandDispatcher {
         val bot = getBotOrThrow()
         var matched = false
         for (handler in qqCommands) {
-            if (bot.groupConfig.items.any { it.qq == event.subject.id && it.status.contains(handler.getCommandBannedStatus()) })
-                if (handler.execute(event) == 1) {
-                    matched = true
-                    break
-                }
+            if (bot.groupConfigService.configs.any { it.qqGroupId == event.subject.id }
+                && handler.execute(event) == 1) {
+                matched = true
+                break
+            }
         }
         return if (matched) 1 else 0
-    }
-
-    private suspend fun handleHelp(message: Message) {
-        val sb = StringBuilder("Command list")
-        for (handler in tgCommands.asSequence().sortedBy { it.command }) {
-            sb.append("\n----------------\n")
-            sb.append("/${handler.command} ${handler.name}\n")
-            sb.append(handler.help)
-        }
-        SendMessage(message.chatId, sb.toString()).send()
     }
 
 

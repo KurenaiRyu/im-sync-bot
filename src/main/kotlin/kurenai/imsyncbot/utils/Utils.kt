@@ -8,20 +8,30 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.kotlinModule
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import io.ktor.client.*
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
-import moe.kurenai.tdlight.model.message.Update
+import okhttp3.internal.toHexString
 import org.reflections.Reflections
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import java.io.File
+import java.nio.file.Path
+import java.security.MessageDigest
 import java.text.CharacterIterator
 import java.text.StringCharacterIterator
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.util.*
+import java.util.zip.CRC32
+import java.util.zip.CRC32C
+import java.util.zip.Checksum
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.io.path.inputStream
 import kotlin.math.abs
 
 /**
@@ -30,6 +40,10 @@ import kotlin.math.abs
  */
 
 val reflections = Reflections("kurenai.imsyncbot")
+
+fun getLogger(name: String = Thread.currentThread().stackTrace[2].className): Logger {
+    return LoggerFactory.getLogger(name)
+}
 
 /**
  * Creates a child scope of the receiver scope.
@@ -119,11 +133,69 @@ fun Long.humanReadableByteCountBin(): String {
     return String.format("%.1f %ciB", value / 1024.0, ci.current())
 }
 
-fun Update.chatInfoString() = this.message?.chat?.let { "[${it.title ?: it.username}(${it.id})]" } ?: ""
-
 fun String?.suffix(): String {
     return this?.substring(this.lastIndexOf('.').plus(1)) ?: ""
 }
+
+fun Long.toLocalDateTime(): LocalDateTime {
+    return LocalDateTime.ofInstant(Instant.ofEpochMilli(this), ZoneId.systemDefault())
+}
+
+fun ByteArray.crc32c(): String {
+    val checksum = CRC32C()
+    checksum.update(this)
+    return checksum.value.toHexString()
+}
+
+fun ByteArray.crc32(): String {
+    val checksum = CRC32()
+    checksum.update(this)
+    return checksum.value.toHexString()
+}
+
+fun Path.crc32c(): String {
+    return checksum(this, CRC32C())
+}
+
+fun Path.crc32(): String {
+    return checksum(this, CRC32())
+}
+
+private fun checksum(path: Path, checksum: Checksum): String {
+    path.inputStream().use { input ->
+        val buff = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (input.read(buff) != -1) {
+            checksum.update(buff)
+        }
+    }
+    return checksum.value.toHexString()
+}
+
+fun ByteArray.md5(): String {
+    val md = MessageDigest.getInstance("MD5")
+    return md.digest(this).toHex()
+}
+
+fun Path.md5(): String {
+    val md = MessageDigest.getInstance("MD5")
+    this.inputStream().use { input ->
+        val buff = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (input.read(buff) != -1) {
+            md.update(buff)
+        }
+    }
+    return md.digest().toHex()
+}
+
+fun ByteArray.toHex(): String = HexFormat.of().formatHex(this)
+
+fun String.parseHex(): ByteArray = HexFormat.of().parseHex(this)
+
+suspend fun <R> withIO(block: suspend () -> R) = withContext(Dispatchers.IO) { block.invoke() }
+
+fun <R> runIO(block: suspend () -> R) = CoroutineScope(Dispatchers.IO).launch { block.invoke() }
+
+val httpClient = HttpClient()
 
 val json = Json {
     encodeDefaults = true

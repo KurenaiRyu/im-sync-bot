@@ -1,5 +1,8 @@
 # IM-SYNC-BOT
 
+![Build Status](https://github.com/KurenaiRyu/im-sync-bot/actions/workflows/build.yml/badge.svg?branch=dev)
+[![codecov](https://codecov.io/gh/KurenaiRyu/im-sync-bot/branch/dev/graph/badge.svg)](https://github.com/KurenaiRyu/im-sync-bot/tree/dev)
+
 im同步机器人，现主要同步（转发）tg跟qq群。
 
 ## Upgrade

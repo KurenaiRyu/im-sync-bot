@@ -1,28 +1,20 @@
 package kurenai.imsyncbot.utils
 
+import it.tdlight.jni.TdApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
+import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.exception.BotException
-import kurenai.imsyncbot.getBotOrThrow
-import kurenai.imsyncbot.service.CacheService
-import kurenai.imsyncbot.telegram.send
-import moe.kurenai.tdlight.exception.TelegramApiException
-import moe.kurenai.tdlight.model.keyboard.InlineKeyboardButton
-import moe.kurenai.tdlight.model.media.File
-import moe.kurenai.tdlight.request.GetFile
-import moe.kurenai.tdlight.util.getLogger
-import net.mamoe.mirai.contact.Contact
-import net.mamoe.mirai.message.data.Image
-import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import java.io.IOException
+import kurenai.imsyncbot.snowFlake
+import net.mamoe.mirai.message.data.MessageSource
+import net.mamoe.mirai.message.data.MessageSourceBuilder
+import net.mamoe.mirai.utils.toIntOrFail
+import java.nio.file.Files
 import java.nio.file.Path
-import java.util.*
-import kotlin.io.path.createDirectories
-import kotlin.io.path.exists
-import kotlin.io.path.fileSize
-import kotlin.io.path.pathString
-import moe.kurenai.tdlight.model.media.File as TelegramFile
+import java.time.LocalDateTime
+import java.time.ZoneOffset
+import kotlin.io.path.*
 
 
 object BotUtil {
@@ -39,60 +31,85 @@ object BotUtil {
 
     private val log = getLogger()
 
-    @Throws(TelegramApiException::class, IOException::class)
-    suspend fun getImage(friend: Contact, fileId: String, fileUniqueId: String): Image? {
-        val file = getTgFile(fileId, fileUniqueId)
-        val image = if (file.filePath!!.lowercase().endsWith(".webp")) {
-            webp2png(file)
-        } else {
-            Path.of(file.filePath!!).takeIf { it.exists() } ?: HttpUtil.download(file, Path.of(getImagePath("$fileId.webp")))
-        }
+//    @Throws(TelegramApiException::class, IOException::class)
+//    suspend fun getImage(friend: Contact, fileId: String, fileUniqueId: String): Image? {
+//        val file = getTgFile(fileId, fileUniqueId)
+//        val image = if (file.filePath!!.lowercase().endsWith(".webp")) {
+//            webp2png(file)
+//        } else {
+//            Path.of(file.filePath!!).takeIf { it.exists() } ?: HttpUtil.download(file, Path.of(getImagePath("$fileId.webp")))
+//        }
+//
+//        var ret: Image? = null
+//        try {
+//            image.toFile().toExternalResource().use {
+//                ret = friend.uploadImage(it)
+//            }
+//        } catch (e: IOException) {
+//            log.error(e.message, e)
+//        }
+//        return ret
+//    }
+//
+//    suspend fun getTgFile(fileId: String, fileUniqueId: String): TelegramFile {
+//        try {
+//            return GetFile(fileId).send()
+//        } catch (e: TelegramApiException) {
+//            log.error(e.message, e)
+//        }
+//        return TelegramFile(fileId, fileUniqueId)
+//    }
+//
+//    suspend fun downloadTgFile(fileId: String, fileUniqueId: String): Path {
+//        val tgFile = GetFile(fileId).send()
+//        val cacheFile = tgFile.filePath?.let { Path.of(it) }
+//        return if (cacheFile?.exists() == true) {
+//            cacheFile
+//        } else {
+//            val url = tgFile.getFileUrl(getBotOrThrow().tg.token)
+//            downloadDoc(tgFile.filePath?.substringAfterLast("/") ?: UUID.randomUUID().toString(), url)
+//        }
+//    }
 
-        var ret: Image? = null
-        try {
-            image.toFile().toExternalResource().use {
-                ret = friend.uploadImage(it)
+    suspend fun downloadDoc(filename: String, url: String, reject: Boolean = false, overwrite: Boolean = false): Path {
+        return download(Path.of(getDocumentPath(filename)), url, reject, overwrite)
+    }
+
+    suspend fun downloadImg(
+        filename: String,
+        url: String,
+        onlyCache: Boolean = false,
+        overwrite: Boolean = false
+    ): Path {
+        val path = Path.of(getImagePath(filename))
+        return download(path, url, onlyCache, overwrite)
+    }
+
+    suspend fun downloadImg(
+        url: String,
+        ext: String = "png",
+        onlyCache: Boolean = false,
+    ): Path {
+        val image = Path.of(getImagePath(snowFlake.nextAlpha()))
+        val tmpPath = download(image, url, onlyCache, false)
+        val type = ImageUtil.determineImageType(tmpPath)
+        val e = if (type != ImageUtil.ImageType.UNKNOWN) {
+            type.ext
+        } else ext
+
+        val path = Path.of(getImagePath(tmpPath.crc32c() + if (e.isNotBlank()) ".$e" else ""))
+        if (path.exists()) tmpPath.deleteExisting()
+        else {
+            withContext(Dispatchers.IO) {
+                Files.move(tmpPath, path)
             }
-        } catch (e: IOException) {
-            log.error(e.message, e)
         }
-        return ret
+        return path
     }
 
-    suspend fun getTgFile(fileId: String, fileUniqueId: String): TelegramFile {
-        try {
-            return GetFile(fileId).send()
-        } catch (e: TelegramApiException) {
-            log.error(e.message, e)
-        }
-        return TelegramFile(fileId, fileUniqueId)
-    }
-
-    suspend fun downloadTgFile(fileId: String, fileUniqueId: String): Path {
-        val tgFile = GetFile(fileId).send()
-        val cacheFile = tgFile.filePath?.let { Path.of(it) }
-        return if (cacheFile?.exists() == true) {
-            cacheFile
-        } else {
-            val url = tgFile.getFileUrl(getBotOrThrow().tg.token)
-            downloadDoc(tgFile.filePath?.substringAfterLast("/") ?: UUID.randomUUID().toString(), url)
-        }
-    }
-
-    suspend fun downloadDoc(filename: String, url: String, reject: Boolean = false): Path {
-        return download(Path.of(getDocumentPath(filename)), url, reject)
-    }
-
-    suspend fun downloadImg(filename: String, url: String, reject: Boolean = false): Path {
-        val image = Path.of(getImagePath(filename))
-        return download(image, url, reject).also {
-            CacheService.cacheImg(image)
-        }
-    }
-
-    private suspend fun download(path: Path, url: String, reject: Boolean): Path {
-        if (!reject) {
-            HttpUtil.download(path, url)
+    private suspend fun download(path: Path, url: String, onlyCache: Boolean, overwrite: Boolean): Path {
+        if (!onlyCache) {
+            HttpUtil.download(path, url, overwrite = overwrite)
         }
         return path
     }
@@ -112,46 +129,36 @@ object BotUtil {
             .replace("/", "_")
     }
 
-    fun buildInlineMarkup(dataList: List<Map<String, String>>): List<List<InlineKeyboardButton>> {
-        return dataList.map { row ->
-            row.map { column ->
-                InlineKeyboardButton(column.key).apply { callbackData = column.value }
-            }
-        }
-    }
+//    fun buildInlineMarkup(dataList: List<Map<String, String>>): List<List<InlineKeyboardButton>> {
+//        return dataList.map { row ->
+//            row.map { column ->
+//                InlineKeyboardButton(column.key).apply { callbackData = column.value }
+//            }
+//        }
+//    }
 
-    suspend fun webp2png(file: TelegramFile): Path {
-        val filename = file.fileUniqueId
+    suspend fun webp2png(file: TdApi.File): Path {
+        val filename = file.remote.uniqueId
         val pngFile = Path.of(getImagePath("$filename.png"))
-        var webpFile: Path
         if (pngFile.exists()) return pngFile
-        else {
-            pngFile.parent.createDirectories()
-            webpFile = Path.of(file.filePath!!)
-            if (!webpFile.exists()) {
-                webpFile = Path.of(getImagePath("$filename.webp"))
-                HttpUtil.download(file, webpFile)
-            }
-        }
-        withContext(Dispatchers.IO) {
+        val webpPath = file.local.path?.let(Path::of) ?: error("Webp local path cannot be null")
+        pngFile.parent.createDirectories()
+        withIO {
             Runtime.getRuntime()
-                .exec(String.format(WEBP_TO_PNG_CMD_PATTERN, webpFile.pathString, pngFile.pathString).replace("\\", "\\\\"))
+                .exec(
+                    String.format(WEBP_TO_PNG_CMD_PATTERN, webpPath.pathString, pngFile.pathString)
+                        .replace("\\", "\\\\")
+                )
                 .onExit().await()
         }
-//        val webp = ImageIO.read(webpFile)
-//        ImageIO.write(webp, "png", pngFile)
         return pngFile
     }
 
-    suspend fun mp42gif(width: Int, tgFile: File): Path {
-        val filename = tgFile.fileUniqueId
+    suspend fun mp42gif(width: Int, file: TdApi.File): Path {
+        val filename = file.remote.uniqueId
         val gifPath = Path.of(getImagePath("$filename.gif"))
         if (gifPath.exists()) return gifPath
-        var mp4Path = Path.of(tgFile.filePath!!)
-        if (!mp4Path.exists()) {
-            mp4Path = Path.of(getImagePath("$filename.mp4"))
-            HttpUtil.download(tgFile, mp4Path)
-        }
+        val mp4Path = Path.of(file.local.path ?: error("Mp4 local file cannot be null"))
         gifPath.parent.createDirectories()
         val process = withContext(Dispatchers.IO) {
             val builder = ProcessBuilder(
@@ -183,5 +190,35 @@ object BotUtil {
             throw BotException("Mp4 to Gif error")
         }
     }
+
+    ///////////////////////////  message  ///////////////////////////
+
+    fun MessageSource.toEntity(handled: Boolean = false): QQMessage {
+        val source = this
+        return QQMessage().apply {
+            messageId = source.ids[0]
+            botId = source.botId
+            targetId = source.targetId
+            fromId = source.fromId
+            type = source.kind
+            this.handled = handled
+            time = source.localDateTime()
+        }
+    }
+
+    fun QQMessage.toSource(): MessageSource {
+        val entity = this
+        return MessageSourceBuilder().apply {
+            id(entity.messageId)
+            internalId(entity.messageId)
+            fromId = entity.fromId
+            targetId = entity.targetId
+            time = entity.time.atZone(ZoneOffset.ofHours(8)).toEpochSecond().toIntOrFail()
+
+        }.build(entity.botId, entity.type)
+    }
+
+    fun MessageSource.localDateTime(): LocalDateTime =
+        LocalDateTime.ofEpochSecond(this.time.toLong(), 0, ZoneOffset.ofHours(8))
 
 }

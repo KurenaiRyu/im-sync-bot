@@ -1,6 +1,5 @@
 package kurenai.imsyncbot.utils
 
-import moe.kurenai.tdlight.util.getLogger
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
 import kotlin.math.min

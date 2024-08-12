@@ -1,0 +1,9 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+  datasource:
+    hikari:
+      jdbc-url: jdbc:h2:file:./db/im-sync-bot;AUTO_SERVER=TRUE
+      auto-commit: false

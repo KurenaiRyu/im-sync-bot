@@ -1,8 +1,6 @@
 package kurenai.imsyncbot.command.inline
 
 import kurenai.imsyncbot.command.AbstractInlineCommand
-import moe.kurenai.tdlight.model.inline.InlineQuery
-import moe.kurenai.tdlight.model.message.Update
 
 /**
  * @author Kurenai

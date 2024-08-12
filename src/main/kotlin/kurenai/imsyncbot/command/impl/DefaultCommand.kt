@@ -1,9 +1,8 @@
 package kurenai.imsyncbot.command.impl
 
+import it.tdlight.jni.TdApi
+import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.getBotOrThrow
-import moe.kurenai.tdlight.model.message.Message
-import moe.kurenai.tdlight.model.message.Update
 
 class DefaultCommand : AbstractTelegramCommand() {
 
@@ -11,9 +10,16 @@ class DefaultCommand : AbstractTelegramCommand() {
     override val help: String = "设置默认群"
     override val onlyGroupMessage = true
 
-    override suspend fun execute(update: Update, message: Message): String {
-        getBotOrThrow().groupConfig.default(message)
-        return "设置默认群成功"
+    override suspend fun execute(
+        bot: ImSyncBot,
+        message: TdApi.Message,
+        sender: TdApi.MessageSenderUser,
+        input: String
+    ): String {
+        return if (bot.groupConfigService.defaultGroup(message))
+            "设置默认群成功"
+        else
+            "已撤销当前群作为默认群"
     }
 
 }
