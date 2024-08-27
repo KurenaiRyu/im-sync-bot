@@ -90,11 +90,11 @@ dependencies {
     implementation("com.linecorp.kotlin-jdsl:spring-data-kotlin-jdsl-starter-jakarta:2.2.0.RELEASE")
 
     //db driver
-    runtimeOnly("com.h2database:h2")
-//    runtimeOnly("org.xerial:sqlite-jdbc")
-//    runtimeOnly("com.github.gwenn:sqlite-dialect")
+    runtimeOnly("org.hibernate.orm:hibernate-community-dialects:6.6.0.Final")
+    runtimeOnly("org.xerial:sqlite-jdbc")
+//    runtimeOnly("com.h2database:h2")
 //    runtimeOnly("mysql:mysql-connector-java")
-    runtimeOnly("org.postgresql:postgresql")
+//    runtimeOnly("org.postgresql:postgresql")
 
     //discord
     implementation("dev.kord:kord-core:${Versions.KORD}")

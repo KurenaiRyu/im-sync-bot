@@ -2,7 +2,8 @@ spring:
   profiles:
     active: dev
   datasource:
-    url: jdbc:h2:file:./db/im-sync-bot;AUTO_SERVER=TRUE
+#    url: jdbc:h2:file:./data/im-sync-bot;AUTO_SERVER=TRUE
+    url: jdbc:sqlite:./data/im-sync-bot.db
     hikari:
       auto-commit: false
 im-sync-bot:
