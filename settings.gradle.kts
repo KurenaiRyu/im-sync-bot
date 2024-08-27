@@ -1,5 +1,3 @@
-@file:Suppress("UnstableApiUsage")
-
 rootProject.name = "im-sync-bot"
 
 pluginManagement {

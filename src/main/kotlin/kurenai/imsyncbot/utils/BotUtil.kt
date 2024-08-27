@@ -228,7 +228,7 @@ object BotUtil {
             internalId(entity.messageId)
             fromId = entity.fromId
             targetId = entity.targetId
-            time = entity.time.atZone(ZoneOffset.ofHours(8)).toEpochSecond().toIntOrFail()
+            time = entity.time.atZone(ZoneOffset.ofHours(8)).toEpochSecond().toInt()
 
         }.build(entity.botId, entity.type)
     }
