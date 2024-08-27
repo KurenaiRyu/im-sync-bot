@@ -11,12 +11,10 @@ services:
         max-size: "50m"
     user: root
     volumes:
-      #      - ./api-data/:/var/lib/telegram-bot-api/ #本地api配置
-      - ./mirai/:/deployments/mirai/
-      - ./config/:/deployments/config/
-      - ./config/config.yaml:/deployments/application.yaml
-      - ./cache:/deployments/cache
-      - ./logs:/deployments/logs
+      - ./data/:/app/data
+      - ./config.yaml:/app/application.yaml
+      - ./cache:/app/cache
+      - ./logs:/app/logs
     depends_on:
       - redis
 #      - api  #本地api则去掉注释
@@ -34,24 +32,3 @@ services:
       - 6379:6379
     volumes:
       - ./redis-data:/usr/local/etc/redis
-
-#  需要本地api则去除注释
-#  api:
-#    image: aiogram/telegram-bot-api
-#    container_name: tg-api
-#    restart: always
-#    environment:
-#      TELEGRAM_API_ID: YOUR_API_ID
-#      TELEGRAM_API_HASH: YOUR_API_HASH
-#      TELEGRAM_STAT: 1
-#      TELEGRAM_LOCAL: 1
-#      TELEGRAM_VERBOSITY: 4
-#    logging:
-#      driver: "json-file"
-#      options:
-#        max-size: "200m"
-#        max-file: "3"
-#    ports:
-#      - 8081-8082:8081-8082
-#    volumes:
-#      - ./api-data:/var/lib/telegram-bot-api

@@ -4,13 +4,13 @@ RUN apt-get update && apt-get install -y tzdata ffmpeg webp && apt-get clean --d
 ENV TZ="Asia/Shanghai"
 ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en'
 
-COPY --chown=185 build/libs/lib/* /deployments/lib/
-COPY --chown=185 build/libs/*.jar /deployments/
-COPY --chown=185 entrypoint.sh /deployments/
+COPY --chown=185 build/libs/lib/* /app/lib/
+COPY --chown=185 build/libs/*.jar /app/
+COPY --chown=185 entrypoint.sh /app/
 
 EXPOSE 8080
 USER 185
 
-WORKDIR /deployments
+WORKDIR /app
 
-ENTRYPOINT ["bash", "/deployments/entrypoint.sh"]
+ENTRYPOINT ["bash", "/app/entrypoint.sh"]
