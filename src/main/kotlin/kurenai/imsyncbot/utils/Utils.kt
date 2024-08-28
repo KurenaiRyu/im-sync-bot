@@ -18,6 +18,7 @@ import org.reflections.Reflections
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.lang.reflect.Field
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.text.CharacterIterator
@@ -216,3 +217,31 @@ val yamlMapper = ObjectMapper(
 }).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
     .setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
     .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+
+fun setEnv(newenv: Properties) {
+    val map = newenv.toMap() as MutableMap<String, String>
+    try {
+        val processEnvironmentClass = Class.forName("java.lang.ProcessEnvironment")
+        val theEnvironmentField: Field = processEnvironmentClass.getDeclaredField("theEnvironment")
+        theEnvironmentField.setAccessible(true)
+        val env = theEnvironmentField.get(null) as MutableMap<String, String>
+        env.putAll(map)
+        val theCaseInsensitiveEnvironmentField: Field =
+            processEnvironmentClass.getDeclaredField("theCaseInsensitiveEnvironment")
+        theCaseInsensitiveEnvironmentField.setAccessible(true)
+        val cienv = theCaseInsensitiveEnvironmentField.get(null) as MutableMap<String, String>
+        cienv.putAll(map)
+    } catch (e: NoSuchFieldException) {
+        val classes = Collections::class.java.declaredClasses
+        val env = System.getenv()
+        for (cl in classes) {
+            if ("java.util.Collections\$UnmodifiableMap" == cl.name) {
+                val field: Field = cl.getDeclaredField("m")
+                field.setAccessible(true)
+                val map = field.get(env) as MutableMap<String, String>
+                map.clear()
+                map.putAll(map)
+            }
+        }
+    }
+}
