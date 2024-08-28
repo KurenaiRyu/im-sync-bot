@@ -1,6 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("org.springframework.boot") version "3.1.0"
@@ -49,9 +48,19 @@ lombok {
     version.set(Versions.LOMBOK)
 }
 
+
 kotlin {
     compilerOptions {
-        languageVersion.set(KotlinVersion.KOTLIN_1_9)
+        languageVersion.set(KotlinVersion.KOTLIN_2_0)
+        freeCompilerArgs.set(
+            listOf(
+                "-Xjsr305=strict",
+                "-opt-in=kotlin.contracts.ExperimentalContracts",
+                "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
+            )
+        )
+        javaParameters.set(true)
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }
 
@@ -90,7 +99,7 @@ dependencies {
     implementation("com.linecorp.kotlin-jdsl:spring-data-kotlin-jdsl-starter-jakarta:2.2.0.RELEASE")
 
     //db driver
-    runtimeOnly("org.hibernate.orm:hibernate-community-dialects:6.6.0.Final")
+    runtimeOnly("org.hibernate.orm:hibernate-community-dialects")
     runtimeOnly("org.xerial:sqlite-jdbc")
 //    runtimeOnly("com.h2database:h2")
 //    runtimeOnly("mysql:mysql-connector-java")
@@ -176,17 +185,6 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-tasks.withType<KotlinCompile> {
-    compilerOptions {
-        freeCompilerArgs = listOf(
-            "-Xjsr305=strict",
-            "-opt-in=kotlin.contracts.ExperimentalContracts",
-            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
-        )
-        javaParameters = true
-        jvmTarget = JvmTarget.JVM_21
-    }
-}
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
@@ -213,8 +211,8 @@ tasks.test {
 tasks.jacocoTestReport {
     dependsOn(tasks.test) // tests are required to run before generating the report
     reports {
-        xml.required = true
-        html.required = true
+        xml.required.set(true)
+        html.required.set(true)
     }
 }
 
