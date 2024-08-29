@@ -1,18 +1,24 @@
-bot:
-  qq:
-    account: 12354547  # qq账号
-    password: your-qq-password # qq密码，ANDROID_WATCH 协议下
-    protocol: ANDROID_PAD #ANDROID_PAD | ANDROID_PHONE | ANDROID_WATCH
-  telegram:
-    token: 1234567:adgcgasdfadf # tg机器人token
-    username: your_bot_name  # tg机器人用户名
-  tg-msg-format: "#$name #id$id $newline$newline$msg" #tg消息格式化: $name: 发送者名称；$id: 发送者id；$newline: 换行；$msg: 消息体
-  qq-msg-format: "#$name: $msg" # qq消息格式化
-  master-of-tg: 12345678 # 主人 tg id
-  master-of-qq: 87654321 # 主人 qq 账号
-  pic-to-file-size: 2   # 图片大约多少M则转为文件发送
-  enable-recall: false  # true 则删掉转发的tg消息，否则会修改成划线消息以表示撤销
-redis:
-  host: redis # redis ip ；若是使用docker-compose构建环境则不需要修改
-  port: 6379  # redis 端口，一般默认就这个端口；若是使用docker-compose构建环境则不需要修改
-  database: 10 # redis数据库id，一般不需要修改，只有多个程序共用时为了避免问题而分开不同数据库
+active: dev
+datasource:
+  url: jdbc:sqlite:im-sync-bot.db
+  driver-class-name: org.sqlite.JDBC
+  hikari:
+    auto-commit: false
+jpa:
+  database-platform: org.hibernate.community.dialect.SQLiteDialect
+  hibernate:
+    ddl-auto: create
+##################################
+####     上面内容不建议改动     #####
+##################################
+im-sync-bot:
+  bot:
+    telegram:
+      token: 1234567:adgcgasdfadf # tg机器人token
+      username: your_bot_name  # tg机器人用户名
+    qq:
+      host: "localhost"  # onebot 服务端ip/域名
+      port: 9000         # onebot 服务端正向连接端口
+      token: ""          # onebot 服务端token，没有就不需要动
+    master-of-tg: 12345678 #主人 tg id
+    master-of-qq: 87654321 #主人 qq 账号

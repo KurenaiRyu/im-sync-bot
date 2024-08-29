@@ -2,22 +2,24 @@ spring:
   profiles:
     active: dev
   datasource:
-#    url: jdbc:h2:file:./data/im-sync-bot;AUTO_SERVER=TRUE
     url: jdbc:sqlite:im-sync-bot.db
     driver-class-name: org.sqlite.JDBC
     hikari:
       auto-commit: false
+  jpa:
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      ddl-auto: create
 im-sync-bot:
   bot:
     telegram:
       token: 1234567:adgcgasdfadf # tg机器人token
       username: your_bot_name  # tg机器人用户名
-    #    base-url: http://api:8081  # 本地api
-
-
-  handler:
-    forward:
-      master-of-tg: 12345678 #主人 tg id
-      master-of-qq: 87654321 #主人 qq 账号
-      tgMsgFormat: "$name$newline$newline$msg"  #tg消息格式化
-      qqMsgFormat: "$name: $msg" # qq消息格式化
+    qq:
+      host: "localhost"  # onebot 服务端ip/域名
+      port: 9000         # onebot 服务端正向连接端口
+      token: ""          # onebot 服务端token，没有就不需要动
+    master-of-tg: 12345678 #主人 tg id
+    master-of-qq: 87654321 #主人 qq 账号
+    tgMsgFormat: "$name$newline$newline$msg"  #tg消息格式化
+    qqMsgFormat: "$name: $msg" # qq消息格式化

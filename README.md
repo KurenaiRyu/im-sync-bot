@@ -31,7 +31,7 @@ im同步机器人，现主要同步（转发）tg跟qq群。
 
 ## 迁移
 
-迁移`data`目录（数据库等文件），以及根目录下的配置文件`config.yaml`
+迁移`im-sync-bot.db`（数据库文件），以及根目录下的配置文件`config.yaml`
 
 ## Thanks
 
