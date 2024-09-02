@@ -6,12 +6,11 @@ import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.exception.BotException
+import kurenai.imsyncbot.imSyncBot
 import kurenai.imsyncbot.snowFlake
-import net.mamoe.mirai.Bot
 import net.mamoe.mirai.event.events.MessageEvent
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageSource
-import net.mamoe.mirai.message.data.MessageSourceBuilder
 import net.mamoe.mirai.message.data.source
 import top.mrxiaom.overflow.Overflow
 import top.mrxiaom.overflow.contact.RemoteBot
@@ -151,8 +150,10 @@ object BotUtil {
         withIO {
             Runtime.getRuntime()
                 .exec(
-                    String.format(WEBP_TO_PNG_CMD_PATTERN, webpPath.pathString, pngFile.pathString)
-                        .replace("\\", "\\\\")
+                    arrayOf(
+                        String.format(WEBP_TO_PNG_CMD_PATTERN, webpPath.pathString, pngFile.pathString)
+                            .replace("\\", "\\\\")
+                    )
                 )
                 .onExit().await()
         }
@@ -199,12 +200,12 @@ object BotUtil {
     ///////////////////////////  message  ///////////////////////////
 
     fun MessageEvent.toEntity(handled: Boolean = false): QQMessage {
-        return this.message.toEntity(this.bot, handled)
+        return this.message.toEntity(handled)
     }
 
-    fun MessageChain.toEntity(bot: Bot? = null, handled: Boolean = false): QQMessage {
+    fun MessageChain.toEntity(handled: Boolean = false): QQMessage {
         val source = this.source
-        val jsonTxt = Overflow.serializeMessage(bot as? RemoteBot, this)
+        val jsonTxt = Overflow.serializeMessage(imSyncBot.qq.qqBot as? RemoteBot, this)
         return QQMessage().apply {
             messageId = source.ids[0]
             botId = source.botId
@@ -217,16 +218,17 @@ object BotUtil {
         }
     }
 
-    fun QQMessage.toSource(): MessageSource {
-        val entity = this
-        return MessageSourceBuilder().apply {
-            id(entity.messageId)
-            internalId(entity.messageId)
-            fromId = entity.fromId
-            targetId = entity.targetId
-            time = entity.time.atZone(ZoneOffset.ofHours(8)).toEpochSecond().toInt()
-
-        }.build(entity.botId, entity.type)
+    suspend fun QQMessage.toSource(): MessageSource {
+        return Overflow.deserializeMessage(imSyncBot.qq.qqBot, this.json).source
+//        val entity = this
+//        return MessageSourceBuilder().apply {
+//            id(entity.messageId)
+//            internalId(entity.messageId)
+//            fromId = entity.fromId
+//            targetId = entity.targetId
+//            time = entity.time.atZone(ZoneOffset.ofHours(8)).toEpochSecond().toInt()
+//
+//        }.build(entity.botId, entity.type)
     }
 
     fun MessageSource.localDateTime(): LocalDateTime =

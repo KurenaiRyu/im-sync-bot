@@ -5,6 +5,7 @@ import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
+import net.mamoe.mirai.message.data.sourceOrNull
 
 private val log = getLogger()
 
@@ -30,7 +31,8 @@ class BindCommand : AbstractTelegramCommand() {
                     if (param.isNotBlank()) {
                         val user = tg.getUser(replyMessage) ?: return "找不到用户"
                         if (user.id == tg.getMe().id) {
-                            val qqMsgSource = MessageService.findQQByTg(replyMessage) ?: return "找不到该qq信息"
+                            val qqMsgSource =
+                                MessageService.findQQByTg(replyMessage)?.sourceOrNull ?: return "找不到该qq信息"
                             bot.userConfigService.bindName(qq = qqMsgSource.fromId, bindingName = param)
                             "qq`${qqMsgSource.fromId}` 绑定名称为 `${param.escapeMarkdown()}`"
                         } else {
@@ -101,7 +103,7 @@ class UnbindCommand : AbstractTelegramCommand() {
                 bot.tg.getMessage(message.replyInChatId()!!, message.replyToMessageId()!!)?.let { reply ->
                     val userId = reply.userSender()?.userId!!
                     if (userId == bot.tg.getMe().id) {
-                        val qqMsgSource = MessageService.findQQByTg(reply)
+                        val qqMsgSource = MessageService.findQQByTg(reply)?.sourceOrNull
                         if (qqMsgSource != null) {
                             bot.userConfigService.unbindNameByQQ(qqMsgSource.fromId)
                             "qq[${qqMsgSource.fromId}] 解绑名称成功"

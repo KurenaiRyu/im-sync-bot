@@ -4,19 +4,17 @@ import it.tdlight.jni.TdApi
 import kotlinx.serialization.json.Json
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.domain.QQTg
+import kurenai.imsyncbot.imSyncBot
 import kurenai.imsyncbot.qqMessageRepository
 import kurenai.imsyncbot.qqTgRepository
 import kurenai.imsyncbot.utils.BotUtil.toEntity
-import kurenai.imsyncbot.utils.BotUtil.toSource
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.event.events.MessageRecallEvent
 import net.mamoe.mirai.message.MessageReceipt
-import net.mamoe.mirai.message.data.MessageChain
-import net.mamoe.mirai.message.data.MessageSource
-import net.mamoe.mirai.message.data.QuoteReply
-import net.mamoe.mirai.message.data.source
+import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.sourceMessage
+import top.mrxiaom.overflow.Overflow
 import kotlin.jvm.optionals.getOrNull
 
 
@@ -41,14 +39,17 @@ object MessageService {
      * @param messageChain
      * @param messages
      */
-    suspend fun cache(entity: QQMessage?, chain: MessageChain, messages: Array<TdApi.Message>? = null) =
+    suspend fun cache(chain: MessageChain, messages: Array<TdApi.Message>? = null) =
         runCatching {
             withIO {
-                val qqMsg = qqMessageRepository.save(
-                    entity?.apply {
-                        handled = true
-                    } ?: chain.toEntity(handled = true)
+                val entity = qqMessageRepository.findByBotIdAndTargetIdAndMessageId(
+                    chain.bot.id,
+                    chain.source.targetId,
+                    chain.source.ids[0]
                 )
+                    ?: chain.toEntity()
+                entity.handled = true
+                val qqMsg = qqMessageRepository.save(entity)
                 messages?.map {
                     QQTg().apply {
                         this.qqId = qqMsg.id
@@ -70,14 +71,13 @@ object MessageService {
      * @param message
      */
     suspend fun cache(receipt: MessageReceipt<*>, message: TdApi.Message) {
-        cache(null, receipt.sourceMessage, arrayOf(message))
+        cache(receipt.sourceMessage, arrayOf(message))
     }
 
     suspend fun findRelationByQuote(chain: MessageChain): QQTg? {
         // QuoteReply's source not contain target info
         return chain[QuoteReply.Key]?.let {
-            val source = chain.source
-            findRelationByQQ(source)
+            findRelationByQQ(chain.source.botId, chain.source.targetId, it.source.ids.first())
         }
     }
 
@@ -119,11 +119,13 @@ object MessageService {
 
     suspend inline fun findQQByTg(message: TdApi.Message) = findQQByTg(message.chatId, message.id)
 
-    suspend fun findQQByTg(chatId: Long, messageId: Long): MessageSource? {
+    suspend fun findQQByTg(chatId: Long, messageId: Long): MessageChain? {
         return withIO {
             qqTgRepository.findByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
                 qqMessageRepository.findById(it.qqId).getOrNull()
-            }?.toSource()
+            }
+        }?.let {
+            Overflow.deserializeMessage(imSyncBot.qq.qqBot, it.json)
         }
     }
 

@@ -321,7 +321,7 @@ class TgMessageHandler(
             return CONTINUE
         }
 
-        MessageService.findQQByTg(update.chatId, update.messageId)
+        MessageService.findQQByTg(update.chatId, update.messageId)?.source
             ?.takeIf { it.fromId == bot.qq.qqBot.id } //只撤回bot消息
             ?.recall()
 
@@ -351,7 +351,7 @@ class TgMessageHandler(
         }
 
         val quoteMsgSource = message.replyToMessageId()?.let {
-            MessageService.findQQByTg(message.chatId, it)
+            MessageService.findQQByTg(message.chatId, it)?.source
         }
         val groupId = quoteMsgSource?.targetId ?: bot.groupConfigService.tgQQ.getOrDefault(
             message.chatId,

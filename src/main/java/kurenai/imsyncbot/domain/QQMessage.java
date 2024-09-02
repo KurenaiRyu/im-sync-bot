@@ -20,8 +20,8 @@ import java.time.LocalDateTime;
 @Table(
         name = "QQ_MESSAGE", indexes = {
         @Index(
-                name = "QQ_MESSAGE_MESSAGE_ID_BOT_ID_OBJ_ID_TYPE_uindex",
-                columnList = "messageId DESC, botId, objId, type",
+                name = "QQ_MESSAGE_uindex",
+                columnList = "botId, targetId, messageId DESC",
                 unique = true
         )}
 )
@@ -34,7 +34,6 @@ public class QQMessage {
     private Long id;
     private Integer messageId;
     private Long botId;
-    private Long objId;
     private Long fromId;
     private Long targetId;
     @Enumerated(EnumType.STRING)

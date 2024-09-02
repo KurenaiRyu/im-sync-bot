@@ -66,7 +66,7 @@ class QQBot(
     lateinit var qqBot: Bot
 
     @OptIn(DelicateCoroutinesApi::class)
-    private val workerScope = this + newFixedThreadPoolContext(10, "${qqProperties.account}-worker")
+    private val workerScope = CoroutineScope(coroutineContext + CoroutineName("qq-worker"))
     private val groupMessageLockMap = ConcurrentHashMap<Long, Semaphore>()
 
     private suspend fun buildBot(): Bot {
