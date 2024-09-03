@@ -5,5 +5,5 @@ spring:
     show-sql: false
   datasource:
     hikari:
-      jdbc-url: jdbc:h2:file:./db/im-sync-bot;AUTO_SERVER=TRUE
+      url: jdbc:sqlite:im-sync-bot.db
       auto-commit: false
