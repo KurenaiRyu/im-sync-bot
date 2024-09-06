@@ -23,57 +23,14 @@ import kotlin.io.path.*
 
 object BotUtil {
 
-    const val WEBP_TO_PNG_CMD_PATTERN = "dwebp %s -o %s"
     const val IMAGE_PATH = "./cache/img/"
     const val DOCUMENT_PATH = "./cache/doc/"
     const val NAME_PATTERN = "\$name"
     const val MSG_PATTERN = "\$msg"
     const val ID_PATTERN = "\$id"
     const val NEWLINE_PATTERN = "\$newline"
-    const val LOG_FILE_PATH = "./logs/im-sync-bot.log"
-    const val DEFAULT_BASE_URL = "https://api.telegram.org"
 
     private val log = getLogger()
-
-//    @Throws(TelegramApiException::class, IOException::class)
-//    suspend fun getImage(friend: Contact, fileId: String, fileUniqueId: String): Image? {
-//        val file = getTgFile(fileId, fileUniqueId)
-//        val image = if (file.filePath!!.lowercase().endsWith(".webp")) {
-//            webp2png(file)
-//        } else {
-//            Path.of(file.filePath!!).takeIf { it.exists() } ?: HttpUtil.download(file, Path.of(getImagePath("$fileId.webp")))
-//        }
-//
-//        var ret: Image? = null
-//        try {
-//            image.toFile().toExternalResource().use {
-//                ret = friend.uploadImage(it)
-//            }
-//        } catch (e: IOException) {
-//            log.error(e.message, e)
-//        }
-//        return ret
-//    }
-//
-//    suspend fun getTgFile(fileId: String, fileUniqueId: String): TelegramFile {
-//        try {
-//            return GetFile(fileId).send()
-//        } catch (e: TelegramApiException) {
-//            log.error(e.message, e)
-//        }
-//        return TelegramFile(fileId, fileUniqueId)
-//    }
-//
-//    suspend fun downloadTgFile(fileId: String, fileUniqueId: String): Path {
-//        val tgFile = GetFile(fileId).send()
-//        val cacheFile = tgFile.filePath?.let { Path.of(it) }
-//        return if (cacheFile?.exists() == true) {
-//            cacheFile
-//        } else {
-//            val url = tgFile.getFileUrl(getBotOrThrow().tg.token)
-//            downloadDoc(tgFile.filePath?.substringAfterLast("/") ?: UUID.randomUUID().toString(), url)
-//        }
-//    }
 
     suspend fun downloadDoc(filename: String, url: String, reject: Boolean = false, overwrite: Boolean = false): Path {
         return download(Path.of(getDocumentPath(filename)), url, reject, overwrite)
@@ -147,16 +104,27 @@ object BotUtil {
         if (pngFile.exists()) return pngFile
         val webpPath = file.local.path?.let(Path::of) ?: error("Webp local path cannot be null")
         pngFile.parent.createDirectories()
-        withIO {
-            Runtime.getRuntime()
-                .exec(
-                    arrayOf(
-                        String.format(WEBP_TO_PNG_CMD_PATTERN, webpPath.pathString, pngFile.pathString)
-                            .replace("\\", "\\\\")
-                    )
-                )
-                .onExit().await()
-        }
+        val tmpFile = Path.of(getImagePath("$filename-tmp.png"))
+
+        val toPngProcess = runCommandAwait(
+            "dwebp",
+            webpPath.pathString,
+            "-o",
+            tmpFile.pathString
+        )
+        if (toPngProcess.exitValue() != 0 || !tmpFile.exists() || tmpFile.fileSize() == 0L) throw BotException("Webp to png fail")
+
+        val resizeProcess = runCommandAwait(
+            "ffmpeg",
+            "-y",
+            "-i",
+            tmpFile.pathString,
+            "-vf",
+            "scale=320:-1",
+            pngFile.pathString
+        )
+        if (resizeProcess.exitValue() != 0  || !pngFile.exists() || pngFile.fileSize() == 0L) throw BotException("Png resize fail")
+
         return pngFile
     }
 
@@ -166,34 +134,19 @@ object BotUtil {
         if (gifPath.exists()) return gifPath
         val mp4Path = Path.of(file.local.path ?: error("Mp4 local file cannot be null"))
         gifPath.parent.createDirectories()
-        val process = withContext(Dispatchers.IO) {
-            val builder = ProcessBuilder(
-                "ffmpeg",
-                "-y",
-                "-i",
-                mp4Path.pathString,
-                "-vf",
-                "scale=${minOf(width, 320)}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
-                gifPath.pathString
-            )
-            builder.redirectErrorStream(true)
-            val process = builder.start()
-            println("Execute ${builder.command().joinToString(" ")}")
-            process.inputStream.bufferedReader().use { input ->
-                var line = input.readLine()
-                while (line != null) {
-                    println(line)
-                    line = input.readLine()
-                }
-            }
-            process.onExit().await()
-            println("Exit code: " + process.exitValue())
-            process
-        }
+        val process = runCommandAwait(
+            "ffmpeg",
+            "-y",
+            "-i",
+            mp4Path.pathString,
+            "-vf",
+            "scale=${minOf(width, 320)}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+            gifPath.pathString
+        )
 
         if (process.exitValue() == 0 && gifPath.exists() && gifPath.fileSize() > 0) return gifPath
         else {
-            throw BotException("Mp4 to Gif error")
+            throw BotException("Mp4 to Gif fail")
         }
     }
 

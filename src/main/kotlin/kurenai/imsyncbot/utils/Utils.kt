@@ -10,6 +10,7 @@ import com.fasterxml.jackson.module.kotlin.KotlinFeature
 import com.fasterxml.jackson.module.kotlin.kotlinModule
 import io.ktor.client.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
@@ -132,6 +133,23 @@ fun Long.humanReadableByteCountBin(): String {
     }
     value *= java.lang.Long.signum(this).toLong()
     return String.format("%.1f %ciB", value / 1024.0, ci.current())
+}
+
+suspend fun runCommandAwait(vararg args: String) = withIO {
+    val builder = ProcessBuilder(*args)
+    builder.redirectErrorStream(true)
+    val process = builder.start()
+    println("Execute ${builder.command().joinToString(" ")}")
+    process.inputStream.bufferedReader().use { input ->
+        var line = input.readLine()
+        while (line != null) {
+            println(line)
+            line = input.readLine()
+        }
+    }
+    process.onExit().await()
+    println("Exit code: " + process.exitValue())
+    process
 }
 
 fun String?.suffix(): String {
