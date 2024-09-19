@@ -27,7 +27,7 @@ class JsoupTest {
     @Test
     fun testQuote() {
         val content =
-            "<quote chronocat:seq=\"299662\"><author id=\"865927499\" name=\"男同天才anshang\" avatar=\"http://thirdqq.qlogo.cn/headimg_dl?dst_uin=865927499&amp;spec=640\"/>感觉这应该是老东西测试</quote><at id=\"865927499\" name=\"男同天才anshang\"/> 菜就多练（"
+            "<quote chronocat:seq=\"223\"><author id=\"123\" name=\"testQQName\" avatar=\"http://thirdqq.qlogo.cn/headimg_dl?dst_uin=865927499&amp;spec=640\"/>感觉这应该是老东西测试</quote><at id=\"865927499\" name=\"男同天才anshang\"/> 菜就多练（"
         val body = Jsoup.parse(content).body()
         val quote = body.getElementsByTag("quote")
         var text = body.textNodes().joinToString().escapeMarkdown()
