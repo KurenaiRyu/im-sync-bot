@@ -106,25 +106,21 @@ class InfoCommand : AbstractTelegramCommand() {
                 list.joinToString("\n")
             }
         } else {
-            val group = bot.groupConfigService.tgQQ[message.chatId]?.let { qqBot.getGroup(it) }
-            if (group == null) {
-                return "找不到绑定的qq群"
-            } else {
-                val list = ArrayList<String>()
-                val config = bot.groupConfigService.configs.firstOrNull { it.telegramGroupId == message.chatId }
-                list.add("绑定群id: `${group.id}`")
-                list.add("绑定群名称: `${group.name.escapeMarkdown()}`")
-                list.add("绑定群群主: `${group.owner.nick.escapeMarkdown()}`\\(`${group.owner.id}`\\)")
-                if (config?.status?.isNotEmpty() == true)
-                    list.add("状态: ${config.status.toString().escapeMarkdown()}")
+            val group = bot.groupConfigService.tgQQ[message.chatId]?.let { qqBot.getGroup(it) }?:return "找不到绑定的qq群"
+            val list = ArrayList<String>()
+            val config = bot.groupConfigService.configs.firstOrNull { it.telegramGroupId == message.chatId }
+            list.add("绑定群id: `${group.id}`")
+            list.add("绑定群名称: `${group.name.escapeMarkdown()}`")
+            list.add("绑定群群主: `${group.owner.nick.escapeMarkdown()}`\\(`${group.owner.id}`\\)")
+            if (config?.status?.isNotEmpty() == true)
+                list.add("状态: ${config.status.toString().escapeMarkdown()}")
 
-                val path =
-                    withIO { BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl, overwrite = true) }
-                bot.tg.send {
-                    messagePhoto(message.chatId, path.pathString, list.joinToString("\n").fmt(ParseMode.MARKDOWN_V2))
-                }
-                null
+            val path =
+                withIO { BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl, overwrite = true) }
+            bot.tg.send {
+                messagePhoto(message.chatId, path.pathString, list.joinToString("\n").fmt(ParseMode.MARKDOWN_V2))
             }
+            null
         }
     }
 
