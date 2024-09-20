@@ -181,7 +181,7 @@ infix fun <T : Object> T.constructorEquals(constructor: Int) = this.constructor 
 fun Update.info(): String {
     return when (this) {
         is UpdateConnectionState -> "Update connection state: ${state::class.simpleName}"
-        is UpdateMessageSendFailed -> "Sent message $oldMessageId -> ${message.id} to chat ${message.chatId} fail: $errorCode $errorMessage"
+        is UpdateMessageSendFailed -> "Sent message $oldMessageId -> ${message.id} to chat ${message.chatId} fail: ${error.code} ${error.message}"
         is UpdateMessageSendSucceeded -> "Sent message $oldMessageId -> ${message.id} to chat ${message.chatId}"
         is UpdateDeleteMessages -> "Deleted messages $messageIds from chat $chatId"
         is UpdateMessageContent -> "Edited message content $messageId from chat $chatId"
@@ -201,19 +201,19 @@ fun Update.info(): String {
 
 //////////////  message reply  //////////////
 fun SendMessage.setReplyToMessageId(messageId: Long?, chatId: Long? = null) {
-    this.replyTo ?: run { this.replyTo = MessageReplyToMessage() }
+    this.replyTo ?: run { this.replyTo = InputMessageReplyToMessage() }
     this.replyTo.setMessageId(messageId, chatId)
 }
 
 fun SendMessageAlbum.setReplyToMessageId(messageId: Long?, chatId: Long? = null) {
-    this.replyTo ?: run { this.replyTo = MessageReplyToMessage() }
+    this.replyTo ?: run { this.replyTo = InputMessageReplyToMessage() }
     this.replyTo.setMessageId(messageId, chatId)
 }
 
 fun Message.replyToMessageId() = this.replyTo?.messageId()
 fun Message.replyInChatId() = this.replyTo?.chatId()
 
-fun MessageReplyTo.setMessageId(messageId: Long?, chatId: Long? = null) = (this as? MessageReplyToMessage)?.apply {
+fun InputMessageReplyTo.setMessageId(messageId: Long?, chatId: Long? = null) = (this as? InputMessageReplyToMessage)?.apply {
     messageId?.also(this::messageId::set)
     chatId?.also(this::chatId::set)
 }

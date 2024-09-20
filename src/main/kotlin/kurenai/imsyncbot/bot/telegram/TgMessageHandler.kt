@@ -158,7 +158,7 @@ class TgMessageHandler(
                 bot.tg.pendingMessage.getIfPresent(update.oldMessageId)?.let {
                     bot.tg.pendingMessage.invalidate(update.oldMessageId)
                     if (it.isActive) {
-                        it.resumeWith(Result.failure(BotException("[${update.errorCode}] ${update.errorMessage}")))
+                        it.resumeWith(Result.failure(BotException("[${update.error}] ${update.error.message}")))
                     }
                 }
             }
@@ -236,8 +236,8 @@ class TgMessageHandler(
                     update.oldMessageId,
                     update.message.id,
                     update.message.chatId,
-                    update.errorCode,
-                    update.errorMessage
+                    update.error.code,
+                    update.error.message
                 )
             }
 

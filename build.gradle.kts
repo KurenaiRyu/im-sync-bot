@@ -33,7 +33,7 @@ repositories {
             maven("https://s01.oss.sonatype.org/content/repositories/snapshots")
         }
         filter {
-            includeGroup("top.mrxiaom")
+            includeGroup("top.mrxiaom.mirai")
         }
     }
 }
@@ -68,7 +68,7 @@ object Versions {
     const val VERTX_VERSION = "4.2.3"
     const val LOG4J = "2.20.0"
     const val KTOR = "2.3.+"
-    const val TD_LIGHT = "3.1.4+td.1.8.17"
+    const val TD_LIGHT = "3.4.0+td.1.8.26"
     const val MIRAI = "2.16.0-RC"
     const val KORD = "0.9.0"
     const val COROUTINE_TEST = "1.7.1"
@@ -113,7 +113,7 @@ dependencies {
     implementation("net.mamoe:mirai-core-api")
 //    implementation("net.mamoe:mirai-core")
     implementation("net.mamoe:mirai-core-utils")
-    implementation("top.mrxiaom:overflow-core:2.16.+")
+    implementation("top.mrxiaom.mirai:overflow-core:0.9.9.513-b165a7a-SNAPSHOT")
 
     //tdlib
     implementation(platform("it.tdlight:tdlight-java-bom:${Versions.TD_LIGHT}"))
