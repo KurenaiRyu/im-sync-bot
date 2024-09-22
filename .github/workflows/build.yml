@@ -56,7 +56,7 @@ jobs:
       - name: Build with Gradle
         if: steps.cache-jar.outputs.cache-hit != 'true'
         run: ./gradlew build
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: im-sync-bot
           path: build/libs/
