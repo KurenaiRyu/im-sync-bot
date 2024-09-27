@@ -7,7 +7,7 @@ im同步机器人，现主要同步（转发）tg跟qq群。
 
 ## 使用方式
 - jar包运行方式  
-  1. 单独jar包运行需要自己搭建环境，要求要安装java 17、redis、ffmpeg、dwebp。  
+  1. 单独jar包运行需要自己搭建环境，要求要安装java 17、ffmpeg、dwebp。  
   java，redis是必须，但版本号可以稍低。  
   ffmpeg、dwebp则不一定需要但是会报错误，windows用户可以下载对应exe文件放入jar包所在的目录下即可。
   上述软件具体安装这里不做赘述。
