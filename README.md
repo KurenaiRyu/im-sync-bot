@@ -7,9 +7,8 @@ im同步机器人，现主要同步（转发）tg跟qq群。
 
 ## 使用方式
 - jar包运行方式  
-  1. 单独jar包运行需要自己搭建环境，要求要安装java 17、ffmpeg、dwebp。  
-  java，redis是必须，但版本号可以稍低。  
-  ffmpeg、dwebp则不一定需要但是会报错误，windows用户可以下载对应exe文件放入jar包所在的目录下即可。
+  1. 单独jar包运行需要自己搭建环境，要求要安装java 17。  
+  另外ffmpeg、dwebp则不一定需要但是会报错误，windows用户可以下载对应exe文件放入jar包所在的目录下即可。
   上述软件具体安装这里不做赘述。
   2. 复制项目下的`config.example.yaml`为`application.yaml`，根据文件内的注释修改配置。
   3. 准备好环境后，在[Release](https://github.com/KurenaiRyu/im-sync-bot/releases)
