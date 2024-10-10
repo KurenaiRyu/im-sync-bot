@@ -5,6 +5,7 @@ plugins {
     id("org.springframework.boot") version "3.1.0"
     id("io.spring.dependency-management") version "1.1.0"
     id("io.freefair.lombok") version "8.1.0"
+    id("com.google.devtools.ksp") version "2.0.0-1.0.24"
     kotlin("jvm") version "2.0.0"
     kotlin("plugin.spring") version "2.0.0"
     kotlin("plugin.lombok") version "2.0.0"
@@ -50,6 +51,10 @@ lombok {
 
 
 kotlin {
+    sourceSets.main {
+        kotlin.srcDir("build/generated/ksp/main/kotlin")
+    }
+
     compilerOptions {
         languageVersion.set(KotlinVersion.KOTLIN_2_0)
         freeCompilerArgs.set(
@@ -73,6 +78,7 @@ object Versions {
     const val KORD = "0.9.0"
     const val COROUTINE_TEST = "1.7.1"
     const val LOMBOK = "1.18.32"
+    const val JIMMER = "0.8.+"
 }
 dependencies {
 
@@ -156,7 +162,9 @@ dependencies {
     implementation("com.google.guava:guava:31.1-jre")
     implementation("org.jsoup:jsoup:1.15.3")
 
-    implementation("org.redisson:redisson:3.19.1")
+    //jimmer
+    implementation("org.babyfish.jimmer:jimmer-sql-kotlin:${Versions.JIMMER}")
+    ksp("org.babyfish.jimmer:jimmer-ksp:${Versions.JIMMER}")
 
     implementation("org.reflections", "reflections", "0.10.2")
 

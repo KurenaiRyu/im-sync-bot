@@ -1,9 +1,18 @@
 package kurenai.imsyncbot
 
 import com.linecorp.kotlinjdsl.spring.data.SpringDataQueryFactory
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import jakarta.persistence.EntityManager
+import kurenai.imsyncbot.jimmer.SqliteDialect
 import kurenai.imsyncbot.repository.*
 import kurenai.imsyncbot.utils.setEnv
+import org.babyfish.jimmer.sql.JSqlClient
+import org.babyfish.jimmer.sql.dialect.Dialect
+import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.cfg.KSqlClientDsl.ConnectionManagerDsl
+import org.babyfish.jimmer.sql.kt.newKSqlClient
+import org.babyfish.jimmer.sql.runtime.ConnectionManager
 import org.springframework.boot.Banner
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -65,6 +74,17 @@ fun initProperties() {
             pop.load(stream)
             setEnv(pop)
         }
+    }
+}
+
+fun initDB() {
+    val config = HikariConfig()
+    config.jdbcUrl = "jdbc:sqlite:im-sync-bot.db"
+    config.driverClassName = "org.sqlite.JDBC"
+    config.isAutoCommit = false
+    val client = newKSqlClient {
+        setDialect(SqliteDialect())
+        setConnectionManager(ConnectionManager.simpleConnectionManager(HikariDataSource(config)))
     }
 }
 
