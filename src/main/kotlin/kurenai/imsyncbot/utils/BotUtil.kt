@@ -2,7 +2,6 @@ package kurenai.imsyncbot.utils
 
 import it.tdlight.jni.TdApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.exception.BotException
@@ -104,26 +103,26 @@ object BotUtil {
         if (pngFile.exists()) return pngFile
         val webpPath = file.local.path?.let(Path::of) ?: error("Webp local path cannot be null")
         pngFile.parent.createDirectories()
-        val tmpFile = Path.of(getImagePath("$filename-tmp.png"))
+//        val tmpFile = Path.of(getImagePath("$filename-tmp.png"))
 
         val toPngProcess = runCommandAwait(
             "dwebp",
             webpPath.pathString,
             "-o",
-            tmpFile.pathString
-        )
-        if (toPngProcess.exitValue() != 0 || !tmpFile.exists() || tmpFile.fileSize() == 0L) throw BotException("Webp to png fail")
-
-        val resizeProcess = runCommandAwait(
-            "ffmpeg",
-            "-y",
-            "-i",
-            tmpFile.pathString,
-            "-vf",
-            "scale=320:-1",
             pngFile.pathString
         )
-        if (resizeProcess.exitValue() != 0  || !pngFile.exists() || pngFile.fileSize() == 0L) throw BotException("Png resize fail")
+        if (toPngProcess.exitValue() != 0 || !pngFile.exists() || pngFile.fileSize() == 0L) throw BotException("Webp to png fail")
+
+//        val resizeProcess = runCommandAwait(
+//            "ffmpeg",
+//            "-y",
+//            "-i",
+//            tmpFile.pathString,
+//            "-vf",
+//            "scale=320:-1",
+//            pngFile.pathString
+//        )
+//        if (resizeProcess.exitValue() != 0  || !pngFile.exists() || pngFile.fileSize() == 0L) throw BotException("Png resize fail")
 
         return pngFile
     }
