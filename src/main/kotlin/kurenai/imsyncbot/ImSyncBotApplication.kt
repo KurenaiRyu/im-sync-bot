@@ -7,6 +7,7 @@ import jakarta.persistence.EntityManager
 import kurenai.imsyncbot.jimmer.SqliteDialect
 import kurenai.imsyncbot.repository.*
 import kurenai.imsyncbot.utils.setEnv
+import org.babyfish.jimmer.sql.event.TriggerType
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.newKSqlClient
 import org.babyfish.jimmer.sql.runtime.ConnectionManager
@@ -35,7 +36,6 @@ import kotlin.io.path.name
 @EnableConfigurationProperties(ConfigProperties::class)
 class ImSyncBotApplication
 
-lateinit var qqMessageRepository: QQMessageRepository
 lateinit var qqTgRepository: QQTgRepository
 lateinit var fileCacheRepository: FileCacheRepository
 lateinit var groupConfigRepository: GroupConfigRepository
@@ -51,7 +51,6 @@ suspend fun main(args: Array<String>) {
     applicationContext = runApplication<ImSyncBotApplication>(*args) {
         this.setBannerMode(Banner.Mode.OFF)
     }
-    qqMessageRepository = applicationContext.getBean(QQMessageRepository::class.java)
     qqTgRepository = applicationContext.getBean(QQTgRepository::class.java)
     fileCacheRepository = applicationContext.getBean(FileCacheRepository::class.java)
     groupConfigRepository = applicationContext.getBean(GroupConfigRepository::class.java)
@@ -79,8 +78,10 @@ fun initDB() {
     val config = HikariConfig()
     config.jdbcUrl = "jdbc:sqlite:im-sync-bot.db"
     config.driverClassName = "org.sqlite.JDBC"
-    config.isAutoCommit = false
+    config.isAutoCommit = true
+    config.maximumPoolSize = 1
     sqlClient = newKSqlClient {
+        setTriggerType(TriggerType.BINLOG_ONLY)
         setDialect(SqliteDialect())
         setConnectionManager(ConnectionManager.simpleConnectionManager(HikariDataSource(config)))
     }

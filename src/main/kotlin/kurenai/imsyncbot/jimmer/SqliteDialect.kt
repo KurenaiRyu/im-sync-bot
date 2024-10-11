@@ -101,6 +101,8 @@ class SqliteDialect : DefaultDialect() {
             .enter(AbstractSqlBuilder.ScopeType.WHERE)
             .appendPredicates()
             .leave()
+            .sql(" returning ")
+            .appendId()
     }
 
     override fun upsert(ctx: UpsertContext) {

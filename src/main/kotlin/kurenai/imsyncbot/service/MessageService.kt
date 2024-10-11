@@ -1,43 +1,27 @@
 package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
-import kotlinx.serialization.json.Json
-import kurenai.imsyncbot.domain.QQMessage
-import kurenai.imsyncbot.domain.QQTg
+import kurenai.imsyncbot.domain.*
 import kurenai.imsyncbot.imSyncBot
-import kurenai.imsyncbot.jimmer.domain.botId
-import kurenai.imsyncbot.jimmer.domain.by
-import kurenai.imsyncbot.jimmer.domain.copy
-import kurenai.imsyncbot.qqMessageRepository
 import kurenai.imsyncbot.qqTgRepository
+import kurenai.imsyncbot.repository.QQMessageRepository
 import kurenai.imsyncbot.sqlClient
-import kurenai.imsyncbot.utils.BotUtil.localDateTime
+import kurenai.imsyncbot.utils.BotUtil.toEntity
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.event.events.MessageRecallEvent
 import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.sourceMessage
-import org.babyfish.jimmer.kt.new
-import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import top.mrxiaom.overflow.Overflow
-import top.mrxiaom.overflow.contact.RemoteBot
-import kotlin.jvm.optionals.getOrNull
 
 
 object MessageService {
 
     private val log = getLogger()
-    private val messageJson = Json {
-        ignoreUnknownKeys = true
-    }
 
-    suspend fun save(message: QQMessage) = runCatching {
-        withIO {
-            qqMessageRepository.save(message)
-        }
-    }.onFailure {
-        log.error("Save message failed", it)
+    suspend fun save(message: QQMessage) = withIO {
+        sqlClient.save(message).modifiedEntity
     }
 
     /**
@@ -46,49 +30,26 @@ object MessageService {
      * @param messageChain
      * @param messages
      */
-    suspend fun cache(chain: MessageChain, messages: Array<TdApi.Message>? = null) =
-        runCatching {
-            val qqMsg = sqlClient.createQuery(kurenai.imsyncbot.jimmer.domain.QQMessage::class) {
-                where(table.botId eq chain.bot.id)
-                select(table)
-            }.fetchOneOrNull()?.let { entity ->
-                sqlClient.save(entity.copy {
+    suspend fun cache(chain: MessageChain, messages: Array<TdApi.Message>? = null) = runCatching {
+        withIO {
+            val qqMsg = QQMessageRepository.findByChain(chain)?.let { entity ->
+                save(entity.copy {
                     handled = true
-                }).modifiedEntity
-            }?: let {
-                new(kurenai.imsyncbot.jimmer.domain.QQMessage::class).by {
-                    botId = chain.bot.id
-                    targetId = chain.source.targetId
-                    messageId = chain.source.ids[0]
-                    json = Overflow.serializeMessage(imSyncBot.qq.qqBot as? RemoteBot, chain)
-                    type = chain.source.kind
-                    time = chain.source.localDateTime()
-                    handled = true
+                })
+            } ?: chain.toEntity(true)
+
+            messages?.map {
+                QQTg().apply {
+                    this.qqId = qqMsg.id
+                    this.qqMsgId = qqMsg.messageId
+                    tgGrpId = it.chatId
+                    tgMsgId = it.id
                 }
-            }
-
-
-            withIO {
-//                val entity = qqMessageRepository.findByBotIdAndTargetIdAndMessageId(
-//                    chain.bot.id,
-//                    chain.source.targetId,
-//                    chain.source.ids[0]
-//                )
-//                    ?: chain.toEntity()
-//                entity.handled = true
-//                val qqMsg = qqMessageRepository.save(entity)
-                messages?.map {
-                    QQTg().apply {
-                        this.qqId = qqMsg.id
-                        this.qqMsgId = qqMsg.messageId
-                        tgGrpId = it.chatId
-                        tgMsgId = it.id
-                    }
-                }?.let(qqTgRepository::saveAll)
-            }
-        }.onFailure {
-            log.error("Cache message failed", it)
+            }?.let(qqTgRepository::saveAll)
         }
+    }.onFailure {
+        log.error("Cache message failed", it)
+    }
 
     /**
      * 缓存信息，用于receipt
@@ -115,19 +76,15 @@ object MessageService {
         require(botId > 0L) { "Bot id should be greater than to 0" }
         require(targetId > 0L) { "Target id should be greater than to 0" }
         require(msgId != 0) { "Message id should bot be 0" }
-        return withIO {
-            qqMessageRepository.findByBotIdAndTargetIdAndMessageId(botId, targetId, msgId)?.let {
-                qqTgRepository.findByQqId(it.id).firstOrNull()
-            }
+        return QQMessageRepository.findByBotIdAndTargetIdAndMessageId(botId, targetId, msgId)?.let {
+            qqTgRepository.findByQqId(it.id).firstOrNull()
         }
     }
 
     suspend fun findQQMessageByDelete(update: TdApi.UpdateDeleteMessages): List<QQMessage> {
-        return withIO {
-            val qqIds =
-                qqTgRepository.findByTgGrpIdAndTgMsgIdIn(update.chatId, update.messageIds.toList()).map { it.qqId }
-            qqMessageRepository.findAllById(qqIds)
-        }
+        val qqIds =
+            qqTgRepository.findByTgGrpIdAndTgMsgIdIn(update.chatId, update.messageIds.toList()).map { it.qqId }
+        return QQMessageRepository.findAllById(qqIds)
     }
 
     suspend fun findRelationByRecall(event: MessageRecallEvent.GroupRecall): QQTg? {
@@ -137,20 +94,16 @@ object MessageService {
     suspend fun findQQMessageByTg(message: TdApi.Message) = findQQMessageByTg(message.chatId, message.id)
 
     suspend fun findQQMessageByTg(chatId: Long, messageId: Long): QQMessage? {
-        return withIO {
-            qqTgRepository.findByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
-                qqMessageRepository.findById(it.qqId).getOrNull()
-            }
+        return qqTgRepository.findByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
+            QQMessageRepository.findById(it.qqId)
         }
     }
 
     suspend inline fun findQQByTg(message: TdApi.Message) = findQQByTg(message.chatId, message.id)
 
     suspend fun findQQByTg(chatId: Long, messageId: Long): MessageChain? {
-        return withIO {
-            qqTgRepository.findByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
-                qqMessageRepository.findById(it.qqId).getOrNull()
-            }
+        return qqTgRepository.findByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
+            QQMessageRepository.findById(it.qqId)
         }?.let {
             Overflow.deserializeMessage(imSyncBot.qq.qqBot, it.json)
         }

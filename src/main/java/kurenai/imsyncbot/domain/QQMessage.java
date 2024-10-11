@@ -1,20 +1,11 @@
 package kurenai.imsyncbot.domain;
 
-import jakarta.persistence.*;
-import kurenai.imsyncbot.configuration.annotation.SnowFlakeGenerator;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import net.mamoe.mirai.message.data.MessageSourceKind;
-import org.hibernate.annotations.ColumnDefault;
-
-import java.time.LocalDateTime;
-
 /**
  * @author Kurenai
  * @since 2023/7/22 19:36
  */
 
+/*
 
 @Entity
 @Table(
@@ -51,3 +42,4 @@ public class QQMessage {
     @ColumnDefault("0")
     private Integer version;
 }
+*/

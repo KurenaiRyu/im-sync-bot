@@ -1,18 +1,12 @@
-package kurenai.imsyncbot.jimmer.domain
+package kurenai.imsyncbot.domain
 
-import kurenai.imsyncbot.domain.MessageStatus
 import kurenai.imsyncbot.jimmer.SnowFlakeGenerator
 import net.mamoe.mirai.message.data.MessageSourceKind
-import org.babyfish.jimmer.sql.Column
-import org.babyfish.jimmer.sql.Entity
-import org.babyfish.jimmer.sql.GeneratedValue
-import org.babyfish.jimmer.sql.GenerationType
-import org.babyfish.jimmer.sql.Id
-import org.babyfish.jimmer.sql.Key
-import org.babyfish.jimmer.sql.meta.UUIDIdGenerator
+import org.babyfish.jimmer.sql.*
 import java.time.LocalDateTime
 
 @Entity
+@Table(name = "QQ_MESSAGE")
 interface QQMessage {
 
     @Id
@@ -22,7 +16,6 @@ interface QQMessage {
     val messageId: Int
     @Key
     val botId: Long
-    @Key
     val fromId: Long
     @Key
     val targetId: Long
@@ -32,7 +25,7 @@ interface QQMessage {
     val status: MessageStatus
 
     @Column(name = "JSON_TXT")
-    val json: String?
+    val json: String
     val handled: Boolean?
     val time: LocalDateTime
 

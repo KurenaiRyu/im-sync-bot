@@ -4,6 +4,7 @@ import it.tdlight.jni.TdApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.domain.QQMessage
+import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.imSyncBot
 import kurenai.imsyncbot.snowFlake
@@ -11,6 +12,7 @@ import net.mamoe.mirai.event.events.MessageEvent
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.source
+import org.babyfish.jimmer.kt.new
 import top.mrxiaom.overflow.Overflow
 import top.mrxiaom.overflow.contact.RemoteBot
 import java.nio.file.Files
@@ -158,7 +160,7 @@ object BotUtil {
     fun MessageChain.toEntity(handled: Boolean = false): QQMessage {
         val source = this.source
         val jsonTxt = Overflow.serializeMessage(imSyncBot.qq.qqBot as? RemoteBot, this)
-        return QQMessage().apply {
+        return new(QQMessage::class).by {
             messageId = source.ids[0]
             botId = source.botId
             targetId = source.targetId
