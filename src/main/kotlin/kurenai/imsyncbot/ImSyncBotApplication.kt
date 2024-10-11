@@ -7,10 +7,7 @@ import jakarta.persistence.EntityManager
 import kurenai.imsyncbot.jimmer.SqliteDialect
 import kurenai.imsyncbot.repository.*
 import kurenai.imsyncbot.utils.setEnv
-import org.babyfish.jimmer.sql.JSqlClient
-import org.babyfish.jimmer.sql.dialect.Dialect
 import org.babyfish.jimmer.sql.kt.KSqlClient
-import org.babyfish.jimmer.sql.kt.cfg.KSqlClientDsl.ConnectionManagerDsl
 import org.babyfish.jimmer.sql.kt.newKSqlClient
 import org.babyfish.jimmer.sql.runtime.ConnectionManager
 import org.springframework.boot.Banner
@@ -19,7 +16,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Configuration
-import org.springframework.core.convert.Property
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories
 import java.nio.file.Files
 import java.nio.file.Path
@@ -48,6 +44,7 @@ lateinit var qqDiscordRepository: QqDiscordRepository
 lateinit var applicationContext: ApplicationContext
 lateinit var queryFactory: SpringDataQueryFactory
 lateinit var configProperties: ConfigProperties
+lateinit var sqlClient: KSqlClient
 
 suspend fun main(args: Array<String>) {
     initProperties()
@@ -62,6 +59,7 @@ suspend fun main(args: Array<String>) {
     qqDiscordRepository = applicationContext.getBean(QqDiscordRepository::class.java)
     queryFactory = applicationContext.getBean(SpringDataQueryFactory::class.java)
     configProperties = applicationContext.getBean(ConfigProperties::class.java)
+    initDB()
     start()
 }
 
@@ -82,7 +80,7 @@ fun initDB() {
     config.jdbcUrl = "jdbc:sqlite:im-sync-bot.db"
     config.driverClassName = "org.sqlite.JDBC"
     config.isAutoCommit = false
-    val client = newKSqlClient {
+    sqlClient = newKSqlClient {
         setDialect(SqliteDialect())
         setConnectionManager(ConnectionManager.simpleConnectionManager(HikariDataSource(config)))
     }

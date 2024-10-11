@@ -5,8 +5,13 @@ import kotlinx.serialization.json.Json
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.domain.QQTg
 import kurenai.imsyncbot.imSyncBot
+import kurenai.imsyncbot.jimmer.domain.botId
+import kurenai.imsyncbot.jimmer.domain.by
+import kurenai.imsyncbot.jimmer.domain.copy
 import kurenai.imsyncbot.qqMessageRepository
 import kurenai.imsyncbot.qqTgRepository
+import kurenai.imsyncbot.sqlClient
+import kurenai.imsyncbot.utils.BotUtil.localDateTime
 import kurenai.imsyncbot.utils.BotUtil.toEntity
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.withIO
@@ -14,7 +19,10 @@ import net.mamoe.mirai.event.events.MessageRecallEvent
 import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.sourceMessage
+import org.babyfish.jimmer.kt.new
+import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import top.mrxiaom.overflow.Overflow
+import top.mrxiaom.overflow.contact.RemoteBot
 import kotlin.jvm.optionals.getOrNull
 
 
@@ -41,15 +49,35 @@ object MessageService {
      */
     suspend fun cache(chain: MessageChain, messages: Array<TdApi.Message>? = null) =
         runCatching {
+            val qqMsg = sqlClient.createQuery(kurenai.imsyncbot.jimmer.domain.QQMessage::class) {
+                where(table.botId eq chain.bot.id)
+                select(table)
+            }.fetchOneOrNull()?.let { entity ->
+                sqlClient.save(entity.copy {
+                    handled = true
+                }).modifiedEntity
+            }?: let {
+                new(kurenai.imsyncbot.jimmer.domain.QQMessage::class).by {
+                    botId = chain.bot.id
+                    targetId = chain.source.targetId
+                    messageId = chain.source.ids[0]
+                    json = Overflow.serializeMessage(imSyncBot.qq.qqBot as? RemoteBot, chain)
+                    type = chain.source.kind
+                    time = chain.source.localDateTime()
+                    handled = true
+                }
+            }
+
+
             withIO {
-                val entity = qqMessageRepository.findByBotIdAndTargetIdAndMessageId(
-                    chain.bot.id,
-                    chain.source.targetId,
-                    chain.source.ids[0]
-                )
-                    ?: chain.toEntity()
-                entity.handled = true
-                val qqMsg = qqMessageRepository.save(entity)
+//                val entity = qqMessageRepository.findByBotIdAndTargetIdAndMessageId(
+//                    chain.bot.id,
+//                    chain.source.targetId,
+//                    chain.source.ids[0]
+//                )
+//                    ?: chain.toEntity()
+//                entity.handled = true
+//                val qqMsg = qqMessageRepository.save(entity)
                 messages?.map {
                     QQTg().apply {
                         this.qqId = qqMsg.id
