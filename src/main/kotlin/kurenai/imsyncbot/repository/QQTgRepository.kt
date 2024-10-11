@@ -14,7 +14,7 @@ interface QQTgRepository : JpaRepository<QQTg, Long> {
 
     fun findByTgGrpIdAndTgMsgIdIn(tgGrpId: Long, tgMsgId: Collection<Long>): List<QQTg>
 
-    fun findByQqId(qqId: Long): QQTg?
+    fun findByQqId(qqId: Long): List<QQTg>
 
     fun findAllByTgMsgId(tgMsgId: Long): List<QQTg>
 

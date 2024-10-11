@@ -12,7 +12,6 @@ import kurenai.imsyncbot.qqMessageRepository
 import kurenai.imsyncbot.qqTgRepository
 import kurenai.imsyncbot.sqlClient
 import kurenai.imsyncbot.utils.BotUtil.localDateTime
-import kurenai.imsyncbot.utils.BotUtil.toEntity
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.event.events.MessageRecallEvent
@@ -118,7 +117,7 @@ object MessageService {
         require(msgId != 0) { "Message id should bot be 0" }
         return withIO {
             qqMessageRepository.findByBotIdAndTargetIdAndMessageId(botId, targetId, msgId)?.let {
-                qqTgRepository.findByQqId(it.id)
+                qqTgRepository.findByQqId(it.id).firstOrNull()
             }
         }
     }
