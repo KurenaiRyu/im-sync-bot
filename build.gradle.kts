@@ -79,6 +79,7 @@ object Versions {
     const val COROUTINE_TEST = "1.7.1"
     const val LOMBOK = "1.18.32"
     const val JIMMER = "0.8.+"
+    const val JACKSON = "2.18.0"
 }
 dependencies {
 
@@ -90,11 +91,12 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-configuration-processor")
 
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.14.2")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:${Versions.JACKSON}")
     implementation("org.jetbrains.kotlinx:atomicfu:0.20.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.21")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.2")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:${Versions.JACKSON}")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${Versions.JACKSON}")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${Versions.JACKSON}")
 
     //exif
     implementation("com.ashampoo:kim:0.18.4")
