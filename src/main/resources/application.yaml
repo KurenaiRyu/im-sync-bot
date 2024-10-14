@@ -5,7 +5,8 @@ spring:
     url: jdbc:sqlite:im-sync-bot.db
     driver-class-name: org.sqlite.JDBC
     hikari:
-      auto-commit: false
+      auto-commit: true
+      maximum-pool-size: 1
   jpa:
     database-platform: org.hibernate.community.dialect.SQLiteDialect
     hibernate:
