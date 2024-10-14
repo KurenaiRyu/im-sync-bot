@@ -16,7 +16,11 @@ interface QQTg {
     val id: Long
     val qqId: Long
     val qqMsgId: Int
+
+    @Key
     val tgGrpId: Long
+
+    @Key
     val tgMsgId: Long
 
     @Version
