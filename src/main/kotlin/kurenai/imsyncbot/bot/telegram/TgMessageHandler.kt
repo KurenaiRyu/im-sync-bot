@@ -8,10 +8,10 @@ import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.Running
 import kurenai.imsyncbot.command.CommandDispatcher
+import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.exception.CommandException
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
-import kurenai.imsyncbot.qqTgRepository
 import kurenai.imsyncbot.repository.QQTgRepository
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
@@ -147,9 +147,12 @@ class TgMessageHandler(
                         log.trace("Resume {}", it)
                         it.resumeWith(Result.success(update.message))
                     } else {
-                        QQTgRepository.findByTgMsgId(update.oldMessageId).forEach { old ->
-                            old.tgMsgId = update.message.id
-                            qqTgRepository.save(old)
+                        QQTgRepository.findByTgMsgId(update.oldMessageId).map { exist ->
+                            exist.copy {
+                                tgMsgId = update.message.id
+                            }
+                        }.let { newOne ->
+                            QQTgRepository.saveAll(newOne)
                         }
                     }
                 }

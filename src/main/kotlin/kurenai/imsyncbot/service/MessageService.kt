@@ -3,7 +3,6 @@ package kurenai.imsyncbot.service
 import it.tdlight.jni.TdApi
 import kurenai.imsyncbot.domain.*
 import kurenai.imsyncbot.imSyncBot
-import kurenai.imsyncbot.qqTgRepository
 import kurenai.imsyncbot.repository.QQMessageRepository
 import kurenai.imsyncbot.repository.QQTgRepository
 import kurenai.imsyncbot.sqlClient
@@ -81,13 +80,13 @@ object MessageService {
         require(targetId > 0L) { "Target id should be greater than to 0" }
         require(msgId != 0) { "Message id should bot be 0" }
         return QQMessageRepository.findByBotIdAndTargetIdAndMessageId(botId, targetId, msgId)?.let {
-            qqTgRepository.findByQqId(it.id).firstOrNull()
+            QQTgRepository.findByQqId(it.id).firstOrNull()
         }
     }
 
     suspend fun findQQMessageByDelete(update: TdApi.UpdateDeleteMessages): List<QQMessage> {
         val qqIds =
-            qqTgRepository.findByTgGrpIdAndTgMsgIdIn(update.chatId, update.messageIds.toList()).map { it.qqId }
+            QQTgRepository.findByTgGrpIdAndTgMsgIdIn(update.chatId, update.messageIds.toList()).map { it.qqId }
         return QQMessageRepository.findByIds(qqIds)
     }
 
@@ -98,7 +97,7 @@ object MessageService {
     suspend fun findQQMessageByTg(message: TdApi.Message) = findQQMessageByTg(message.chatId, message.id)
 
     suspend fun findQQMessageByTg(chatId: Long, messageId: Long): QQMessage? {
-        return qqTgRepository.findOneByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
+        return QQTgRepository.findOneByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
             QQMessageRepository.findById(it.qqId)
         }
     }
@@ -106,7 +105,7 @@ object MessageService {
     suspend inline fun findQQByTg(message: TdApi.Message) = findQQByTg(message.chatId, message.id)
 
     suspend fun findQQByTg(chatId: Long, messageId: Long): MessageChain? {
-        return qqTgRepository.findOneByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
+        return QQTgRepository.findOneByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
             QQMessageRepository.findById<QQMessage>(it.qqId)
         }?.let {
             Overflow.deserializeMessage(imSyncBot.qq.qqBot, it.json)

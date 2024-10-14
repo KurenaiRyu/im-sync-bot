@@ -1,15 +1,10 @@
 package kurenai.imsyncbot.domain;
 
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.ColumnDefault;
-
 /**
  * @author Kurenai
  * @since 2023/7/22 19:30
  */
+/*
 
 @Entity
 @Table(name = "FILE_CACHE")
@@ -27,3 +22,4 @@ public class FileCache {
     @ColumnDefault("0")
     private Integer version;
 }
+*/
