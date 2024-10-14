@@ -11,7 +11,6 @@ import org.hibernate.annotations.ColumnDefault;
  * @since 2023/7/22 19:30
  */
 
-
 @Entity
 @Table(name = "FILE_CACHE")
 @Data

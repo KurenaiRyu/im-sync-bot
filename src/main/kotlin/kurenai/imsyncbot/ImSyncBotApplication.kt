@@ -36,8 +36,6 @@ import kotlin.io.path.name
 @EnableConfigurationProperties(ConfigProperties::class)
 class ImSyncBotApplication
 
-lateinit var qqTgRepository: QQTgRepository
-lateinit var fileCacheRepository: FileCacheRepository
 lateinit var groupConfigRepository: GroupConfigRepository
 lateinit var userConfigRepository: UserConfigRepository
 lateinit var qqDiscordRepository: QqDiscordRepository
@@ -51,8 +49,6 @@ suspend fun main(args: Array<String>) {
     applicationContext = runApplication<ImSyncBotApplication>(*args) {
         this.setBannerMode(Banner.Mode.OFF)
     }
-    qqTgRepository = applicationContext.getBean(QQTgRepository::class.java)
-    fileCacheRepository = applicationContext.getBean(FileCacheRepository::class.java)
     groupConfigRepository = applicationContext.getBean(GroupConfigRepository::class.java)
     userConfigRepository = applicationContext.getBean(UserConfigRepository::class.java)
     qqDiscordRepository = applicationContext.getBean(QqDiscordRepository::class.java)

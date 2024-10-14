@@ -11,6 +11,7 @@ import org.hibernate.annotations.ColumnDefault;
  * @author Kurenai
  * @since 2023/7/22 19:40
  */
+/*
 
 @Entity
 @Table(
@@ -35,3 +36,4 @@ public class QQTg {
     @ColumnDefault("0")
     private Integer version;
 }
+*/

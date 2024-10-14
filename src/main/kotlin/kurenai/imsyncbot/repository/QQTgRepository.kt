@@ -1,21 +1,57 @@
 package kurenai.imsyncbot.repository
 
 import kurenai.imsyncbot.domain.QQTg
-import org.springframework.data.jpa.repository.JpaRepository
+import kurenai.imsyncbot.domain.qqId
+import kurenai.imsyncbot.domain.tgGrpId
+import kurenai.imsyncbot.domain.tgMsgId
+import kurenai.imsyncbot.sqlClient
+import kurenai.imsyncbot.utils.withIO
+import org.babyfish.jimmer.sql.kt.ast.expression.eq
+import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 
 /**
  * @author Kurenai
  * @since 2023/6/3 16:36
  */
 
-interface QQTgRepository : JpaRepository<QQTg, Long> {
+object QQTgRepository : BaseRepository<QQTg, Long>() {
 
-    fun findByTgGrpIdAndTgMsgId(tgGrpId: Long, tgMsgId: Long): QQTg?
+    suspend fun findOneByTgGrpIdAndTgMsgId(tgGrpId: Long, tgMsgId: Long): QQTg? = withIO {
+        sqlClient.createQuery(QQTg::class) {
+            where(
+                table.tgGrpId eq tgGrpId,
+                table.tgMsgId eq tgMsgId,
+                )
+            select(table)
+        }.fetchOneOrNull()
+    }
 
-    fun findByTgGrpIdAndTgMsgIdIn(tgGrpId: Long, tgMsgId: Collection<Long>): List<QQTg>
+    suspend fun findByTgGrpIdAndTgMsgIdIn(tgGrpId: Long, tgMsgId: Collection<Long>): List<QQTg> = withIO {
+        sqlClient.createQuery(QQTg::class) {
+            where(
+                table.tgGrpId eq tgGrpId,
+                table.tgMsgId valueIn tgMsgId,
+            )
+            select(table)
+        }.execute()
+    }
 
-    fun findByQqId(qqId: Long): List<QQTg>
+    suspend fun findByQqId(qqId: Long): List<QQTg> = withIO {
+        sqlClient.createQuery(QQTg::class) {
+            where(
+                table.qqId eq qqId,
+            )
+            select(table)
+        }.execute()
+    }
 
-    fun findAllByTgMsgId(tgMsgId: Long): List<QQTg>
+    suspend fun findByTgMsgId(tgMsgId: Long): List<QQTg> = withIO {
+        sqlClient.createQuery(QQTg::class) {
+            where(
+                table.tgMsgId eq tgMsgId,
+            )
+            select(table)
+        }.execute()
+    }
 
 }

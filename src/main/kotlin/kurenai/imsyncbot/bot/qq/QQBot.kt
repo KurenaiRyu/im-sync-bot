@@ -185,7 +185,11 @@ class QQBot(
             when (event) {
                 is MessageEvent -> {
                     val message = event.toEntity()
-                    MessageService.save(event.toEntity())
+                    kotlin.runCatching {
+                        MessageService.save(event.toEntity())
+                    }.onFailure {
+                        log.warn("Save message error", it)
+                    }
                     when (event) {
                         is FriendMessageEvent -> {
 //                            bot.qqMessageHandler.onFriendMessage(

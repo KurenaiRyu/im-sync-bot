@@ -12,6 +12,7 @@ import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.exception.CommandException
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.qqTgRepository
+import kurenai.imsyncbot.repository.QQTgRepository
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
 import kurenai.imsyncbot.utils.BotUtil.toSource
@@ -146,7 +147,7 @@ class TgMessageHandler(
                         log.trace("Resume {}", it)
                         it.resumeWith(Result.success(update.message))
                     } else {
-                        qqTgRepository.findAllByTgMsgId(update.oldMessageId).forEach { old ->
+                        QQTgRepository.findByTgMsgId(update.oldMessageId).forEach { old ->
                             old.tgMsgId = update.message.id
                             qqTgRepository.save(old)
                         }

@@ -1,9 +1,6 @@
 package kurenai.imsyncbot.repository
 
-import kurenai.imsyncbot.domain.QQMessage
-import kurenai.imsyncbot.domain.botId
-import kurenai.imsyncbot.domain.messageId
-import kurenai.imsyncbot.domain.targetId
+import kurenai.imsyncbot.domain.*
 import kurenai.imsyncbot.sqlClient
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.message.data.MessageChain
@@ -16,14 +13,12 @@ import org.babyfish.jimmer.sql.kt.ast.expression.eq
  * @since 2023/6/3 16:36
  */
 
-object QQMessageRepository {
-
-    suspend fun findById(id: Long) = withIO { sqlClient.findById(QQMessage::class, id) }
+object QQMessageRepository: BaseRepository<QQMessage, Long>() {
 
     suspend fun findByChain(chain: MessageChain) =
         findByBotIdAndTargetIdAndMessageId(chain.bot.id, chain.source.targetId, chain.source.ids[0])
 
-    suspend fun findByBotIdAndTargetIdAndMessageId(botId: Long, targetId: Long, messageId: Int) = withIO {
+    suspend fun findByBotIdAndTargetIdAndMessageId(botId: Long, targetId: Long, messageId: Int): QQMessage? = withIO {
         sqlClient.createQuery(QQMessage::class) {
             where(
                 table.botId eq botId,
@@ -32,10 +27,6 @@ object QQMessageRepository {
             )
             select(table)
         }.fetchOneOrNull()
-    }
-
-    suspend fun findAllById(qqIds: List<Long>) = withIO {
-        sqlClient.findByIds(QQMessage::class, qqIds)
     }
 
 }

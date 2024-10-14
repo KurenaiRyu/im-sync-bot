@@ -5,6 +5,7 @@ import kurenai.imsyncbot.domain.*
 import kurenai.imsyncbot.imSyncBot
 import kurenai.imsyncbot.qqTgRepository
 import kurenai.imsyncbot.repository.QQMessageRepository
+import kurenai.imsyncbot.repository.QQTgRepository
 import kurenai.imsyncbot.sqlClient
 import kurenai.imsyncbot.utils.BotUtil.toEntity
 import kurenai.imsyncbot.utils.getLogger
@@ -13,6 +14,7 @@ import net.mamoe.mirai.event.events.MessageRecallEvent
 import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.sourceMessage
+import org.babyfish.jimmer.kt.new
 import top.mrxiaom.overflow.Overflow
 
 
@@ -39,13 +41,15 @@ object MessageService {
             } ?: chain.toEntity(true)
 
             messages?.map {
-                QQTg().apply {
+                new(QQTg::class).by {
                     this.qqId = qqMsg.id
                     this.qqMsgId = qqMsg.messageId
                     tgGrpId = it.chatId
                     tgMsgId = it.id
                 }
-            }?.let(qqTgRepository::saveAll)
+            }?.let {
+                QQTgRepository.saveAll(it)
+            }
         }
     }.onFailure {
         log.error("Cache message failed", it)
@@ -84,7 +88,7 @@ object MessageService {
     suspend fun findQQMessageByDelete(update: TdApi.UpdateDeleteMessages): List<QQMessage> {
         val qqIds =
             qqTgRepository.findByTgGrpIdAndTgMsgIdIn(update.chatId, update.messageIds.toList()).map { it.qqId }
-        return QQMessageRepository.findAllById(qqIds)
+        return QQMessageRepository.findByIds(qqIds)
     }
 
     suspend fun findRelationByRecall(event: MessageRecallEvent.GroupRecall): QQTg? {
@@ -94,7 +98,7 @@ object MessageService {
     suspend fun findQQMessageByTg(message: TdApi.Message) = findQQMessageByTg(message.chatId, message.id)
 
     suspend fun findQQMessageByTg(chatId: Long, messageId: Long): QQMessage? {
-        return qqTgRepository.findByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
+        return qqTgRepository.findOneByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
             QQMessageRepository.findById(it.qqId)
         }
     }
@@ -102,8 +106,8 @@ object MessageService {
     suspend inline fun findQQByTg(message: TdApi.Message) = findQQByTg(message.chatId, message.id)
 
     suspend fun findQQByTg(chatId: Long, messageId: Long): MessageChain? {
-        return qqTgRepository.findByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
-            QQMessageRepository.findById(it.qqId)
+        return qqTgRepository.findOneByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
+            QQMessageRepository.findById<QQMessage>(it.qqId)
         }?.let {
             Overflow.deserializeMessage(imSyncBot.qq.qqBot, it.json)
         }

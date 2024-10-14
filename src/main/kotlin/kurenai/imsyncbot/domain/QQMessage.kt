@@ -28,5 +28,7 @@ interface QQMessage {
     val json: String
     val handled: Boolean?
     val time: LocalDateTime
+    @Version
+    val version: Int
 
 }
