@@ -2,19 +2,17 @@ package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
 import jakarta.persistence.criteria.Predicate
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.configuration.AbstractConfig
 import kurenai.imsyncbot.domain.UserConfig
-import kurenai.imsyncbot.userConfigRepository
+import kurenai.imsyncbot.domain.by
+import kurenai.imsyncbot.domain.copy
+import kurenai.imsyncbot.repository.UserConfigRepository
 import kurenai.imsyncbot.utils.isBot
-import kurenai.imsyncbot.utils.json
 import kurenai.imsyncbot.utils.username
-import java.nio.file.Path
-import kotlin.io.path.exists
-import kotlin.io.path.moveTo
-import kotlin.io.path.readText
+import org.babyfish.jimmer.kt.new
 
 /**
  * 用户配置类
@@ -43,175 +41,155 @@ class UserConfigService(
     var admins = emptyList<Long>()
     var superAdmins = emptyList<Long>()
     override lateinit var configs: MutableList<UserConfig>
-    override val path: Path = Path.of("./config", "user.json")
 
     init {
-        migration()
-        refresh()
+        runBlocking { refresh() }
     }
 
-    override fun migration() {
-        if (path.exists()) {
-            val configs = json.decodeFromString(ListSerializer(User.serializer()), path.readText()).toMutableList()
-            if (configs.isNotEmpty()) {
-                val exists = findByQQOrTg(configs.mapNotNull { it.qq }, configs.mapNotNull { it.tg })
-                val existQQ = exists.map { it.qq }.toHashSet()
-                val existTG = exists.map { it.tg }.toHashSet()
-                val updates = configs.filter {
-                    it.qq !in existQQ && it.tg !in existTG
-                }.map {
-                    UserConfig().apply {
-                        qq = it.qq
-                        tg = it.tg
-                        bindingName = it.bindingName
-                        status = it.status
-                    }
-                }
-                userConfigRepository.saveAll(updates)
-                path.moveTo(path.parent.resolve("user.bak.json"))
-            }
-        }
-    }
-
-
-    fun admin(id: Long, username: String? = null, isSuper: Boolean = false) {
+    suspend fun admin(id: Long, username: String? = null, isSuper: Boolean = false) {
         val filters = configs.filter { c -> id == c.tg }
         val adminStatus = if (isSuper) UserStatus.SUPER_ADMIN else UserStatus.ADMIN
         if (filters.isEmpty()) {
-            val new = UserConfig().apply {
+            val new = new(UserConfig::class).by {
                 tg = id
-                status = hashSetOf(adminStatus)
+                status = listOf(adminStatus)
             }
-            userConfigRepository.save(new)
+            UserConfigRepository.save(new)
             refresh()
         } else {
-            filters.forEach { c ->
-                if (!c.status.contains(adminStatus)) {
-                    c.status.add(adminStatus)
+            filters.map { c ->
+                c.copy {
+                    if (status?.contains(adminStatus) == false) {
+                        status().add(adminStatus)
+                    }
+                    if (!isSuper) status().remove(UserStatus.SUPER_ADMIN)
                 }
-                if (!isSuper) c.status.remove(UserStatus.SUPER_ADMIN)
+            }.let {
+                UserConfigRepository.saveAll(it)
             }
-            userConfigRepository.saveAll(filters)
         }
     }
 
-    fun removeAdmin(id: Long) {
+    suspend fun removeAdmin(id: Long) {
         val filters = configs.filter { c -> id == c.tg }
-        filters.forEach {
-            it.status.remove(UserStatus.SUPER_ADMIN)
-            it.status.remove(UserStatus.ADMIN)
+        filters.map {
+            it.copy {
+                status().remove(UserStatus.SUPER_ADMIN)
+                status().remove(UserStatus.ADMIN)
+            }
+        }.let {
+            UserConfigRepository.saveAll(it)
         }
-        userConfigRepository.saveAll(filters)
     }
 
-    fun ban(tg: Long? = null, qq: Long? = null, username: String? = null) {
+    suspend fun ban(tg: Long? = null, qq: Long? = null, username: String? = null) {
         addStatus(UserStatus.BANNED, tg, qq, username)
     }
 
-    fun unban(id: Long) {
+    suspend fun unban(id: Long) {
         removeStatus(id, UserStatus.BANNED)
     }
 
-    fun banPic(tg: Long? = null, qq: Long? = null, username: String? = null) {
+    suspend fun banPic(tg: Long? = null, qq: Long? = null, username: String? = null) {
         addStatus(UserStatus.PIC_BANNED, tg, qq, username)
     }
 
-    fun unbanPic(id: Long) {
+    suspend fun unbanPic(id: Long) {
         removeStatus(id, UserStatus.PIC_BANNED)
     }
 
-    private fun addStatus(status: UserStatus, tg: Long? = null, qq: Long? = null, username: String? = null) {
+    private suspend fun addStatus(status: UserStatus, tg: Long? = null, qq: Long? = null, username: String? = null) {
         val filters = configs.filter { c -> tg?.let { c.tg == it } ?: qq?.let { c.qq == it } ?: false }
         if (filters.isEmpty()) {
-            val new = UserConfig().apply {
+            UserConfigRepository.save(new(UserConfig::class).by {
                 this.tg = tg
                 this.qq = qq
-                this.status = hashSetOf(status)
-            }
-            userConfigRepository.save(new)
+                this.status = listOf(status)
+            })
             refresh()
         } else {
-            filters.forEach { c ->
-                if (!c.status.contains(UserStatus.BANNED)) {
-                    c.status.add(UserStatus.BANNED)
+            filters.map { c ->
+                if (c.status?.contains(UserStatus.BANNED) == false) {
+                    UserConfigRepository.save(
+                        c.copy {
+                            this.status().add(UserStatus.BANNED)
+                        }
+                    )
                 }
             }
-            userConfigRepository.saveAll(filters)
         }
     }
 
-    private fun removeStatus(id: Long, status: UserStatus) {
+    private suspend fun removeStatus(id: Long, status: UserStatus) {
         val filters = configs.filter { c -> (id == c.tg || id == c.qq) }
         filters.forEach {
-            it.status.remove(status)
+            UserConfigRepository.save(it.copy {
+                status().remove(status)
+            })
         }
-        userConfigRepository.saveAll(filters)
     }
 
-    fun bindName(tg: Long? = null, qq: Long? = null, bindingName: String) {
+    suspend fun bindName(tg: Long? = null, qq: Long? = null, bindingName: String) {
         val filter = configs.filter { c -> tg?.let { c.tg == it } ?: qq?.let { c.qq == it } ?: false }
         if (filter.isEmpty()) {
-            val new = UserConfig().apply {
+            val theNew = new(UserConfig::class).by {
                 this.tg = tg
                 this.qq = qq
                 this.bindingName = bindingName
             }
-            configs.add(new)
-            userConfigRepository.save(new)
+            configs.add(theNew)
+            UserConfigRepository.save(theNew)
             refresh()
         } else {
             filter.forEach { c ->
-                c.bindingName = bindingName
+                UserConfigRepository.save(c.copy {
+                    this.bindingName = bindingName
+                })
             }
-            userConfigRepository.saveAll(filter)
         }
     }
 
-    fun unbindNameByTG(id: Long) {
-        val filters = configs.filter { b -> id == b.tg }
-        filters.forEach {
-            it.bindingName = null
-        }
-        afterUnbind(filters)
+    suspend fun unbindNameByTG(id: Long) {
+        doUnbind(configs.filter { b -> id == b.tg })
     }
 
-    fun unbindNameByQQ(id: Long) {
-        val filters = configs.filter { b -> id == b.qq }
-        filters.forEach {
-            it.bindingName = null
-        }
-        afterUnbind(filters)
+    suspend fun unbindNameByQQ(id: Long) {
+        doUnbind(configs.filter { b -> id == b.qq })
     }
 
-    private fun afterUnbind(filters: List<UserConfig>) {
+    private suspend fun doUnbind(filters: List<UserConfig>) {
         val deleteList = filters.filter { it.qq == null && it.tg == null }
         if (deleteList.isNotEmpty()) {
-            userConfigRepository.deleteAll(deleteList)
+            UserConfigRepository.deleteByIds<UserConfig>(deleteList.map(UserConfig::id))
         }
         val saveList = filters.filter { it.tg != null || it.qq != null }
         if (saveList.isNotEmpty()) {
-            userConfigRepository.saveAll(saveList)
+            saveList.forEach {
+                UserConfigRepository.save(it.copy {
+                    bindingName = null
+                })
+            }
         }
     }
 
-    fun link(tg: Long, qq: Long) {
+    suspend fun link(tg: Long, qq: Long) {
         val list = configs.filter { it.tg == tg || it.qq == qq }
         val bindingName = list.firstNotNullOfOrNull { it.bindingName }
         val status = if (list.isEmpty()) HashSet()
         else list.map { it.status.toMutableList() }
             .reduce { acc, item -> acc.also { it.addAll(item) } }
             .distinct().toHashSet()
-        val one = list.firstOrNull() ?: UserConfig().apply {
+        val one = list.firstOrNull() ?: new(UserConfig::class).by {
             this.tg = tg
             this.qq = qq
             this.bindingName = bindingName
-            this.status = status
+            this.status().addAll(status)
         }
-        userConfigRepository.save(one)
+        UserConfigRepository.save(one)
         list.forEachIndexed { index, userConfig ->
             if (index > 0) {
                 configs.remove(userConfig)
-                userConfigRepository.delete(userConfig)
+                UserConfigRepository.deleteById<UserConfig>(userConfig.id)
             }
         }
     }
@@ -236,7 +214,7 @@ class UserConfigService(
         else Permission.NORMAL
     }
 
-    override fun refresh() {
+    override suspend fun refresh() {
         val ids = HashMap<Long, String>()
         val usernames = HashMap<String, String>()
         val qqUsernames = HashMap<Long, String>()
@@ -248,7 +226,7 @@ class UserConfigService(
         val friendChats = HashMap<Long, Long>()
         val chatFriends = HashMap<Long, Long>()
 
-        configs = userConfigRepository.findAll().toMutableList()
+        configs = UserConfigRepository.findAll().toMutableList()
         for (config in configs) {
             if (config.tg != null && config.qq != null) links.add(config)
             if (config.bindingName != null) {
@@ -292,7 +270,7 @@ class UserConfigService(
                             admins.add(it)
                             superAdmins.add(it)
                         }
-                        masterUsername = config.bindingName
+                        masterUsername = config.bindingName?:"Master"
                     }
                 }
             }
@@ -327,38 +305,29 @@ class UserConfigService(
         return "用户名绑定配置"
     }
 
-    fun add(config: UserConfig) {
+    suspend fun add(config: UserConfig) {
         val filter = configs.filter { c -> config.tg?.let { c.tg == it } ?: config.qq?.let { c.qq == it } ?: false }
         if (filter.isEmpty()) {
-            userConfigRepository.save(config)
+            UserConfigRepository.save(config)
             refresh()
         } else {
             filter.forEach { c ->
-                config.bindingName?.let { c.bindingName = it }
-                config.status.takeIf { it.isNotEmpty() }?.let {
-                    for (status in it) {
-                        if (!c.status.contains(status)) {
-                            c.status.add(status)
+                UserConfigRepository.save(c.copy {
+                    config.bindingName?.let { bindingName = it }
+                    config.status.takeIf { it.isNotEmpty() }?.let {
+                        for (s in it) {
+                            if (status?.contains(s) == false)
+                                status().add(s)
                         }
                     }
-                }
+                })
             }
-            userConfigRepository.saveAll(filter)
         }
     }
 
-    fun findByQQOrTg(qqList: List<Long>? = null, tgList: List<Long>? = null): List<UserConfig> {
-        if (qqList?.isEmpty() == true && tgList?.isEmpty() == true) return emptyList()
-        return userConfigRepository.findAll { root, query, builder ->
-            val predicateList = mutableListOf<Predicate>()
-            if (qqList?.isNotEmpty() == true) {
-                predicateList.add(root.get<Long>("qq").`in`(qqList))
-            }
-            if (tgList?.isNotEmpty() == true) {
-                predicateList.add(root.get<Long>("tg").`in`(tgList))
-            }
-            builder.or(*predicateList.toTypedArray())
-        }
+    suspend fun findByQQOrTg(qqList: List<Long> = emptyList(), tgList: List<Long> = emptyList()): List<UserConfig> {
+        if (qqList.isEmpty() && tgList.isEmpty()) return emptyList()
+        return UserConfigRepository.findByTgOrQQ(tgList, qqList)
     }
 
 }

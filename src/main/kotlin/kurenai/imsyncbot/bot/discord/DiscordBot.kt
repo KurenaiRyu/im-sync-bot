@@ -24,6 +24,8 @@ import kurenai.imsyncbot.*
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.domain.QQDiscord
+import kurenai.imsyncbot.domain.by
+import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.snowFlake
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.contact.Group
@@ -32,6 +34,7 @@ import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
+import org.babyfish.jimmer.kt.new
 import java.util.WeakHashMap
 import kotlin.coroutines.CoroutineContext
 
@@ -212,12 +215,13 @@ class DiscordBot(
             val config = groupConfigRepository.findByQqGroupId(groupId)
             if (config != null) {
                 if (config.discordChannelId != channel.id.value.toLong()) {
-                    config.discordChannelId = channel.id.value.toLong()
-                    groupConfigRepository.save(config)
+                    groupConfigRepository.save(config.copy {
+                        discordChannelId = channel.id.value.toLong()
+                    })
                 }
             } else {
                 groupConfigRepository.save(
-                    GroupConfig().apply {
+                    new(GroupConfig::class).by {
                         this.qqGroupId = groupId
                         this.name = group.name
                         discordChannelId = channel.id.value.toLong()

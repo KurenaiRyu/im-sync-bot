@@ -15,6 +15,7 @@ import java.util.HashSet;
  * @author Kurenai
  * @since 2023/7/22 18:26
  */
+/*
 
 @Entity
 @Table(name = "USER_CONFIG")
@@ -41,3 +42,4 @@ public class UserConfig {
     private Integer version;
 
 }
+*/

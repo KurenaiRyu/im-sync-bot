@@ -14,6 +14,7 @@ import java.util.HashSet;
  * @author Kurenai
  * @since 2023/7/22 18:26
  */
+/*
 
 @Entity
 @Table(name = "GROUP_CONFIG")
@@ -36,3 +37,4 @@ public class GroupConfig {
     private Integer version;
 
 }
+*/

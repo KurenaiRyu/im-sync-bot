@@ -1,6 +1,12 @@
 package kurenai.imsyncbot.repository
 
 import kurenai.imsyncbot.domain.GroupConfig
+import kurenai.imsyncbot.domain.qqGroupId
+import kurenai.imsyncbot.domain.tgMsgId
+import kurenai.imsyncbot.sqlClient
+import kurenai.imsyncbot.utils.withIO
+import org.babyfish.jimmer.sql.kt.ast.expression.eq
+import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 import org.springframework.data.jpa.repository.JpaRepository
 
 /**
@@ -8,10 +14,26 @@ import org.springframework.data.jpa.repository.JpaRepository
  * @since 2023/6/18 21:17
  */
 
-interface GroupConfigRepository : JpaRepository<GroupConfig, Long> {
+object GroupConfigRepository : BaseRepository<GroupConfig, Long>() {
 
-    fun findByQqGroupId(groupId: Long): GroupConfig?
+    suspend fun findAll() = withIO {
+        createQuery<GroupConfig> {
+            select(table)
+        }.execute()
+    }
 
-    fun findAllByQqGroupIdIn(groupIds: Collection<Long>): Collection<GroupConfig>
+    suspend fun findByQqGroupId(groupId: Long): GroupConfig? = withIO {
+        createQuery<GroupConfig> {
+            where(table.qqGroupId eq groupId)
+            select(table)
+        }.fetchOneOrNull()
+    }
+
+    suspend fun findAllByQqGroupIdIn(groupIds: Collection<Long>): Collection<GroupConfig> = withIO {
+        createQuery<GroupConfig> {
+            where(table.qqGroupId valueIn groupIds)
+            select(table)
+        }.execute()
+    }
 
 }

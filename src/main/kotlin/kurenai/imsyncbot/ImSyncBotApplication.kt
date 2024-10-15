@@ -4,7 +4,11 @@ import com.linecorp.kotlinjdsl.spring.data.SpringDataQueryFactory
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import jakarta.persistence.EntityManager
+import kurenai.imsyncbot.domain.GroupConfig
+import kurenai.imsyncbot.domain.UserConfig
+import kurenai.imsyncbot.jimmer.scalar.GroupStatusScalarProvider
 import kurenai.imsyncbot.jimmer.SqliteDialect
+import kurenai.imsyncbot.jimmer.scalar.UserStatusScalarProvider
 import kurenai.imsyncbot.repository.*
 import kurenai.imsyncbot.utils.setEnv
 import org.babyfish.jimmer.sql.event.TriggerType
@@ -36,8 +40,6 @@ import kotlin.io.path.name
 @EnableConfigurationProperties(ConfigProperties::class)
 class ImSyncBotApplication
 
-lateinit var groupConfigRepository: GroupConfigRepository
-lateinit var userConfigRepository: UserConfigRepository
 lateinit var qqDiscordRepository: QqDiscordRepository
 lateinit var applicationContext: ApplicationContext
 lateinit var queryFactory: SpringDataQueryFactory
@@ -49,8 +51,6 @@ suspend fun main(args: Array<String>) {
     applicationContext = runApplication<ImSyncBotApplication>(*args) {
         this.setBannerMode(Banner.Mode.OFF)
     }
-    groupConfigRepository = applicationContext.getBean(GroupConfigRepository::class.java)
-    userConfigRepository = applicationContext.getBean(UserConfigRepository::class.java)
     qqDiscordRepository = applicationContext.getBean(QqDiscordRepository::class.java)
     queryFactory = applicationContext.getBean(SpringDataQueryFactory::class.java)
     configProperties = applicationContext.getBean(ConfigProperties::class.java)
@@ -62,7 +62,7 @@ fun initProperties() {
     Files.list(Path.of(".")).filter {
         it.name.endsWith(".env") && it.name != "example.env" && !it.isDirectory()
     }.findFirst().ifPresent {
-        var pop = Properties()
+        val pop = Properties()
         it.inputStream().use { stream ->
             pop.load(stream)
             setEnv(pop)
@@ -79,6 +79,8 @@ fun initDB() {
     sqlClient = newKSqlClient {
         setTriggerType(TriggerType.BINLOG_ONLY)
         setDialect(SqliteDialect())
+        setScalarProvider(GroupConfig::status, GroupStatusScalarProvider())
+        setScalarProvider(UserConfig::status, UserStatusScalarProvider())
         setConnectionManager(ConnectionManager.simpleConnectionManager(HikariDataSource(config)))
     }
 }

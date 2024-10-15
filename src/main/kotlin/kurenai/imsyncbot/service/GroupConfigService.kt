@@ -1,20 +1,16 @@
 package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi.Message
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.configuration.AbstractConfig
 import kurenai.imsyncbot.domain.GroupConfig
-import kurenai.imsyncbot.groupConfigRepository
+import kurenai.imsyncbot.domain.by
+import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.GroupConfigRepository
-import kurenai.imsyncbot.snowFlake
-import kurenai.imsyncbot.utils.json
 import kurenai.imsyncbot.utils.withIO
-import java.nio.file.Path
-import kotlin.io.path.exists
-import kotlin.io.path.moveTo
-import kotlin.io.path.readText
+import org.babyfish.jimmer.kt.new
 
 //TODO: Migrate to DB
 class GroupConfigService(
@@ -31,45 +27,9 @@ class GroupConfigService(
     var picBannedGroups = emptyList<Long>()
     var filterGroups = emptyList<Long>()
     override lateinit var configs: MutableList<GroupConfig>
-    override val path: Path = Path.of(configPath, "group.json")
 
     init {
-        migration()
-        refresh()
-    }
-
-    override fun migration() {
-        if (path.exists()) {
-            val configs = json.decodeFromString(ListSerializer(Group.serializer()), path.readText())
-            if (configs.isEmpty().not()) {
-                val exists =
-                    groupConfigRepository.findAllByQqGroupIdIn(configs.map { it.qq }).associateBy { it.qqGroupId }
-                val entities = configs.filter { (exists[it.qq]?.telegramGroupId ?: 0) == 0L }
-                    .map {
-                        exists[it.qq]?.let { exist ->
-                            GroupConfig().apply {
-                                id = exist.id
-                                name = it.title
-                                qqGroupId = it.qq
-                                telegramGroupId = it.tg
-                                discordChannelId = exist.discordChannelId
-                                status = it.status
-                            }
-                        } ?: run {
-                            GroupConfig().apply {
-                                id = snowFlake.nextId()
-                                name = it.title
-                                qqGroupId = it.qq
-                                telegramGroupId = it.tg
-                                discordChannelId = null
-                                status = it.status
-                            }
-                        }
-                    }
-                groupConfigRepository.saveAll(entities)
-                path.moveTo(path.parent.resolve("group.bak.json"))
-            }
-        }
+        runBlocking { refresh() }
     }
 
     suspend fun ban(tg: Long) {
@@ -94,26 +54,29 @@ class GroupConfigService(
 
     suspend fun addStatus(tg: Long, status: GroupStatus) {
         configs.firstOrNull { it.telegramGroupId == tg && !it.status.contains(status) }?.let {
-            it.status.add(status)
-            save(it)
+            save(it.copy {
+                this.status += status
+            })
         }
     }
 
     suspend fun removeStatus(tg: Long, status: GroupStatus) {
         configs.firstOrNull { it.telegramGroupId == tg && it.status.contains(status) }?.also {
-            it.status.remove(status)
-            save(it)
+            save(it.copy {
+                this.status -= status
+            })
         }
     }
 
     suspend fun bind(tg: Long, qq: Long, title: String) {
         configs.firstOrNull { it.telegramGroupId == tg }?.also {
             //Only modify qq when exist
-            it.name = title
-            it.qqGroupId = qq
-            save(it)
+            save(it.copy {
+                name = title
+                qqGroupId = qq
+            })
         } ?: run {
-            save(GroupConfig().apply {
+            save(new(GroupConfig::class).by {
                 this.qqGroupId = qq
                 this.name = title
                 this.telegramGroupId = tg
@@ -142,22 +105,30 @@ class GroupConfigService(
         val defaultGroup = configs.firstOrNull { it.status.contains(GroupStatus.DEFAULT) }
         val chat = bot.tg.getChat(message.chatId)
         if (defaultGroup != null) {
-            defaultGroup.status.remove(GroupStatus.DEFAULT)
-            withIO { groupConfigRepository.save(defaultGroup) }
-            if (message.chatId == defaultGroup.telegramGroupId) return false
+            val updateList = mutableListOf(defaultGroup.copy {
+                status -= GroupStatus.DEFAULT
+            })
+
+            val theNew = if (message.chatId == defaultGroup.telegramGroupId) return false
             else {
                 configs.firstOrNull { it.telegramGroupId == message.chatId }?.let {
-                    addStatus(message.chatId, GroupStatus.DEFAULT)
+                    it.copy {
+                        this.status += GroupStatus.DEFAULT
+                    }
                 } ?: run {
-                    save(
-                        GroupConfig(
-                        )
-                    )
+                    new(GroupConfig::class).by {
+                        telegramGroupId = message.chatId
+                        qqGroupId = tgQQ[message.chatId] ?: 0L
+                        name = chat.title
+                        status = hashSetOf(GroupStatus.DEFAULT)
+                    }
                 }
             }
+            updateList.add(theNew)
+            saveAll(updateList)
         } else {
             save(
-                GroupConfig().apply {
+                new(GroupConfig::class).by {
                     telegramGroupId = message.chatId
                     qqGroupId = tgQQ[message.chatId] ?: 0L
                     name = chat.title
@@ -168,41 +139,42 @@ class GroupConfigService(
         return true
     }
 
-    override fun refresh() {
+    override suspend fun refresh() {
         val qqTg = HashMap<Long, Long>()
         val tgQQ = HashMap<Long, Long>()
         val bannedGroups = ArrayList<Long>()
         val picBannedGroups = ArrayList<Long>()
         val filterGroups = ArrayList<Long>()
-        configs = groupConfigRepository.findAll()
-            .filter { it.telegramGroupId != null }
+        configs = GroupConfigRepository.findAll()
             .toMutableList()
         for (config in configs) {
-            val telegramGroupId = config.telegramGroupId!!
-            qqTg[config.qqGroupId] = telegramGroupId
-            tgQQ[telegramGroupId] = config.qqGroupId
+            val telegramGroupId = config.telegramGroupId
+            config.qqGroupId?.let {
+                qqTg[it] = telegramGroupId
+                tgQQ[telegramGroupId] = tgQQ[it] ?: 0L
+            }
 
             var banned = false
             for (status in config.status) {
                 when (status) {
                     GroupStatus.BANNED -> {
-                        bannedGroups.add(config.qqGroupId)
+                        config.qqGroupId?.let { bannedGroups.add(it) }
                         bannedGroups.add(telegramGroupId)
                         banned = true
                     }
 
                     GroupStatus.PIC_BANNED -> {
-                        picBannedGroups.add(config.qqGroupId)
+                        config.qqGroupId?.let { picBannedGroups.add(it) }
                         picBannedGroups.add(telegramGroupId)
                     }
 
                     GroupStatus.DEFAULT -> {
-                        defaultQQGroup = config.qqGroupId
+                        defaultQQGroup = config.qqGroupId?:0
                         defaultTgGroup = telegramGroupId
                     }
                 }
             }
-            if (!banned) filterGroups.add(config.qqGroupId)
+            if (!banned) config.qqGroupId?.let { filterGroups.add(it) }
         }
         this.qqTg = qqTg.toMap()
         this.tgQQ = tgQQ.toMap()
@@ -216,10 +188,22 @@ class GroupConfigService(
      *
      * 需要调用[GroupConfigRepository.save]需要统一调用该方法，为了能够统一处理修改后的一些操作
      *
-     * @param config Group config
+     * @param configs Group config list to save
+     */
+    private suspend fun saveAll(configs: List<GroupConfig>) {
+        GroupConfigRepository.saveAll(configs)
+        refresh()
+    }
+
+    /**
+     * Save [GroupConfig]
+     *
+     * 需要调用[GroupConfigRepository.save]需要统一调用该方法，为了能够统一处理修改后的一些操作
+     *
+     * @param config Group config to save
      */
     private suspend fun save(config: GroupConfig) {
-        withIO { groupConfigRepository.save(config) }
+        GroupConfigRepository.save(config)
         refresh()
     }
 
@@ -231,7 +215,7 @@ class GroupConfigService(
      * @param config Group config
      */
     private suspend fun delete(config: GroupConfig) {
-        withIO { groupConfigRepository.delete(config) }
+        withIO { GroupConfigRepository.deleteById<GroupConfig>(config.id) }
         refresh()
     }
 
