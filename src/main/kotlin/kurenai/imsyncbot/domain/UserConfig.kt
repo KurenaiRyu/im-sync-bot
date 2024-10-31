@@ -20,7 +20,7 @@ interface UserConfig {
     val qq: Long?
     val bindingName: String?
     @Scalar
-    val status: Set<UserStatus>
+    val status: MutableSet<UserStatus>
 
     @Version
     val version: Int

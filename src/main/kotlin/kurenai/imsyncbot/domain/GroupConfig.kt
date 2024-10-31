@@ -22,7 +22,7 @@ interface GroupConfig {
     val telegramGroupId: Long
     val discordChannelId: Long?
     @Scalar
-    val status: Set<GroupStatus>
+    val status: MutableSet<GroupStatus>
 
     @Version
     val version: Int

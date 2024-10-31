@@ -4,17 +4,17 @@ import kurenai.imsyncbot.service.GroupStatus
 import org.babyfish.jimmer.sql.runtime.AbstractScalarProvider
 
 class GroupStatusScalarProvider :
-    AbstractScalarProvider<Set<GroupStatus>, String>() {
+    AbstractScalarProvider<MutableSet<GroupStatus>, String>() {
 
-    override fun toScalar(sqlValue: String): Set<GroupStatus> {
+    override fun toScalar(sqlValue: String): MutableSet<GroupStatus> {
         return if (sqlValue.isEmpty()) {
-            emptySet()
+            mutableSetOf()
         } else {
-            sqlValue.split(",").map { GroupStatus.valueOf(it.trim()) }.toSet()
+            sqlValue.split(",").map { GroupStatus.valueOf(it.trim()) }.toMutableSet()
         }
     }
 
-    override fun toSql(scalarValue: Set<GroupStatus>): String {
+    override fun toSql(scalarValue: MutableSet<GroupStatus>): String {
         return scalarValue.joinToString(",") { it.toString() }
     }
 

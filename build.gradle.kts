@@ -2,17 +2,13 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
-    id("org.springframework.boot") version "3.1.0"
-    id("io.spring.dependency-management") version "1.1.0"
     id("io.freefair.lombok") version "8.1.0"
-    id("com.google.devtools.ksp") version "2.0.0-1.0.24"
-    kotlin("jvm") version "2.0.0"
-    kotlin("plugin.spring") version "2.0.0"
-    kotlin("plugin.lombok") version "2.0.0"
-    kotlin("plugin.serialization") version "2.0.0"
-    kotlin("plugin.allopen") version "2.0.0"
-    kotlin("plugin.noarg") version "2.0.0"
-    kotlin("plugin.jpa") version "2.0.0"
+    id("com.google.devtools.ksp") version "2.0.21-1.0.25"
+    kotlin("jvm") version "2.0.21"
+    kotlin("plugin.lombok") version "2.0.21"
+    kotlin("plugin.serialization") version "2.0.21"
+    kotlin("plugin.allopen") version "2.0.21"
+    kotlin("plugin.noarg") version "2.0.21"
     jacoco
 }
 
@@ -40,9 +36,6 @@ repositories {
 }
 
 configurations {
-    all {
-        exclude("org.springframework.boot", "spring-boot-starter-logging")
-    }
 }
 
 lombok {
@@ -88,9 +81,6 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.5.1")
 
-    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    implementation("org.springframework.boot:spring-boot-configuration-processor")
-
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:${Versions.JACKSON}")
     implementation("org.jetbrains.kotlinx:atomicfu:0.20.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.21")
@@ -104,11 +94,10 @@ dependencies {
     compileOnly("org.projectlombok:lombok:${Versions.LOMBOK}")
     annotationProcessor("org.projectlombok:lombok:${Versions.LOMBOK}")
 
-    implementation("com.linecorp.kotlin-jdsl:spring-data-kotlin-jdsl-starter-jakarta:2.2.0.RELEASE")
+    implementation("com.zaxxer:HikariCP:6.0.0")
 
     //db driver
-    runtimeOnly("org.hibernate.orm:hibernate-community-dialects")
-    runtimeOnly("org.xerial:sqlite-jdbc")
+    runtimeOnly("org.xerial:sqlite-jdbc:3.47.0.0")
 //    runtimeOnly("com.h2database:h2")
 //    runtimeOnly("mysql:mysql-connector-java")
 //    runtimeOnly("org.postgresql:postgresql")
@@ -119,21 +108,22 @@ dependencies {
     //mirai
     implementation(platform("net.mamoe:mirai-bom:${Versions.MIRAI}"))
     implementation("net.mamoe:mirai-core-api")
-//    implementation("net.mamoe:mirai-core")
     implementation("net.mamoe:mirai-core-utils")
-    implementation("top.mrxiaom.mirai:overflow-core:0.9.9.513-b165a7a-SNAPSHOT")
+    implementation("top.mrxiaom.mirai:overflow-core:0.9.9.+")
 
     //tdlib
     implementation(platform("it.tdlight:tdlight-java-bom:${Versions.TD_LIGHT}"))
     implementation("it.tdlight:tdlight-java")
-    val hostOs = System.getProperty("os.name")
-    val isWin = hostOs.startsWith("Windows")
-    val classifier = when {
-        hostOs == "Linux" -> "linux_amd64_gnu_ssl1"
-        isWin -> "windows_amd64"
-        else -> throw GradleException("[$hostOs] is not support!")
-    }
-    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
+//    val hostOs = System.getProperty("os.name")
+//    val isWin = hostOs.startsWith("Windows")
+//    val classifier = when {
+//        hostOs == "Linux" -> "linux_amd64_gnu_ssl1"
+//        isWin -> "windows_amd64"
+//        else -> throw GradleException("[$hostOs] is not support!")
+//    }
+//    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
+    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "windows_amd64")
+    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "linux_amd64_gnu_ssl1")
 
     implementation("io.ktor:ktor-client-core:${Versions.KTOR}")
     implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR}")
@@ -161,7 +151,7 @@ dependencies {
     implementation("com.sksamuel.aedile:aedile-core:1.2.0")
 
     //tool kit
-    implementation("com.google.guava:guava:31.1-jre")
+    implementation("com.google.guava:guava:32.0.0-jre")
     implementation("org.jsoup:jsoup:1.15.3")
 
     //jimmer
@@ -170,7 +160,7 @@ dependencies {
 
     implementation("org.reflections", "reflections", "0.10.2")
 
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINE_TEST}")
 }
 
@@ -202,20 +192,16 @@ tasks.withType<JavaCompile> {
 }
 
 tasks.register<Delete>("clearLib") {
-    delete("${layout.buildDirectory}/libs/lib")
+    delete("${layout.buildDirectory.get()}/libs/lib")
 }
 
 tasks.register<Copy>("copyLib") {
     from(configurations.runtimeClasspath)
-    into("${layout.buildDirectory}/libs/lib")
-}
-
-tasks.bootJar {
-    enabled = true
-    archiveFileName.set("${rootProject.name}.jar")
+    into("${layout.buildDirectory.get()}/libs/lib")
 }
 
 tasks.test {
+    useJUnitPlatform()
     finalizedBy(tasks.jacocoTestReport) // report is always generated after tests run
 }
 tasks.jacocoTestReport {
@@ -226,20 +212,19 @@ tasks.jacocoTestReport {
     }
 }
 
-//tasks.jar {
-//    enabled = false
-//    dependsOn("clearLib")
-//    dependsOn("copyLib")
-//    exclude("**/*.jar")
-//    manifest {
-//        attributes["Manifest-Version"] = "1.0"
-//        attributes["Multi-Release"] = "true"
-//        attributes["Main-Class"] = "kurenai.imsyncbot.ImSyncBotApplicationKt"
-//        attributes["Class-Path"] =
-//            configurations.runtimeClasspath.get().files.joinToString(" ") { "lib/${it.name}" }
-//    }
-//    archiveFileName.set("${rootProject.name}.jar")
-//}
+tasks.jar {
+    dependsOn("clearLib")
+    dependsOn("copyLib")
+    exclude("**/*.jar")
+    manifest {
+        attributes["Manifest-Version"] = "1.0"
+        attributes["Multi-Release"] = "true"
+        attributes["Main-Class"] = "kurenai.imsyncbot.ImSyncBotApplicationKt"
+        attributes["Class-Path"] =
+            configurations.runtimeClasspath.get().files.joinToString(" ") { "lib/${it.name}" }
+    }
+    archiveFileName.set("${rootProject.name}.jar")
+}
 
 tasks.withType<Test> {
     useJUnitPlatform()

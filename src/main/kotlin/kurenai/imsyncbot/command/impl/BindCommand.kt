@@ -72,7 +72,7 @@ class BindCommand : AbstractTelegramCommand() {
                 bot.groupConfigService.configs.joinToString("\n") {
                     "`${it.telegramGroupId}` \\<\\=\\> `${it.qqGroupId}` \\#${
                         qqBot.getGroup(
-                            it.qqGroupId
+                            it.qqGroupId!!
                         )?.name?.escapeMarkdown() ?: "找不到该QQ群"
                     }"
                 }

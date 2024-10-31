@@ -4,17 +4,17 @@ import kurenai.imsyncbot.service.UserStatus
 import org.babyfish.jimmer.sql.runtime.AbstractScalarProvider
 
 class UserStatusScalarProvider :
-    AbstractScalarProvider<Set<UserStatus>, String>() {
+    AbstractScalarProvider<MutableSet<UserStatus>, String>() {
 
-    override fun toScalar(sqlValue: String): Set<UserStatus> {
+    override fun toScalar(sqlValue: String): MutableSet<UserStatus> {
         return if (sqlValue.isEmpty()) {
-            emptySet()
+            mutableSetOf()
         } else {
-            sqlValue.split(",").map { UserStatus.valueOf(it.trim()) }.toSet()
+            sqlValue.split(",").map { UserStatus.valueOf(it.trim()) }.toMutableSet()
         }
     }
 
-    override fun toSql(scalarValue: Set<UserStatus>): String {
+    override fun toSql(scalarValue: MutableSet<UserStatus>): String {
         return scalarValue.joinToString(",") { it.toString() }
     }
 

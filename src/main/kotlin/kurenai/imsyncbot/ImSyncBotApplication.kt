@@ -1,27 +1,18 @@
 package kurenai.imsyncbot
 
-import com.linecorp.kotlinjdsl.spring.data.SpringDataQueryFactory
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import jakarta.persistence.EntityManager
 import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.domain.UserConfig
-import kurenai.imsyncbot.jimmer.scalar.GroupStatusScalarProvider
 import kurenai.imsyncbot.jimmer.SqliteDialect
+import kurenai.imsyncbot.jimmer.scalar.GroupStatusScalarProvider
 import kurenai.imsyncbot.jimmer.scalar.UserStatusScalarProvider
-import kurenai.imsyncbot.repository.*
 import kurenai.imsyncbot.utils.setEnv
 import org.babyfish.jimmer.sql.event.TriggerType
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.newKSqlClient
 import org.babyfish.jimmer.sql.runtime.ConnectionManager
-import org.springframework.boot.Banner
-import org.springframework.boot.autoconfigure.SpringBootApplication
-import org.springframework.boot.context.properties.EnableConfigurationProperties
-import org.springframework.boot.runApplication
-import org.springframework.context.ApplicationContext
-import org.springframework.context.annotation.Configuration
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories
+import org.yaml.snakeyaml.Yaml
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
@@ -35,25 +26,13 @@ import kotlin.io.path.name
  * @since 2023/6/3 16:29
  */
 
-@SpringBootApplication
-@EnableJpaRepositories
-@EnableConfigurationProperties(ConfigProperties::class)
 class ImSyncBotApplication
 
-lateinit var qqDiscordRepository: QqDiscordRepository
-lateinit var applicationContext: ApplicationContext
-lateinit var queryFactory: SpringDataQueryFactory
 lateinit var configProperties: ConfigProperties
 lateinit var sqlClient: KSqlClient
 
 suspend fun main(args: Array<String>) {
     initProperties()
-    applicationContext = runApplication<ImSyncBotApplication>(*args) {
-        this.setBannerMode(Banner.Mode.OFF)
-    }
-    qqDiscordRepository = applicationContext.getBean(QqDiscordRepository::class.java)
-    queryFactory = applicationContext.getBean(SpringDataQueryFactory::class.java)
-    configProperties = applicationContext.getBean(ConfigProperties::class.java)
     initDB()
     start()
 }
@@ -68,6 +47,9 @@ fun initProperties() {
             setEnv(pop)
         }
     }
+
+    val configPath = Path.of("config.yaml")
+    configProperties = Yaml().loadAs(Files.readString(configPath), ConfigProperties::class.java)
 }
 
 fun initDB() {
@@ -83,12 +65,4 @@ fun initDB() {
         setScalarProvider(UserConfig::status, UserStatusScalarProvider())
         setConnectionManager(ConnectionManager.simpleConnectionManager(HikariDataSource(config)))
     }
-}
-
-@Configuration
-class JpaConfig {
-
-    fun config(manager: EntityManager) {
-    }
-
 }

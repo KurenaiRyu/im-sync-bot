@@ -3,11 +3,8 @@ package kurenai.imsyncbot.repository
 import kurenai.imsyncbot.domain.UserConfig
 import kurenai.imsyncbot.domain.qq
 import kurenai.imsyncbot.domain.tg
-import kurenai.imsyncbot.sqlClient
 import kurenai.imsyncbot.utils.withIO
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
-import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor
 
 /**
  * @author Kurenai

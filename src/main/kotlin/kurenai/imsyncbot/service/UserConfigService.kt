@@ -1,7 +1,6 @@
 package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
-import jakarta.persistence.criteria.Predicate
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kurenai.imsyncbot.ConfigProperties
@@ -52,17 +51,17 @@ class UserConfigService(
         if (filters.isEmpty()) {
             val new = new(UserConfig::class).by {
                 tg = id
-                status = listOf(adminStatus)
+                status = hashSetOf(adminStatus)
             }
             UserConfigRepository.save(new)
             refresh()
         } else {
             filters.map { c ->
                 c.copy {
-                    if (status?.contains(adminStatus) == false) {
-                        status().add(adminStatus)
+                    if (!this@copy.status.contains(adminStatus)) {
+                        this@copy.status += adminStatus
                     }
-                    if (!isSuper) status().remove(UserStatus.SUPER_ADMIN)
+                    if (!isSuper) this@copy.status.remove(UserStatus.SUPER_ADMIN)
                 }
             }.let {
                 UserConfigRepository.saveAll(it)
@@ -74,8 +73,8 @@ class UserConfigService(
         val filters = configs.filter { c -> id == c.tg }
         filters.map {
             it.copy {
-                status().remove(UserStatus.SUPER_ADMIN)
-                status().remove(UserStatus.ADMIN)
+                status.remove(UserStatus.SUPER_ADMIN)
+                status.remove(UserStatus.ADMIN)
             }
         }.let {
             UserConfigRepository.saveAll(it)
@@ -104,7 +103,7 @@ class UserConfigService(
             UserConfigRepository.save(new(UserConfig::class).by {
                 this.tg = tg
                 this.qq = qq
-                this.status = listOf(status)
+                this.status = hashSetOf(status)
             })
             refresh()
         } else {
@@ -112,7 +111,7 @@ class UserConfigService(
                 if (c.status?.contains(UserStatus.BANNED) == false) {
                     UserConfigRepository.save(
                         c.copy {
-                            this.status().add(UserStatus.BANNED)
+                            this.status.add(UserStatus.BANNED)
                         }
                     )
                 }
@@ -124,7 +123,7 @@ class UserConfigService(
         val filters = configs.filter { c -> (id == c.tg || id == c.qq) }
         filters.forEach {
             UserConfigRepository.save(it.copy {
-                status().remove(status)
+                this.status.remove(status)
             })
         }
     }
@@ -183,7 +182,7 @@ class UserConfigService(
             this.tg = tg
             this.qq = qq
             this.bindingName = bindingName
-            this.status().addAll(status)
+            this.status.addAll(status)
         }
         UserConfigRepository.save(one)
         list.forEachIndexed { index, userConfig ->
@@ -316,8 +315,8 @@ class UserConfigService(
                     config.bindingName?.let { bindingName = it }
                     config.status.takeIf { it.isNotEmpty() }?.let {
                         for (s in it) {
-                            if (status?.contains(s) == false)
-                                status().add(s)
+                            if (!status.contains(s))
+                                status.add(s)
                         }
                     }
                 })

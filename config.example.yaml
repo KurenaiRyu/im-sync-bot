@@ -1,16 +1,3 @@
-active: dev
-datasource:
-  url: jdbc:sqlite:im-sync-bot.db
-  driver-class-name: org.sqlite.JDBC
-  hikari:
-    auto-commit: false
-jpa:
-  database-platform: org.hibernate.community.dialect.SQLiteDialect
-  hibernate:
-    ddl-auto: create
-##################################
-####     上面内容不建议改动     #####
-##################################
 im-sync-bot:
   bot:
     telegram:

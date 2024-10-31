@@ -1,7 +1,6 @@
 package kurenai.imsyncbot
 
 import kotlinx.serialization.Serializable
-import org.springframework.boot.context.properties.ConfigurationProperties
 import java.net.Proxy
 
 /**
@@ -11,7 +10,6 @@ import java.net.Proxy
  */
 
 
-@ConfigurationProperties(prefix = "im-sync-bot")
 @Serializable
 data class ConfigProperties(
     val enable: Boolean = true,

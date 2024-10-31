@@ -2,12 +2,9 @@ package kurenai.imsyncbot.repository
 
 import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.domain.qqGroupId
-import kurenai.imsyncbot.domain.tgMsgId
-import kurenai.imsyncbot.sqlClient
 import kurenai.imsyncbot.utils.withIO
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
-import org.springframework.data.jpa.repository.JpaRepository
 
 /**
  * @author Kurenai

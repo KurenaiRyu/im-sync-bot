@@ -23,9 +23,9 @@ import kotlinx.coroutines.flow.*
 import kurenai.imsyncbot.*
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.domain.GroupConfig
-import kurenai.imsyncbot.domain.QQDiscord
 import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.domain.copy
+import kurenai.imsyncbot.repository.GroupConfigRepository
 import kurenai.imsyncbot.snowFlake
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.contact.Group
@@ -212,15 +212,15 @@ class DiscordBot(
             } else interaction.channel
 
 
-            val config = groupConfigRepository.findByQqGroupId(groupId)
+            val config = GroupConfigRepository.findByQqGroupId(groupId)
             if (config != null) {
                 if (config.discordChannelId != channel.id.value.toLong()) {
-                    groupConfigRepository.save(config.copy {
+                    GroupConfigRepository.save(config.copy {
                         discordChannelId = channel.id.value.toLong()
                     })
                 }
             } else {
-                groupConfigRepository.save(
+                GroupConfigRepository.save(
                     new(GroupConfig::class).by {
                         this.qqGroupId = groupId
                         this.name = group.name
@@ -258,12 +258,12 @@ class DiscordBot(
 //            val channel = existChannel[config.name] ?: category.createTextChannel(config.name)
 //            config.discordChannelId = channel.id.value.toLong()
 //        }
-//        groupConfigRepository.saveAll(missConfigs)
+//        GroupConfigRepository.saveAll(missConfigs)
 //    }
 
     private suspend fun handleSyncMessage(source: OnlineMessageSource.Outgoing) {
         val channel = channelCache[source.target.id] ?: run {
-            val channelId = groupConfigRepository.findByQqGroupId(source.target.id)?.discordChannelId ?: return
+            val channelId = GroupConfigRepository.findByQqGroupId(source.target.id)?.discordChannelId ?: return
             kord.getChannel(Snowflake(channelId)) as? TextChannel ?: return
         }
         channelCache.putIfAbsent(source.target.id, channel)
@@ -278,7 +278,7 @@ class DiscordBot(
     suspend fun handleGroupMessageEvent(event: GroupAwareMessageEvent) {
         val group = event.group
         val channel = channelCache[group.id] ?: run {
-            val channelId = groupConfigRepository.findByQqGroupId(group.id)?.discordChannelId ?: return
+            val channelId = GroupConfigRepository.findByQqGroupId(group.id)?.discordChannelId ?: return
             kord.getChannel(Snowflake(channelId)) as? TextChannel ?: return
         }
         channelCache.putIfAbsent(group.id, channel)
@@ -327,14 +327,14 @@ class DiscordBot(
 
                 else -> null
             }?.let { receive ->
-                qqDiscordRepository.save(
-                    QQDiscord().apply {
-                        this.qqGrpId = messageChain.source.targetId
-                        this.qqMsgId = messageChain.source.ids[0]
-                        this.discordChannelId = receive.channelId.value.toLong()
-                        this.discordMsgId = receive.id.value.toLong()
-                    }
-                )
+//                QQDiscordRepository.save(
+//                    QQDiscord().apply {
+//                        this.qqGrpId = messageChain.source.targetId
+//                        this.qqMsgId = messageChain.source.ids[0]
+//                        this.discordChannelId = receive.channelId.value.toLong()
+//                        this.discordMsgId = receive.id.value.toLong()
+//                    }
+//                )
             }
         }
     }
