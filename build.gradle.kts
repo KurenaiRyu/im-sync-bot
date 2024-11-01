@@ -191,11 +191,7 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-tasks.register<Delete>("clearLib") {
-    delete("${layout.buildDirectory.get()}/libs/lib")
-}
-
-tasks.register<Copy>("copyLib") {
+tasks.register<Copy>("syncLib") {
     from(configurations.runtimeClasspath)
     into("${layout.buildDirectory.get()}/libs/lib")
 }
@@ -213,8 +209,7 @@ tasks.jacocoTestReport {
 }
 
 tasks.jar {
-    dependsOn("clearLib")
-    dependsOn("copyLib")
+    dependsOn("syncLib")
     exclude("**/*.jar")
     manifest {
         attributes["Manifest-Version"] = "1.0"
