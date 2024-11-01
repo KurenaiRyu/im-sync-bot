@@ -1,9 +1,0 @@
-spring:
-  jpa:
-    hibernate:
-      ddl-auto: none
-    show-sql: false
-  datasource:
-    hikari:
-      url: jdbc:sqlite:im-sync-bot.db
-      auto-commit: false

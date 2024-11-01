@@ -8,11 +8,11 @@ import kurenai.imsyncbot.jimmer.SqliteDialect
 import kurenai.imsyncbot.jimmer.scalar.GroupStatusScalarProvider
 import kurenai.imsyncbot.jimmer.scalar.UserStatusScalarProvider
 import kurenai.imsyncbot.utils.setEnv
+import kurenai.imsyncbot.utils.yamlMapper
 import org.babyfish.jimmer.sql.event.TriggerType
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.newKSqlClient
 import org.babyfish.jimmer.sql.runtime.ConnectionManager
-import org.yaml.snakeyaml.Yaml
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
@@ -49,7 +49,7 @@ fun initProperties() {
     }
 
     val configPath = Path.of("config.yaml")
-    configProperties = Yaml().loadAs(Files.readString(configPath), ConfigProperties::class.java)
+    configProperties = yamlMapper.readValue(Files.readString(configPath), ConfigProperties::class.java)
 }
 
 fun initDB() {
