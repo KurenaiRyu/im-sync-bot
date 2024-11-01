@@ -21,7 +21,6 @@ import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall
 import net.mamoe.mirai.message.sourceIds
 import net.mamoe.mirai.utils.ExternalResource.Companion.toExternalResource
-import nl.adaptivity.xmlutil.core.impl.multiplatform.name
 import java.util.concurrent.TimeoutException
 import kotlin.math.max
 import kotlin.math.min
@@ -56,7 +55,7 @@ class TgMessageHandler(
             TelegramBot.log.debug(
                 "Telegram bot status {}, do not handle {}.",
                 status.javaClass.simpleName,
-                update::class.name
+                update::class.qualifiedName
             )
             return@launch
         }
@@ -64,7 +63,7 @@ class TgMessageHandler(
             TelegramBot.log.debug(
                 "QQ bot status {}, do not handle {}.",
                 status.javaClass.simpleName,
-                update::class.name
+                update::class.qualifiedName
             )
             return@launch
         }

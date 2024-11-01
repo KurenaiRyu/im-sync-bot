@@ -2,11 +2,11 @@ package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
 import kurenai.imsyncbot.domain.*
-import kurenai.imsyncbot.imSyncBot
 import kurenai.imsyncbot.repository.QQMessageRepository
 import kurenai.imsyncbot.repository.QQTgRepository
 import kurenai.imsyncbot.sqlClient
 import kurenai.imsyncbot.utils.BotUtil.toEntity
+import kurenai.imsyncbot.utils.BotUtil.toMessageChain
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.event.events.MessageRecallEvent
@@ -14,7 +14,6 @@ import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.sourceMessage
 import org.babyfish.jimmer.kt.new
-import top.mrxiaom.overflow.Overflow
 
 
 object MessageService {
@@ -106,9 +105,7 @@ object MessageService {
 
     suspend fun findQQByTg(chatId: Long, messageId: Long): MessageChain? {
         return QQTgRepository.findOneByTgGrpIdAndTgMsgId(chatId, messageId)?.let {
-            QQMessageRepository.findById<QQMessage>(it.qqId)
-        }?.let {
-            Overflow.deserializeMessage(imSyncBot.qq.qqBot, it.json)
+            QQMessageRepository.findById<QQMessage>(it.qqId)?.toMessageChain()
         }
     }
 

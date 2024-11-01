@@ -11,6 +11,7 @@ import kurenai.imsyncbot.snowFlake
 import net.mamoe.mirai.event.events.MessageEvent
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageSource
+import net.mamoe.mirai.message.data.MessageSourceBuilder
 import net.mamoe.mirai.message.data.source
 import org.babyfish.jimmer.kt.new
 import top.mrxiaom.overflow.Overflow
@@ -172,17 +173,22 @@ object BotUtil {
         }
     }
 
-    suspend fun QQMessage.toSource(): MessageSource {
-        return Overflow.deserializeMessage(imSyncBot.qq.qqBot, this.json).source
-//        val entity = this
-//        return MessageSourceBuilder().apply {
-//            id(entity.messageId)
-//            internalId(entity.messageId)
-//            fromId = entity.fromId
-//            targetId = entity.targetId
-//            time = entity.time.atZone(ZoneOffset.ofHours(8)).toEpochSecond().toInt()
-//
-//        }.build(entity.botId, entity.type)
+    suspend fun QQMessage.toMessageChain(): MessageChain {
+        val entity = this
+        return this.toSource().plus(Overflow.deserializeMessageFromJson(imSyncBot.qq.qqBot, entity.json)!!)
+    }
+
+    fun QQMessage.toSource(): MessageSource {
+        val entity = this
+
+        return MessageSourceBuilder().apply {
+            id(entity.messageId)
+            internalId(entity.messageId)
+            fromId = entity.fromId
+            targetId = entity.targetId
+            time = entity.time.atZone(ZoneOffset.ofHours(8)).toEpochSecond().toInt()
+
+        }.build(entity.botId, entity.type)
     }
 
     fun MessageSource.localDateTime(): LocalDateTime =
