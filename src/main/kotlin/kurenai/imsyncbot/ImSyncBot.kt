@@ -39,7 +39,7 @@ class ImSyncBot(
         }
 
     internal val userConfigService: UserConfigService = UserConfigService(configProperties)
-    internal val groupConfigService: GroupConfigService = GroupConfigService(this, "./config")
+    internal val groupConfigService: GroupConfigService = GroupConfigService(this)
     internal val tg: TelegramBot = TelegramBot(configProperties.bot.telegram, this)
     internal var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
     internal val qq: QQBot = QQBot(configProperties.bot.qq, this)

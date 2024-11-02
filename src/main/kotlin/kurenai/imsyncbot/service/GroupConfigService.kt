@@ -13,10 +13,8 @@ import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.withIO
 import org.babyfish.jimmer.kt.new
 
-//TODO: Migrate to DB
 class GroupConfigService(
     val bot: ImSyncBot,
-    configPath: String,
 ) : AbstractConfig<GroupConfig>() {
 
     private val log = getLogger()

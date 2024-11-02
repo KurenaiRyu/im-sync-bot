@@ -13,7 +13,7 @@ plugins {
 }
 
 group = "moe.kurenai.bot"
-version = "0.0.1-SNAPSHOT"
+version = "1.3.1-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -214,7 +214,7 @@ tasks.jar {
     manifest {
         attributes["Manifest-Version"] = "1.0"
         attributes["Multi-Release"] = "true"
-        attributes["Main-Class"] = "kurenai.imsyncbot.ImSyncBotApplicationKt"
+        attributes["Main-Class"] = "kurenai.imsyncbot.BotKt"
         attributes["Class-Path"] =
             configurations.runtimeClasspath.get().files.joinToString(" ") { "lib/${it.name}" }
     }

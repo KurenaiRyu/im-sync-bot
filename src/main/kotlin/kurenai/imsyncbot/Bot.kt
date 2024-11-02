@@ -1,23 +1,37 @@
 package kurenai.imsyncbot
 
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import it.tdlight.Init
 import kurenai.imsyncbot.bot.qq.QQHandler
 import kurenai.imsyncbot.bot.qq.QQMessageHandler
 import kurenai.imsyncbot.command.AbstractInlineCommand
 import kurenai.imsyncbot.command.AbstractQQCommand
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.utils.SnowFlake
-import kurenai.imsyncbot.utils.getLogger
-import kurenai.imsyncbot.utils.humanReadableByteCountBin
+import kurenai.imsyncbot.domain.GroupConfig
+import kurenai.imsyncbot.domain.UserConfig
+import kurenai.imsyncbot.jimmer.SqliteDialect
+import kurenai.imsyncbot.jimmer.scalar.GroupStatusScalarProvider
+import kurenai.imsyncbot.jimmer.scalar.UserStatusScalarProvider
+import kurenai.imsyncbot.reflections
+import kurenai.imsyncbot.utils.*
+import org.babyfish.jimmer.sql.event.TriggerType
+import org.babyfish.jimmer.sql.kt.KSqlClient
+import org.babyfish.jimmer.sql.kt.newKSqlClient
+import org.babyfish.jimmer.sql.runtime.ConnectionManager
 import org.reflections.Reflections
 import org.slf4j.Logger
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.timerTask
 import kotlin.io.path.fileSize
+import kotlin.io.path.inputStream
+import kotlin.io.path.isDirectory
+import kotlin.io.path.name
 
 /**
  * @author Kurenai
@@ -34,25 +48,52 @@ internal val tgCommands = ArrayList<AbstractTelegramCommand>()
 internal val qqCommands = ArrayList<AbstractQQCommand>()
 internal val inlineCommands = HashMap<String, AbstractInlineCommand>()
 internal val qqHandlers = ArrayList<QQHandler>()
+lateinit var configProperties: ConfigProperties
+lateinit var sqlClient: KSqlClient
 
 internal lateinit var instants: MutableList<ImSyncBot>
 internal lateinit var imSyncBot: ImSyncBot
 
-//suspend fun main() {
-//    instants = loadInstants()
-//    configs.first()
-//    commonInit()
-//    instants.forEach { it.start() }
-//}
-
-suspend fun start() {
+suspend fun main() {
     Init.init() //td-lib
+    initProperties()
+    initDB()
     imSyncBot = ImSyncBot(configProperties)
     imSyncBot.start()
     commonInit()
 }
 
-fun commonInit() {
+private fun initProperties() {
+    Files.list(Path.of(".")).filter {
+        it.name.endsWith(".env") && it.name != "example.env" && !it.isDirectory()
+    }.findFirst().ifPresent {
+        val pop = Properties()
+        it.inputStream().use { stream ->
+            pop.load(stream)
+            setEnv(pop)
+        }
+    }
+
+    val configPath = Path.of("config.yaml")
+    configProperties = yamlMapper.readValue(Files.readString(configPath), ConfigProperties::class.java)
+}
+
+private fun initDB() {
+    val config = HikariConfig()
+    config.jdbcUrl = "jdbc:sqlite:im-sync-bot.db"
+    config.driverClassName = "org.sqlite.JDBC"
+    config.isAutoCommit = true
+    config.maximumPoolSize = 1
+    sqlClient = newKSqlClient {
+        setTriggerType(TriggerType.BINLOG_ONLY)
+        setDialect(SqliteDialect())
+        setScalarProvider(GroupConfig::status, GroupStatusScalarProvider())
+        setScalarProvider(UserConfig::status, UserStatusScalarProvider())
+        setConnectionManager(ConnectionManager.simpleConnectionManager(HikariDataSource(config)))
+    }
+}
+
+private fun commonInit() {
     registerTgCommand()
 //    registerQQCommand()
     //TODO: 设置 inline 命令
@@ -61,7 +102,7 @@ fun commonInit() {
     setUpTimer()
 }
 
-fun registerQQHandler() {
+private fun registerQQHandler() {
     reflections.getSubTypesOf(QQHandler::class.java)
         .filter { it != QQMessageHandler::class.java }
         .map { it.getDeclaredConstructor().newInstance() }
