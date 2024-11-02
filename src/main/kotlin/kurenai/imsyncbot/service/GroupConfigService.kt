@@ -9,6 +9,7 @@ import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.GroupConfigRepository
+import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.withIO
 import org.babyfish.jimmer.kt.new
 
@@ -18,11 +19,11 @@ class GroupConfigService(
     configPath: String,
 ) : AbstractConfig<GroupConfig>() {
 
+    private val log = getLogger()
+
     var defaultQQGroup: Long = 0
     var defaultTgGroup: Long = 0
 
-    var qqTg = emptyMap<Long, Long>()
-    var tgQQ = emptyMap<Long, Long>()
     var bannedGroups = emptyList<Long>()
     var picBannedGroups = emptyList<Long>()
     var filterGroups = emptyList<Long>()
@@ -31,6 +32,10 @@ class GroupConfigService(
     init {
         runBlocking { refresh() }
     }
+
+    fun findByQQ(qq: Long) = configs.firstOrNull { it.qqGroupId == qq }
+
+    fun findByTg(tg: Long) = configs.firstOrNull { it.telegramGroupId == tg }
 
     suspend fun ban(tg: Long) {
         addStatus(tg, GroupStatus.BANNED)
@@ -118,7 +123,7 @@ class GroupConfigService(
                 } ?: run {
                     new(GroupConfig::class).by {
                         telegramGroupId = message.chatId
-                        qqGroupId = tgQQ[message.chatId] ?: 0L
+                        qqGroupId = findByTg(message.chatId)?.qqGroupId ?: 0L
                         name = chat.title
                         status = hashSetOf(GroupStatus.DEFAULT)
                     }
@@ -130,7 +135,7 @@ class GroupConfigService(
             save(
                 new(GroupConfig::class).by {
                     telegramGroupId = message.chatId
-                    qqGroupId = tgQQ[message.chatId] ?: 0L
+                    qqGroupId = findByTg(message.chatId)?.qqGroupId ?: 0L
                     name = chat.title
                     status = hashSetOf(GroupStatus.DEFAULT)
                 }
@@ -147,6 +152,15 @@ class GroupConfigService(
         val filterGroups = ArrayList<Long>()
         configs = GroupConfigRepository.findAll()
             .toMutableList()
+
+
+        if (log.isDebugEnabled) {
+            log.debug("Loading group configs...")
+            configs.forEach {
+                log.debug("{}: {} - {}", it.name, it.telegramGroupId, it.qqGroupId)
+            }
+        }
+
         for (config in configs) {
             val telegramGroupId = config.telegramGroupId
             config.qqGroupId?.let {
@@ -176,8 +190,6 @@ class GroupConfigService(
             }
             if (!banned) config.qqGroupId?.let { filterGroups.add(it) }
         }
-        this.qqTg = qqTg.toMap()
-        this.tgQQ = tgQQ.toMap()
         this.bannedGroups = bannedGroups.toList()
         this.picBannedGroups = picBannedGroups.toList()
         this.filterGroups = filterGroups.toList()

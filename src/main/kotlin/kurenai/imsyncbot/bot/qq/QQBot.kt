@@ -266,7 +266,8 @@ class QQBot(
                         this.type = TextEntityTypeMentionName(bot.userConfigService.masterTg)
                     })
                 },
-                bot.groupConfigService.qqTg[event.group.id] ?: bot.groupConfigService.defaultTgGroup
+                bot.groupConfigService.findByQQ(event.group.id)?.telegramGroupId
+                    ?: bot.groupConfigService.defaultTgGroup
             )
         }.onFailure {
             log.error("Send remind message fail.", it)

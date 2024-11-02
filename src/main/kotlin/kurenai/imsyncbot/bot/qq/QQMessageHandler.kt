@@ -178,7 +178,7 @@ class QQMessageHandler(
     }
 
     suspend fun onGroupEvent(event: GroupEvent) {
-        val chatId = bot.groupConfigService.qqTg[event.group.id] ?: return
+        val chatId = bot.groupConfigService.findByQQ(event.group.id)?.telegramGroupId ?: return
         val msg = when (event) {
             is MemberJoinEvent -> {
                 val tag = "\\#入群 \\#id${event.member.id} \\#group${event.group.id}\n"

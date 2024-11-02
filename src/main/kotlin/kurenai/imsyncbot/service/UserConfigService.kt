@@ -9,6 +9,7 @@ import kurenai.imsyncbot.domain.UserConfig
 import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.UserConfigRepository
+import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.isBot
 import kurenai.imsyncbot.utils.username
 import org.babyfish.jimmer.kt.new
@@ -22,6 +23,8 @@ import org.babyfish.jimmer.kt.new
 class UserConfigService(
     configProperties: ConfigProperties
 ) : AbstractConfig<UserConfig>() {
+
+    private val log = getLogger()
 
     var masterTg: Long = configProperties.bot.masterOfTg
     var masterQQ: Long = configProperties.bot.masterOfQq

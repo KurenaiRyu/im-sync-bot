@@ -33,7 +33,7 @@ class InfoCommand : AbstractTelegramCommand() {
                 val qqMsgSource = MessageService.findQQByTg(replyMessage)?.sourceOrNull
                 if (qqMsgSource != null) {
                     val userId = qqMsgSource.fromId
-                    val qqGroup = bot.groupConfigService.tgQQ[message.chatId]?.let { qqBot.getGroup(it) }
+                    val qqGroup = bot.groupConfigService.findByTg(message.chatId)?.qqGroupId?.let { qqBot.getGroup(it) }
                     if (qqGroup == null) {
                         return "找不到绑定的qq群"
                     } else {
@@ -106,7 +106,8 @@ class InfoCommand : AbstractTelegramCommand() {
                 list.joinToString("\n")
             }
         } else {
-            val group = bot.groupConfigService.tgQQ[message.chatId]?.let { qqBot.getGroup(it) }?:return "找不到绑定的qq群"
+            val group = bot.groupConfigService.findByTg(message.chatId)?.qqGroupId?.let { qqBot.getGroup(it) }
+                ?: return "找不到绑定的qq群"
             val list = ArrayList<String>()
             val config = bot.groupConfigService.configs.firstOrNull { it.telegramGroupId == message.chatId }
             list.add("绑定群id: `${group.id}`")

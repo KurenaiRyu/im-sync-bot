@@ -22,7 +22,6 @@ import net.mamoe.mirai.event.events.GroupTempMessageEvent
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.utils.MiraiExperimentalApi
-import nl.adaptivity.xmlutil.ExperimentalXmlUtilApi
 import nl.adaptivity.xmlutil.serialization.UnknownChildHandler
 import nl.adaptivity.xmlutil.serialization.XML
 import nl.adaptivity.xmlutil.serialization.XmlSerializationPolicy
@@ -97,7 +96,6 @@ private val json = Json {
     prettyPrint = true
 }
 
-@OptIn(ExperimentalXmlUtilApi::class)
 private val xml = XML {
     encodeDefault = XmlSerializationPolicy.XmlEncodeDefault.NEVER
     unknownChildHandler = UnknownChildHandler { input, inputKind, descriptor, name, candidates ->
@@ -140,7 +138,7 @@ class GroupMessageContext(
     val chatId: Long = if (isTempMessage) {
         bot.userConfigService.defaultChatId
     } else {
-        bot.groupConfigService.qqTg[group.id] ?: bot.groupConfigService.defaultTgGroup
+        bot.groupConfigService.findByQQ(group.id)?.telegramGroupId ?: bot.groupConfigService.defaultTgGroup
     }
     val normalType: Normal by lazy { Normal() }
 

@@ -320,9 +320,7 @@ class TgMessageHandler(
     }
 
     private suspend fun onEditMessage(update: UpdateMessageContent): Int {
-        if (!bot.groupConfigService.tgQQ.containsKey(update.chatId)) {
-            return CONTINUE
-        }
+        bot.groupConfigService.findByTg(update.chatId) ?: return CONTINUE
 
         MessageService.findQQByTg(update.chatId, update.messageId)?.source
             ?.takeIf { it.fromId == bot.qq.qqBot.id } //只撤回bot消息
@@ -340,7 +338,7 @@ class TgMessageHandler(
     suspend fun onMessage(message: TdApi.Message): Int {
 
         val userSender = message.userSender()
-        if (!bot.groupConfigService.tgQQ.containsKey(message.chatId)) {
+        bot.groupConfigService.findByTg(message.chatId) ?: run {
             log.info("ignore no configProperties group")
             return CONTINUE
         }
@@ -356,10 +354,8 @@ class TgMessageHandler(
         val quoteMsgSource = message.replyToMessageId()?.let {
             MessageService.findQQByTg(message.chatId, it)?.source
         }
-        val groupId = quoteMsgSource?.targetId ?: bot.groupConfigService.tgQQ.getOrDefault(
-            message.chatId,
-            bot.groupConfigService.defaultQQGroup
-        )
+        val groupId = quoteMsgSource?.targetId ?: bot.groupConfigService.findByTg(message.chatId)?.qqGroupId
+        ?: bot.groupConfigService.defaultQQGroup
         if (groupId == 0L) return CONTINUE
         val group = bot.qq.qqBot.getGroup(groupId)
         if (null == group) {
