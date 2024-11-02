@@ -71,7 +71,7 @@ object Versions {
     const val KORD = "0.9.0"
     const val COROUTINE_TEST = "1.7.1"
     const val LOMBOK = "1.18.32"
-    const val JIMMER = "0.8.+"
+    const val JIMMER = "latest.release"
     const val JACKSON = "2.18.0"
 }
 dependencies {
