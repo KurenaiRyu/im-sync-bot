@@ -1,6 +1,9 @@
 package kurenai.imsyncbot.repository
 
-import kurenai.imsyncbot.domain.*
+import kurenai.imsyncbot.domain.QQMessage
+import kurenai.imsyncbot.domain.botId
+import kurenai.imsyncbot.domain.messageId
+import kurenai.imsyncbot.domain.targetId
 import kurenai.imsyncbot.sqlClient
 import kurenai.imsyncbot.utils.withIO
 import net.mamoe.mirai.message.data.MessageChain
@@ -30,3 +33,4 @@ object QQMessageRepository: BaseRepository<QQMessage, Long>() {
     }
 
 }
+

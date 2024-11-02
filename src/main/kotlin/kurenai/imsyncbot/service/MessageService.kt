@@ -32,11 +32,11 @@ object MessageService {
      */
     suspend fun cache(chain: MessageChain, messages: Array<TdApi.Message>? = null) = runCatching {
         withIO {
-            val qqMsg = QQMessageRepository.findByChain(chain)?.let { entity ->
+            val qqMsg = QQMessageRepository.findByChain(chain)?.also { entity ->
                 save(entity.copy {
                     handled = true
                 })
-            } ?: chain.toEntity(true)
+            } ?: QQMessageRepository.save(chain.toEntity(true))
 
             messages?.map {
                 new(QQTg::class).by {
@@ -61,7 +61,7 @@ object MessageService {
      * @param message
      */
     suspend fun cache(receipt: MessageReceipt<*>, message: TdApi.Message) {
-        cache(receipt.sourceMessage, arrayOf(message))
+        cache(receipt.source.plus(receipt.sourceMessage), arrayOf(message))
     }
 
     suspend fun findRelationByQuote(chain: MessageChain): QQTg? {
