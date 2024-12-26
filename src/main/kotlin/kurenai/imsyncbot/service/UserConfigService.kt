@@ -44,10 +44,6 @@ class UserConfigService(
     var superAdmins = emptyList<Long>()
     override lateinit var configs: MutableList<UserConfig>
 
-    init {
-        runBlocking { refresh() }
-    }
-
     suspend fun admin(id: Long, username: String? = null, isSuper: Boolean = false) {
         val filters = configs.filter { c -> id == c.tg }
         val adminStatus = if (isSuper) UserStatus.SUPER_ADMIN else UserStatus.ADMIN
@@ -101,24 +97,24 @@ class UserConfigService(
     }
 
     private suspend fun addStatus(status: UserStatus, tg: Long? = null, qq: Long? = null, username: String? = null) {
-        val filters = configs.filter { c -> tg?.let { c.tg == it } ?: qq?.let { c.qq == it } ?: false }
-        if (filters.isEmpty()) {
+        if (tg == null && qq == null) {
+            log.warn("Tg or QQ id not found, skipped.")
+            return
+        }
+
+        val config = if (tg != null) UserConfigRepository.findByTg(tg) else UserConfigRepository.findByQQ(qq!!)
+        if (config == null) {
             UserConfigRepository.save(new(UserConfig::class).by {
                 this.tg = tg
                 this.qq = qq
                 this.status = hashSetOf(status)
             })
-            refresh()
         } else {
-            filters.map { c ->
-                if (c.status?.contains(UserStatus.BANNED) == false) {
-                    UserConfigRepository.save(
-                        c.copy {
-                            this.status.add(UserStatus.BANNED)
-                        }
-                    )
+            UserConfigRepository.save(
+                config.copy {
+                    this.status.add(status)
                 }
-            }
+            )
         }
     }
 
