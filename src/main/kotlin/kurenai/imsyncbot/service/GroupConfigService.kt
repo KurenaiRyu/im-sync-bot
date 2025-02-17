@@ -17,6 +17,8 @@ class GroupConfigService(
     val bot: ImSyncBot,
 ) : AbstractConfig<GroupConfig>() {
 
+    //TODO: group change to supper group cause
+
     private val log = getLogger()
 
     var defaultQQGroup: Long = 0

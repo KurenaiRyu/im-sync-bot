@@ -1,7 +1,6 @@
 package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.configuration.AbstractConfig
@@ -45,39 +44,35 @@ class UserConfigService(
     override lateinit var configs: MutableList<UserConfig>
 
     suspend fun admin(id: Long, username: String? = null, isSuper: Boolean = false) {
-        val filters = configs.filter { c -> id == c.tg }
+        val config = UserConfigRepository.findByTgOrQQ(id)
+
         val adminStatus = if (isSuper) UserStatus.SUPER_ADMIN else UserStatus.ADMIN
-        if (filters.isEmpty()) {
+        if (config == null) {
             val new = new(UserConfig::class).by {
                 tg = id
                 status = hashSetOf(adminStatus)
             }
             UserConfigRepository.save(new)
-            refresh()
         } else {
-            filters.map { c ->
-                c.copy {
-                    if (!this@copy.status.contains(adminStatus)) {
-                        this@copy.status += adminStatus
-                    }
+            UserConfigRepository.save(
+                config.copy {
+                    if (!this@copy.status.contains(adminStatus)) this@copy.status += adminStatus
+
                     if (!isSuper) this@copy.status.remove(UserStatus.SUPER_ADMIN)
                 }
-            }.let {
-                UserConfigRepository.saveAll(it)
-            }
+            )
         }
+        refresh()
     }
 
     suspend fun removeAdmin(id: Long) {
-        val filters = configs.filter { c -> id == c.tg }
-        filters.map {
-            it.copy {
-                status.remove(UserStatus.SUPER_ADMIN)
-                status.remove(UserStatus.ADMIN)
-            }
-        }.let {
-            UserConfigRepository.saveAll(it)
-        }
+        val config = UserConfigRepository.findByTgOrQQ(id) ?: return
+
+        UserConfigRepository.save(config.copy {
+            status.remove(UserStatus.SUPER_ADMIN)
+            status.remove(UserStatus.ADMIN)
+        })
+        refresh()
     }
 
     suspend fun ban(tg: Long? = null, qq: Long? = null, username: String? = null) {
@@ -110,86 +105,82 @@ class UserConfigService(
                 this.status = hashSetOf(status)
             })
         } else {
-            UserConfigRepository.save(
-                config.copy {
-                    this.status.add(status)
-                }
-            )
+            if (!config.status.contains(status)) {
+                UserConfigRepository.save(
+                    config.copy {
+                        this.status.add(status)
+                    }
+                )
+            }
         }
+        refresh()
     }
 
     private suspend fun removeStatus(id: Long, status: UserStatus) {
-        val filters = configs.filter { c -> (id == c.tg || id == c.qq) }
-        filters.forEach {
-            UserConfigRepository.save(it.copy {
+        val config = UserConfigRepository.findByTgOrQQ(id) ?: return
+
+        if (config.status.contains(status)) {
+            UserConfigRepository.save(config.copy {
                 this.status.remove(status)
             })
         }
+        refresh()
     }
 
     suspend fun bindName(tg: Long? = null, qq: Long? = null, bindingName: String) {
-        val filter = configs.filter { c -> tg?.let { c.tg == it } ?: qq?.let { c.qq == it } ?: false }
-        if (filter.isEmpty()) {
+        val config = UserConfigRepository.findByTgOrQQ(tg ?: qq ?: return)
+
+        if (config == null) {
             val theNew = new(UserConfig::class).by {
                 this.tg = tg
                 this.qq = qq
                 this.bindingName = bindingName
             }
-            configs.add(theNew)
             UserConfigRepository.save(theNew)
-            refresh()
         } else {
-            filter.forEach { c ->
-                UserConfigRepository.save(c.copy {
-                    this.bindingName = bindingName
-                })
-            }
+            UserConfigRepository.save(config.copy {
+                this.bindingName = bindingName
+            })
         }
+        refresh()
     }
 
     suspend fun unbindNameByTG(id: Long) {
-        doUnbind(configs.filter { b -> id == b.tg })
+        doUnbind(UserConfigRepository.findByTg(id) ?: return)
     }
 
     suspend fun unbindNameByQQ(id: Long) {
-        doUnbind(configs.filter { b -> id == b.qq })
+        doUnbind(UserConfigRepository.findByQQ(id) ?: return)
     }
 
-    private suspend fun doUnbind(filters: List<UserConfig>) {
-        val deleteList = filters.filter { it.qq == null && it.tg == null }
-        if (deleteList.isNotEmpty()) {
-            UserConfigRepository.deleteByIds<UserConfig>(deleteList.map(UserConfig::id))
-        }
-        val saveList = filters.filter { it.tg != null || it.qq != null }
-        if (saveList.isNotEmpty()) {
-            saveList.forEach {
-                UserConfigRepository.save(it.copy {
-                    bindingName = null
-                })
-            }
-        }
+    private suspend fun doUnbind(config: UserConfig) {
+        UserConfigRepository.save(config.copy {
+            bindingName = null
+        })
     }
 
     suspend fun link(tg: Long, qq: Long) {
-        val list = configs.filter { it.tg == tg || it.qq == qq }
-        val bindingName = list.firstNotNullOfOrNull { it.bindingName }
-        val status = if (list.isEmpty()) HashSet()
-        else list.map { it.status.toMutableList() }
-            .reduce { acc, item -> acc.also { it.addAll(item) } }
-            .distinct().toHashSet()
-        val one = list.firstOrNull() ?: new(UserConfig::class).by {
-            this.tg = tg
-            this.qq = qq
-            this.bindingName = bindingName
-            this.status.addAll(status)
+        val qqConfig = UserConfigRepository.findByQQ(qq)
+        val tgConfig = UserConfigRepository.findByTg(tg)
+
+        if (qqConfig == null && tgConfig == null) {
+            UserConfigRepository.save(new(UserConfig::class).by {
+                this.tg = tg
+                this.qq = qq
+            })
+        } else if (tgConfig != null) {
+            UserConfigRepository.save(tgConfig.copy {
+                this.qq = qq
+                qqConfig?.status?.let { this.status += it }
+                qqConfig?.bindingName?.let { this.bindingName = it }
+            })
+            if (qqConfig != null) UserConfigRepository.deleteById<UserConfig>(qqConfig.id)
+        } else if (qqConfig != null) {
+            UserConfigRepository.save(qqConfig.copy {
+                this.tg = tg
+            })
         }
-        UserConfigRepository.save(one)
-        list.forEachIndexed { index, userConfig ->
-            if (index > 0) {
-                configs.remove(userConfig)
-                UserConfigRepository.deleteById<UserConfig>(userConfig.id)
-            }
-        }
+        refresh()
     }
 
 //    fun unlink(user: User) {

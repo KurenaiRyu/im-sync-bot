@@ -5,6 +5,7 @@ import kurenai.imsyncbot.domain.qq
 import kurenai.imsyncbot.domain.tg
 import kurenai.imsyncbot.utils.withIO
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
+import org.babyfish.jimmer.sql.kt.ast.expression.or
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 
 /**
@@ -24,6 +25,13 @@ object UserConfigRepository : BaseRepository<UserConfig, Long>() {
     suspend fun findByQQ(qq: Long): UserConfig? = withIO {
         createQuery<UserConfig> {
             where(table.qq eq qq)
+            select(table)
+        }.fetchOneOrNull()
+    }
+
+    suspend fun findByTgOrQQ(id: Long): UserConfig? = withIO {
+        createQuery<UserConfig> {
+            where(or(table.tg eq id, table.qq eq id))
             select(table)
         }.fetchOneOrNull()
     }
