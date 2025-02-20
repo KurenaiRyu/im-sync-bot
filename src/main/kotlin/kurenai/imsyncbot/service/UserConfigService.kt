@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.configuration.AbstractConfig
@@ -10,7 +11,6 @@ import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.UserConfigRepository
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.isBot
-import kurenai.imsyncbot.utils.username
 import org.babyfish.jimmer.kt.new
 
 /**
@@ -39,9 +39,21 @@ class UserConfigService(
     var links = emptyList<UserConfig>()
     var bannedIds = emptyList<Long>()
     var picBannedIds = emptyList<Long>()
-    var admins = emptyList<Long>()
-    var superAdmins = emptyList<Long>()
     override lateinit var configs: MutableList<UserConfig>
+
+    init {
+        runBlocking { refresh() }
+    }
+
+    fun findByTg(tg: Long?): UserConfig? {
+        if (tg == null) return null
+        return configs.find { it.tg == tg }
+    }
+
+    fun findByQQ(qq: Long?): UserConfig? {
+        if (qq == null) return null
+        return configs.find { it.qq == qq }
+    }
 
     suspend fun admin(id: Long, username: String? = null, isSuper: Boolean = false) {
         val config = UserConfigRepository.findByTgOrQQ(id)
@@ -194,12 +206,12 @@ class UserConfigService(
     fun isQQMaster(id: Long) = masterQQ == id
 
     fun getPermission(user: TdApi.User?): Permission {
-        return if (user == null || user.isBot()) Permission.NORMAL
-        else if (masterTg == user.id
-            || masterUsername == user.username()
-        ) Permission.MASTER
-        else if (user.id.let(superAdmins::contains)) Permission.SUPPER_ADMIN
-        else if (user.id.let(admins::contains)) Permission.ADMIN
+        if (user == null || user.isBot()) return Permission.NORMAL
+        val config = findByTg(user.id) ?: return Permission.NORMAL
+
+        return if (config.isMaster()) Permission.MASTER
+        else if (config.isSuperAdmin()) Permission.SUPPER_ADMIN
+        else if (config.isAdmin()) Permission.ADMIN
         else Permission.NORMAL
     }
 
@@ -211,7 +223,6 @@ class UserConfigService(
         val bannedIds = ArrayList<Long>()
         val picBannedIds = ArrayList<Long>()
         val admins = ArrayList<Long>()
-        val superAdmins = ArrayList<Long>()
         val friendChats = HashMap<Long, Long>()
         val chatFriends = HashMap<Long, Long>()
 
@@ -242,22 +253,18 @@ class UserConfigService(
                     UserStatus.SUPER_ADMIN -> {
                         config.tg?.let {
                             admins.add(it)
-                            superAdmins.add(it)
                         }
                         config.qq?.let {
                             admins.add(it)
-                            superAdmins.add(it)
                         }
                     }
 
                     UserStatus.MASTER -> {
                         config.tg?.let {
                             admins.add(it)
-                            superAdmins.add(it)
                         }
                         config.qq?.let {
                             admins.add(it)
-                            superAdmins.add(it)
                         }
                         masterUsername = config.bindingName?:"Master"
                     }
@@ -274,9 +281,7 @@ class UserConfigService(
         }
 
         admins.add(masterTg)
-        superAdmins.add(masterTg)
         admins.add(masterQQ)
-        superAdmins.add(masterQQ)
 
         idBindings = ids.toMap()
         usernameBindings = usernames.toMap()
@@ -284,8 +289,6 @@ class UserConfigService(
         this.links = links.toList()
         this.bannedIds = bannedIds.toList()
         this.picBannedIds = picBannedIds.toList()
-        this.admins = admins.toList()
-        this.superAdmins = superAdmins.toList()
         this.friendChatIds = friendChats.toMap()
         this.chatIdFriends = chatFriends.toMap()
     }
@@ -341,4 +344,23 @@ enum class UserStatus {
     MASTER,
     BANNED,
     PIC_BANNED
+}
+
+
+fun UserConfig.isAdmin(): Boolean {
+    return status.any {
+        it == UserStatus.ADMIN || it == UserStatus.SUPER_ADMIN || it == UserStatus.MASTER
+    }
+}
+
+fun UserConfig.isSuperAdmin(): Boolean {
+    return status.any {
+        it == UserStatus.SUPER_ADMIN || it == UserStatus.MASTER
+    }
+}
+
+fun UserConfig.isMaster(): Boolean {
+    return status.any {
+        it == UserStatus.MASTER
+    }
 }

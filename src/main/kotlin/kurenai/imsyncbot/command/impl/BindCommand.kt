@@ -4,6 +4,8 @@ import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.service.MessageService
+import kurenai.imsyncbot.service.isAdmin
+import kurenai.imsyncbot.service.isSuperAdmin
 import kurenai.imsyncbot.utils.*
 import net.mamoe.mirai.message.data.sourceOrNull
 
@@ -44,7 +46,7 @@ class BindCommand : AbstractTelegramCommand() {
                     }
                 } ?: "找不到引用的消息"
             } else {
-                if (bot.userConfigService.superAdmins.contains(message.userSender()?.userId)) {
+                if (bot.userConfigService.findByTg(message.userSender()?.userId)?.isAdmin() == true) {
                     try {
                         val qq = param.toLong()
                         qqBot.getGroup(qq)?.let {
@@ -61,9 +63,8 @@ class BindCommand : AbstractTelegramCommand() {
                     "绑定群组操作需要超级管理员权限"
                 }
             }
-        } else if (chat.type.constructor == ChatTypePrivate.CONSTRUCTOR && bot.userConfigService.superAdmins.contains(
-                chat.id
-            )
+        } else if (chat.type.constructor == ChatTypePrivate.CONSTRUCTOR && bot.userConfigService.findByTg(chat.id)
+                ?.isSuperAdmin() == true
         ) {
             val usernameBinds =
                 bot.userConfigService.configs.filter { it.bindingName != null }
@@ -109,7 +110,7 @@ class UnbindCommand : AbstractTelegramCommand() {
                             "qq[${qqMsgSource.fromId}] 解绑名称成功"
                         } else "找不到该qq信息"
                     } else {
-                        if (bot.userConfigService.superAdmins.contains(message.userSender()?.userId)) {
+                        if (bot.userConfigService.findByTg(message.userSender()?.userId)?.isSuperAdmin() == true) {
                             bot.userConfigService.unbindNameByTG(userId)
                             "$userId 解绑名称成功"
                         } else {

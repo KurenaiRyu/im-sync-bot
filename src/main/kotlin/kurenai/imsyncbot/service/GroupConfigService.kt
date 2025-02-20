@@ -17,7 +17,7 @@ class GroupConfigService(
     val bot: ImSyncBot,
 ) : AbstractConfig<GroupConfig>() {
 
-    //TODO: group change to supper group cause
+    //TODO: resolve group change to supper group
 
     private val log = getLogger()
 
