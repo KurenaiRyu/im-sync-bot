@@ -3,12 +3,12 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
     id("io.freefair.lombok") version "8.1.0"
-    id("com.google.devtools.ksp") version "2.0.21-1.0.25"
-    kotlin("jvm") version "2.0.21"
-    kotlin("plugin.lombok") version "2.0.21"
-    kotlin("plugin.serialization") version "2.0.21"
-    kotlin("plugin.allopen") version "2.0.21"
-    kotlin("plugin.noarg") version "2.0.21"
+    id("com.google.devtools.ksp") version "2.1.10-1.0.30"
+    kotlin("jvm") version "2.1.10"
+    kotlin("plugin.lombok") version "2.1.10"
+    kotlin("plugin.serialization") version "2.1.10"
+    kotlin("plugin.allopen") version "2.1.10"
+    kotlin("plugin.noarg") version "2.1.10"
     jacoco
 }
 
@@ -65,14 +65,14 @@ kotlin {
 object Versions {
     const val VERTX_VERSION = "4.2.3"
     const val LOG4J = "2.20.0"
-    const val KTOR = "2.3.+"
+    const val KTOR = "3.1.0"
     const val TD_LIGHT = "3.4.0+td.1.8.26"
     const val MIRAI = "2.16.0-RC"
     const val KORD = "0.9.0"
     const val COROUTINE_TEST = "1.7.1"
     const val LOMBOK = "1.18.32"
     const val JIMMER = "latest.release"
-    const val JACKSON = "2.18.0"
+    const val JACKSON = "2.18.2"
 }
 dependencies {
 
@@ -81,15 +81,16 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.5.1")
 
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:${Versions.JACKSON}")
-    implementation("org.jetbrains.kotlinx:atomicfu:0.20.0")
+    implementation("org.jetbrains.kotlinx:atomicfu:0.27.0")
     implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.21")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:${Versions.JACKSON}")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:${Versions.JACKSON}")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${Versions.JACKSON}")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${Versions.JACKSON}")
 
     //exif
     implementation("com.ashampoo:kim:0.18.4")
+    implementation("io.ktor:ktor-client-okhttp-jvm:3.1.0")
 
     compileOnly("org.projectlombok:lombok:${Versions.LOMBOK}")
     annotationProcessor("org.projectlombok:lombok:${Versions.LOMBOK}")

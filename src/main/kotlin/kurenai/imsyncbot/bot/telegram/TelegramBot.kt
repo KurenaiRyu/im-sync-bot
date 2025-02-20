@@ -16,8 +16,6 @@ import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.util.*
 import kotlin.Result
-import kotlin.contracts.InvocationKind
-import kotlin.contracts.contract
 import kotlin.io.path.pathString
 import kotlin.io.path.writeBytes
 import kotlin.time.Duration
@@ -298,9 +296,6 @@ class TelegramBot(
         timeout: Duration = DEFAULT_TIMEOUT,
         block: () -> TdApi.Function<R>
     ): R {
-        contract {
-            callsInPlace(block, InvocationKind.EXACTLY_ONCE)
-        }
         val params = block()
         val (value, duration) = measureTimedValue {
             withContext(this.coroutineContext) {
