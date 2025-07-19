@@ -68,11 +68,7 @@ object HttpUtil {
     }
 
     private suspend fun getRemoteFileSize(url: String, enableProxy: Boolean = false): Long {
-        val response = client.get(url) {
-            headers {
-                append(HttpHeaders.Range, "bytes=0-1")
-            }
-        }
+        val response = client.head(url)
         return when (response.status) {
             HttpStatusCode.PartialContent -> {
                 log.debug("Get remote file size fail")
@@ -84,7 +80,7 @@ object HttpUtil {
             }
 
             else -> {
-                response.headers[HttpHeaders.ContentRange]?.substringAfterLast('/')?.toLong() ?: 0
+                response.headers[HttpHeaders.ContentLength]?.toLong() ?: 0L
             }
         }
     }
