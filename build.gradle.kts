@@ -25,14 +25,6 @@ repositories {
             includeGroup("it.tdlight")
         }
     }
-    exclusiveContent {
-        forRepository {
-            maven("https://s01.oss.sonatype.org/content/repositories/releases")
-        }
-        filter {
-            includeGroup("top.mrxiaom.mirai")
-        }
-    }
 }
 
 configurations {
@@ -110,7 +102,7 @@ dependencies {
     implementation(platform("net.mamoe:mirai-bom:${Versions.MIRAI}"))
     implementation("net.mamoe:mirai-core-api")
     implementation("net.mamoe:mirai-core-utils")
-    implementation("top.mrxiaom.mirai:overflow-core:1.0.1")
+    implementation("top.mrxiaom.mirai:overflow-core:1.0.6")
 
     //tdlib
     implementation(platform("it.tdlight:tdlight-java-bom:${Versions.TD_LIGHT}"))
