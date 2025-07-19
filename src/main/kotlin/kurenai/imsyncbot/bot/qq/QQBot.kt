@@ -4,20 +4,17 @@ import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.TextEntity
 import it.tdlight.jni.TdApi.TextEntityTypeMentionName
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
+import kurenai.imsyncbot.bot.MessageDispatch
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil.toEntity
 import kurenai.imsyncbot.utils.getLogger
-import kurenai.imsyncbot.utils.launchWithPermit
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.event.Event
@@ -25,7 +22,6 @@ import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.PlainText
 import top.mrxiaom.overflow.BotBuilder
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
 
 class QQBot(
@@ -57,17 +53,12 @@ class QQBot(
 
     val status = MutableStateFlow<BotStatus>(Initializing)
 
-    private val messageChannel = Channel<Event>(Channel.BUFFERED, BufferOverflow.DROP_OLDEST) {
-        log.warn("Drop oldest event $it")
-    }
-
     private val loginLock = Mutex()
 
     lateinit var qqBot: Bot
 
-    @OptIn(DelicateCoroutinesApi::class)
-    private val workerScope = CoroutineScope(coroutineContext + CoroutineName("qq-worker"))
-    private val groupMessageLockMap = ConcurrentHashMap<Long, Semaphore>()
+    private val workerScope = CoroutineScope(coroutineContext + CoroutineName("qq-message-worker"))
+    private val messageDispatcher = MessageDispatch(scope = workerScope, name = "qq-message-dispatcher")
 
     private suspend fun buildBot(): Bot {
         val url = "ws://${qqProperties.host}:${qqProperties.port}/"
@@ -134,14 +125,11 @@ class QQBot(
                 }.getOrDefault(false)
             }.subscribeAlways<Event> { event ->
                 event.id()?.let {
-                    val semaphore = groupMessageLockMap.computeIfAbsent(it) { _ ->
-                        Semaphore(1)
-                    }
-                    workerScope.launchWithPermit(semaphore, CoroutineName(event.idString())) {
+                    messageDispatcher.submit(event.idWithClsName()) {
                         handleEvent(event)
                     }
                 } ?: run {
-                    workerScope.launch(CoroutineName(event.idString())) {
+                    workerScope.launch(CoroutineName(event.idWithClsName())) {
                         handleEvent(event)
                     }
                 }
@@ -284,7 +272,7 @@ class QQBot(
         }
     }
 
-    private fun Event.idString() = when (this) {
+    private fun Event.idWithClsName() = when (this) {
         is GroupEvent -> {
             "${this::class.simpleName}[${this.group.id}]"
         }

@@ -11,6 +11,7 @@ import org.apache.logging.log4j.Level
 import org.apache.logging.log4j.core.config.Configurator
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.util.concurrent.Executors
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
@@ -26,7 +27,9 @@ class ImSyncBot(
 
     companion object Key : CoroutineContext.Key<ImSyncBot>
 
-    override val coroutineContext: CoroutineContext = this.plus(CoroutineName("im-sync-bot"))
+    override val coroutineContext: CoroutineContext =
+        Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("ImSyncBot").factory())
+            .asCoroutineDispatcher()
         .plus(SupervisorJob())
         .apply {
             job.invokeOnCompletion {
