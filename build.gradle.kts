@@ -2,13 +2,14 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
-    id("io.freefair.lombok") version "8.1.0"
-    id("com.google.devtools.ksp") version "2.1.10-1.0.30"
-    kotlin("jvm") version "2.1.10"
-    kotlin("plugin.lombok") version "2.1.10"
-    kotlin("plugin.serialization") version "2.1.10"
-    kotlin("plugin.allopen") version "2.1.10"
-    kotlin("plugin.noarg") version "2.1.10"
+    application
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.kotlin.lombok)
+    alias(libs.plugins.kotlin.openall)
+    alias(libs.plugins.kotlin.noarg)
+    alias(libs.plugins.lombok)
+    alias(libs.plugins.ksp)
     jacoco
 }
 
@@ -27,13 +28,6 @@ repositories {
     }
 }
 
-configurations {
-}
-
-lombok {
-    version.set(Versions.LOMBOK)
-}
-
 
 kotlin {
     sourceSets.main {
@@ -41,7 +35,7 @@ kotlin {
     }
 
     compilerOptions {
-        languageVersion.set(KotlinVersion.KOTLIN_2_0)
+        languageVersion.set(KotlinVersion.KOTLIN_2_1)
         freeCompilerArgs.set(
             listOf(
                 "-Xjsr305=strict",
@@ -55,111 +49,72 @@ kotlin {
 }
 
 object Versions {
-    const val VERTX_VERSION = "4.2.3"
-    const val LOG4J = "2.20.0"
-    const val KTOR = "3.1.0"
-    const val TD_LIGHT = "3.4.0+td.1.8.26"
-    const val MIRAI = "2.16.0-RC"
     const val KORD = "0.9.0"
-    const val COROUTINE_TEST = "1.7.1"
-    const val LOMBOK = "1.18.32"
-    const val JIMMER = "latest.release"
-    const val JACKSON = "2.18.2"
 }
 dependencies {
 
-    implementation("org.jetbrains.kotlin", "kotlin-reflect")
-    implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.5.1")
+    implementation(libs.kotlin.bom)
+    implementation(libs.kotlin.reflect)
+    implementation(libs.kotlin.stdlib.jdk8)
+    implementation(libs.kotlinx.io.core)
+    implementation(libs.kotlinx.atomicfu)
+    implementation(libs.kotlinx.json)
+    implementation(libs.kotlinx.coroutines)
+    implementation(libs.kotlinx.datetime)
 
-    implementation("org.jetbrains.kotlinx:atomicfu:0.27.0")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.21")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:${Versions.JACKSON}")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:${Versions.JACKSON}")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${Versions.JACKSON}")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:${Versions.JACKSON}")
+    implementation(libs.bundles.jackson)
+    implementation(libs.jackson.dataformat.yaml)
+
+    implementation(libs.bundles.ktorClient)
+
+    implementation(libs.bundles.mirai)
+
+    compileOnly(libs.lombok)
+    annotationProcessor(libs.lombok)
+
+    implementation(libs.bundles.jimmer)
+    implementation(libs.hikaricp)
+    implementation(libs.sqlite)
+
+    implementation(libs.bundles.log)
+    implementation(libs.diruptor)
+
+    implementation(libs.caffeine)
+    implementation(libs.jsoup)
+    implementation(libs.apache.commons.pool2)
+    implementation(libs.reflections)
+
+    //tdlib
+    implementation(platform(libs.tdlight.bom))
+    implementation(libs.tdlight)
+    val hostOs = System.getProperty("os.name")
+    val isWin = hostOs.startsWith("Windows")
+    val classifier = when {
+        hostOs == "Linux" -> "linux_amd64_gnu_ssl1"
+        isWin -> "windows_amd64"
+        else -> throw GradleException("[$hostOs] is not support!")
+    }
+    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
+    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "linux_amd64_gnu_ssl1")
 
     //exif
     implementation("com.ashampoo:kim:0.18.4")
-    implementation("io.ktor:ktor-client-okhttp-jvm:3.1.0")
-
-    compileOnly("org.projectlombok:lombok:${Versions.LOMBOK}")
-    annotationProcessor("org.projectlombok:lombok:${Versions.LOMBOK}")
-
-    implementation("com.zaxxer:HikariCP:6.0.0")
-
-    //db driver
-    runtimeOnly("org.xerial:sqlite-jdbc:3.47.0.0")
-//    runtimeOnly("com.h2database:h2")
-//    runtimeOnly("mysql:mysql-connector-java")
-//    runtimeOnly("org.postgresql:postgresql")
 
     //discord
     implementation("dev.kord:kord-core:${Versions.KORD}")
-
-    //mirai
-    implementation(platform("net.mamoe:mirai-bom:${Versions.MIRAI}"))
-    implementation("net.mamoe:mirai-core-api")
-    implementation("net.mamoe:mirai-core-utils")
-    implementation("top.mrxiaom.mirai:overflow-core:1.0.6")
-
-    //tdlib
-    implementation(platform("it.tdlight:tdlight-java-bom:${Versions.TD_LIGHT}"))
-    implementation("it.tdlight:tdlight-java")
-//    val hostOs = System.getProperty("os.name")
-//    val isWin = hostOs.startsWith("Windows")
-//    val classifier = when {
-//        hostOs == "Linux" -> "linux_amd64_gnu_ssl1"
-//        isWin -> "windows_amd64"
-//        else -> throw GradleException("[$hostOs] is not support!")
-//    }
-//    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
-    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "windows_amd64")
-    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "linux_amd64_gnu_ssl1")
-
-    implementation("io.ktor:ktor-client-core:${Versions.KTOR}")
-    implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR}")
-
-    //cache
-    implementation("com.sksamuel.aedile:aedile-core:1.2.0")
-
-    //logging
-    implementation("org.apache.logging.log4j:log4j-core:${Versions.LOG4J}")
-    implementation("org.apache.logging.log4j:log4j-api:${Versions.LOG4J}")
-    implementation("org.apache.logging.log4j:log4j-slf4j2-impl:${Versions.LOG4J}")
-    implementation("com.lmax:disruptor:3.4.4")
 
     //xml
     implementation("io.github.pdvrieze.xmlutil:core-jvm:0.84.3")
     implementation("io.github.pdvrieze.xmlutil:serialization-jvm:0.84.3")
 
-    //json
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.4.1")
-
     //protobuf
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.4.1")
 
-    //cache
-    implementation("com.sksamuel.aedile:aedile-core:1.2.0")
-
     //tool kit
     implementation("com.google.guava:guava:32.0.0-jre")
-    implementation("org.jsoup:jsoup:1.15.3")
-
-    //jimmer
-    implementation("org.babyfish.jimmer:jimmer-sql-kotlin:${Versions.JIMMER}")
-    ksp("org.babyfish.jimmer:jimmer-ksp:${Versions.JIMMER}")
-
-    implementation("org.reflections", "reflections", "0.10.2")
 
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINE_TEST}")
 }
-
-//application {
-//    applicationDefaultJvmArgs = listOf("-Dkotlinx.coroutines.debug", "-Duser.timezone=GMT+08")
-//}
 
 allOpen {
     annotation("javax.persistence.Entity")
@@ -168,10 +123,6 @@ allOpen {
 noArg {
     annotation("javax.persistence.Entity")
 }
-
-//kapt {
-//    keepJavacAnnotationProcessors = true
-//}
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -184,7 +135,7 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-tasks.register<Copy>("syncLib") {
+tasks.register<Sync>("syncLib") {
     from(configurations.runtimeClasspath)
     into("${layout.buildDirectory.get()}/libs/lib")
 }

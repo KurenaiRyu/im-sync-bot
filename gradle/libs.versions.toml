@@ -1,17 +1,75 @@
 [versions]
-jackson = "2.17.0"
-jsoup = "1.17.2"
-ktor = "2.3.9"
-mordant = "2.3.0"
+ktolin = "2.1.21"
+ksp = "2.1.21-2.0.2"
+lombok = "1.18.38"
+serialization = "1.8.1"
+coroutines = "1.10.2"
+ktor = "3.2.0"
+log4j = "2.20.0"
+jimmer = "0.9.96"
+jackson = "2.19.2"
+mirai = "2.16.0-RC"
 
 [libraries]
-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "jackson" }
-jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
-ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
-ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
-ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
-ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
-ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
-ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
-ktor-serialization-jackson = { module = "io.ktor:ktor-serialization-jackson", version.ref = "ktor" }
-mordant = { module = "com.github.ajalt.mordant:mordant", version.ref = "mordant" }
+kotlin-bom = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "ktolin" }
+kotlin-gradle = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin" }
+kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
+kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version = "0.8.0" }
+kotlinx-atomicfu = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version = "0.29.0" }
+kotlinx-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
+kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version = "0.7.1" }
+kotlinx-coroutines = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-client-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor" }
+ktor-server-netty = { group = "io.ktor", name = "ktor-server-netty", version.ref = "ktor" }
+ktor-tls = { group = "io.ktor", name = "ktor-network-tls-certificates", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
+serialization-yaml = { group = "net.mamoe.yamlkt", name = "yamlkt-jvm", version = "0.13.0" }
+caffeine = { group = "com.sksamuel.aedile", name = "aedile-core", version = "2.1.2" }
+jsoup = { group = "org.jsoup", name = "jsoup", version = "1.20.1" }
+directory-watcher = { group = "io.methvin", name = "directory-watcher", version = "0.19.1" }
+apache-commons-pool2 = { group = "org.apache.commons", name = "commons-pool2", version = "2.11.1" }
+apache-log4j-core = { group = "org.apache.logging.log4j", name = "log4j-core", version.ref = "log4j" }
+apache-log4j-api = { group = "org.apache.logging.log4j", name = "log4j-api", version.ref = "log4j" }
+apache-log4j-slf4j2 = { group = "org.apache.logging.log4j", name = "log4j-slf4j2-impl", version.ref = "log4j" }
+zxing-core = { group = "com.google.zxing", name = "core", version = "3.5.2" }
+zxing-javase = { group = "com.google.zxing", name = "javase", version = "3.5.2" }
+slf4j-api = { group = "org.slf4j", name = "slf4j-api", version = "2.0.6" }
+diruptor = { group = "com.lmax", name = "disruptor", version = "3.4.4" }
+tdlight-bom = { module = "it.tdlight:tdlight-java-bom", version = "3.4.0+td.1.8.26" }
+tdlight = { module = "it.tdlight:tdlight-java" }
+jimmer-kotlin = { module = "org.babyfish.jimmer:jimmer-sql-kotlin", version.ref = "jimmer" }
+jimmer-ksp = { module = "org.babyfish.jimmer:jimmer-ksp", version.ref = "jimmer" }
+hikaricp = { module = "com.zaxxer:HikariCP", version = "6.3.0" }
+sqlite = { module = "org.xerial:sqlite-jdbc", version = "3.47.0.0" }
+jackson-module-kotlin = { group = "com.fasterxml.jackson.module", name = "jackson-module-kotlin", version.ref = "jackson" }
+jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }
+jackson-datatype-jsr310 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jsr310", version.ref = "jackson" }
+jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml", version.ref = "jackson" }
+mirai-bom = { group = "net.mamoe", name = "mirai-bom", version.ref = "mirai" }
+mirai-api = { group = "net.mamoe", name = "mirai-core-api" }
+mirai-utils = { group = "net.mamoe", name = "mirai-core-utils" }
+mirai-bridge-overflow = { group = "top.mrxiaom.mirai", name = "overflow-core", version = "1.0.6" }
+lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
+reflections = { group = "org.reflections", name = "reflections", version = "0.10.2" }
+
+[bundles]
+ktorClient = ["ktor-client-core", "ktor-client-okhttp", "ktor-serialization-kotlinx-json", "ktor-client-negotiation"]
+zxing = ["zxing-core", "zxing-javase"]
+log = ["apache-log4j-api", "apache-log4j-core", "apache-log4j-slf4j2", "slf4j-api"]
+jackson = ["jackson-module-kotlin", "jackson-datatype-jdk8", "jackson-datatype-jsr310"]
+mirai = ["mirai-bom", "mirai-api", "mirai-utils", "mirai-bridge-overflow"]
+jimmer = ["jimmer-kotlin", "jimmer-ksp"]
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "ktolin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "ktolin" }
+kotlin-lombok = { id = "org.jetbrains.kotlin.plugin.lombok", version.ref = "ktolin" }
+kotlin-openall = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "ktolin" }
+kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref = "ktolin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+lombok = { id = "io.freefair.lombok", version = "5.3.0" }
+openapi-generator = { id = "org.openapi.generator", version = "7.13.0" }
