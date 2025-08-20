@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
-import kurenai.imsyncbot.bot.MessageDispatch
+import kurenai.imsyncbot.bot.MessageDispatcher
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil.toEntity
@@ -58,7 +58,7 @@ class QQBot(
     lateinit var qqBot: Bot
 
     private val workerScope = CoroutineScope(coroutineContext + CoroutineName("qq-message-worker"))
-    private val messageDispatcher = MessageDispatch(scope = workerScope, name = "qq-message-dispatcher")
+    private val messageDispatcher = MessageDispatcher(scope = workerScope, name = "qq-message-dispatcher")
 
     private suspend fun buildBot(): Bot {
         val url = "ws://${qqProperties.host}:${qqProperties.port}/"
@@ -124,12 +124,12 @@ class QQBot(
                     log.error(it.message, it)
                 }.getOrDefault(false)
             }.subscribeAlways<Event> { event ->
-                event.id()?.let {
-                    messageDispatcher.submit(event.idWithClsName()) {
+                event.idWithGroupOrUserMark()?.also {
+                    messageDispatcher.submit(it) {
                         handleEvent(event)
                     }
                 } ?: run {
-                    workerScope.launch(CoroutineName(event.idWithClsName())) {
+                    workerScope.launch {
                         handleEvent(event)
                     }
                 }
@@ -282,6 +282,17 @@ class QQBot(
         }
 
         else -> "${this::class.simpleName}"
+    }
+    private fun Event.idWithGroupOrUserMark() = when (this) {
+        is GroupEvent -> {
+            "G${this.group.id}"
+        }
+
+        is UserEvent -> {
+            "U[${this.user.id}]"
+        }
+
+        else -> null
     }
 
     private fun Event.id() = when (this) {

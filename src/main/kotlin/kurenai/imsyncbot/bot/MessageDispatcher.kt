@@ -7,8 +7,10 @@ import kotlinx.coroutines.channels.Channel
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.utils.ConcurrentHashMap
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
-class MessageDispatch(
+class MessageDispatcher(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val idleTimeoutMillis: Long = 60_000L,
     private val name: String = "MessageDispatcher-${count.getAndIncrement()}"
@@ -33,11 +35,11 @@ class MessageDispatch(
                         worker.channel.close()
                         log.debug("Clean worker({}-{})", name, worker.id)
                     } else {
-                        log.trace(
-                            "Worker({}-{}) remaining idle timeout is {}, channel has {} tasks",
+                        log.debug(
+                            "Worker({}-{}) remaining idle timeout is {}s, channel empty: {}",
                             name,
                             worker.id,
-                            now - worker.lastAccessTime,
+                            (worker.lastAccessTime + idleTimeoutMillis - now) / 1000.0,
                             worker.channel.isEmpty
                         )
                     }
