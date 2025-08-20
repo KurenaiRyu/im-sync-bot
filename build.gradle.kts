@@ -2,13 +2,14 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 
 plugins {
-    id("io.freefair.lombok") version "8.1.0"
-    id("com.google.devtools.ksp") version "2.0.21-1.0.25"
-    kotlin("jvm") version "2.0.21"
-    kotlin("plugin.lombok") version "2.0.21"
-    kotlin("plugin.serialization") version "2.0.21"
-    kotlin("plugin.allopen") version "2.0.21"
-    kotlin("plugin.noarg") version "2.0.21"
+    application
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.kotlin.lombok)
+    alias(libs.plugins.kotlin.openall)
+    alias(libs.plugins.kotlin.noarg)
+    alias(libs.plugins.lombok)
+    alias(libs.plugins.ksp)
     jacoco
 }
 
@@ -49,7 +50,7 @@ kotlin {
     }
 
     compilerOptions {
-        languageVersion.set(KotlinVersion.KOTLIN_2_0)
+        languageVersion.set(KotlinVersion.KOTLIN_2_1)
         freeCompilerArgs.set(
             listOf(
                 "-Xjsr305=strict",
@@ -76,10 +77,10 @@ object Versions {
 }
 dependencies {
 
-    implementation("org.jetbrains.kotlin", "kotlin-reflect")
-    implementation("org.jetbrains.kotlin", "kotlin-stdlib-jdk8")
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.5.1")
+    implementation(libs.kotlin.bom)
+    implementation(libs.kotlin.reflect)
+    implementation(libs.kotlin.stdlib.jdk8)
+    implementation(libs.kotlinx.io.core)
 
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:${Versions.JACKSON}")
     implementation("org.jetbrains.kotlinx:atomicfu:0.20.0")
