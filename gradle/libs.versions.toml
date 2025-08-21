@@ -8,7 +8,8 @@ ktor = "3.2.0"
 log4j = "2.20.0"
 jimmer = "0.9.96"
 jackson = "2.19.2"
-mirai = "2.16.0-RC"
+mirai = "2.16.0"
+serialize-xml = "0.91.2"
 
 [libraries]
 kotlin-bom = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "ktolin" }
@@ -28,6 +29,8 @@ ktor-server-netty = { group = "io.ktor", name = "ktor-server-netty", version.ref
 ktor-tls = { group = "io.ktor", name = "ktor-network-tls-certificates", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 serialization-yaml = { group = "net.mamoe.yamlkt", name = "yamlkt-jvm", version = "0.13.0" }
+serialization-xml-core = { group = "io.github.pdvrieze.xmlutil", name = "core", version.ref = "serialize-xml" }
+serialization-xml-serialization = { group = "io.github.pdvrieze.xmlutil", name = "serialization", version.ref = "serialize-xml" }
 caffeine = { group = "com.sksamuel.aedile", name = "aedile-core", version = "2.1.2" }
 jsoup = { group = "org.jsoup", name = "jsoup", version = "1.20.1" }
 directory-watcher = { group = "io.methvin", name = "directory-watcher", version = "0.19.1" }
@@ -52,7 +55,7 @@ jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "
 mirai-bom = { group = "net.mamoe", name = "mirai-bom", version.ref = "mirai" }
 mirai-api = { group = "net.mamoe", name = "mirai-core-api" }
 mirai-utils = { group = "net.mamoe", name = "mirai-core-utils" }
-mirai-bridge-overflow = { group = "top.mrxiaom.mirai", name = "overflow-core", version = "1.0.6" }
+mirai-bridge-overflow = { group = "top.mrxiaom.mirai", name = "overflow-core", version = "1.0.7" }
 lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
 reflections = { group = "org.reflections", name = "reflections", version = "0.10.2" }
 
@@ -61,8 +64,9 @@ ktorClient = ["ktor-client-core", "ktor-client-okhttp", "ktor-serialization-kotl
 zxing = ["zxing-core", "zxing-javase"]
 log = ["apache-log4j-api", "apache-log4j-core", "apache-log4j-slf4j2", "slf4j-api"]
 jackson = ["jackson-module-kotlin", "jackson-datatype-jdk8", "jackson-datatype-jsr310"]
-mirai = ["mirai-bom", "mirai-api", "mirai-utils", "mirai-bridge-overflow"]
+mirai = ["mirai-api", "mirai-utils", "mirai-bridge-overflow"]
 jimmer = ["jimmer-kotlin", "jimmer-ksp"]
+serializationXml = ["serialization-xml-core", "serialization-xml-serialization"]
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "ktolin" }

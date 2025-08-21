@@ -35,7 +35,6 @@ kotlin {
     }
 
     compilerOptions {
-        languageVersion.set(KotlinVersion.KOTLIN_2_1)
         freeCompilerArgs.set(
             listOf(
                 "-Xjsr305=strict",
@@ -44,7 +43,6 @@ kotlin {
             )
         )
         javaParameters.set(true)
-        jvmTarget.set(JvmTarget.JVM_21)
     }
 }
 
@@ -64,9 +62,11 @@ dependencies {
 
     implementation(libs.bundles.jackson)
     implementation(libs.jackson.dataformat.yaml)
+    implementation(libs.bundles.serializationXml)
 
     implementation(libs.bundles.ktorClient)
 
+    implementation(platform(libs.mirai.bom))
     implementation(libs.bundles.mirai)
 
     compileOnly(libs.lombok)
@@ -97,21 +97,8 @@ dependencies {
     implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
     implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "linux_amd64_gnu_ssl1")
 
-    //exif
-    implementation("com.ashampoo:kim:0.18.4")
-
     //discord
     implementation("dev.kord:kord-core:${Versions.KORD}")
-
-    //xml
-    implementation("io.github.pdvrieze.xmlutil:core-jvm:0.84.3")
-    implementation("io.github.pdvrieze.xmlutil:serialization-jvm:0.84.3")
-
-    //protobuf
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.4.1")
-
-    //tool kit
-    implementation("com.google.guava:guava:32.0.0-jre")
 
     testImplementation(kotlin("test"))
 }

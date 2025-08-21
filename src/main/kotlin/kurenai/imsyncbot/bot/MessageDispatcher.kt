@@ -1,14 +1,12 @@
 package kurenai.imsyncbot.bot
 
-import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.utils.ConcurrentHashMap
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
+import java.util.concurrent.atomic.AtomicInteger
 
 class MessageDispatcher(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
@@ -76,7 +74,7 @@ class MessageDispatcher(
 
     companion object {
         private val log = getLogger()
-        private val count = atomic(0L)
+        private val count by lazy { AtomicInteger(0) }
     }
 
 
