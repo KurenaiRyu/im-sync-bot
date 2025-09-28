@@ -4,12 +4,9 @@ import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.exception.CommandException
-import kurenai.imsyncbot.getBotOrThrow
-import kurenai.imsyncbot.qqCommands
 import kurenai.imsyncbot.service.Permission
 import kurenai.imsyncbot.tgCommands
 import kurenai.imsyncbot.utils.*
-import net.mamoe.mirai.event.events.MessageEvent
 
 object CommandDispatcher {
 
@@ -76,19 +73,6 @@ object CommandDispatcher {
         responseMsg?.takeIf { it.isNotBlank() }?.let {
             bot.tg.sendMessageText(it, chat.id, parseMode, replayToMessageId = if (reply) message.id else null)
         }
-    }
-
-    suspend fun execute(event: MessageEvent): Int {
-        val bot = getBotOrThrow()
-        var matched = false
-        for (handler in qqCommands) {
-            if (bot.groupConfigService.configs.any { it.qqGroupId == event.subject.id }
-                && handler.execute(event) == 1) {
-                matched = true
-                break
-            }
-        }
-        return if (matched) 1 else 0
     }
 
 

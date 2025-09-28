@@ -9,7 +9,7 @@ import net.mamoe.mirai.utils.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 class MessageDispatcher(
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
+    private val parentScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val idleTimeoutMillis: Long = 60_000L,
     private val name: String = "MessageDispatcher-${count.getAndIncrement()}"
 ) {
@@ -22,7 +22,7 @@ class MessageDispatcher(
     }
 
     private val workers = ConcurrentHashMap<String, Worker>()
-    private val cleanerJob = scope.launch {
+    private val cleanerJob = parentScope.launch {
         delay(30_000)
         while (true) {
             runCatching {
@@ -62,7 +62,7 @@ class MessageDispatcher(
 
     private fun addWorkerIfNeed(id: String) = workers.computeIfAbsent(id) {
         val channel = Channel<suspend () -> Unit>(Channel.BUFFERED, BufferOverflow.SUSPEND)
-        val job = scope.launch {
+        val job = parentScope.launch {
             for (f in channel) {
                 runCatching { f() }.onFailure { log.error("{}-{} execute error: {}", name, id, it.message, it) }
             }

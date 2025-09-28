@@ -54,7 +54,7 @@ lateinit var sqlClient: KSqlClient
 internal lateinit var instants: MutableList<ImSyncBot>
 internal lateinit var imSyncBot: ImSyncBot
 
-suspend fun main() {
+fun main() {
     Init.init() //td-lib
     initProperties()
     initDB()

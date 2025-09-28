@@ -22,12 +22,13 @@ import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.PlainText
 import top.mrxiaom.overflow.BotBuilder
-import kotlin.coroutines.CoroutineContext
+
 
 class QQBot(
     private val qqProperties: QQProperties,
-    private val bot: ImSyncBot
-) : CoroutineScope {
+    parentJob: Job? = null,
+    val bot: ImSyncBot
+) {
 
     companion object {
         init {
@@ -37,28 +38,25 @@ class QQBot(
         private val log = getLogger()
     }
 
-    override val coroutineContext: CoroutineContext = bot.coroutineContext
-        .plus(SupervisorJob(bot.coroutineContext[Job]))
-        .plus(CoroutineExceptionHandler { context, exception ->
-            when (exception) {
-                is CancellationException -> {
-                    log.warn("{} was cancelled", context[CoroutineName])
-                }
+    private val qqScope = CoroutineScope(SupervisorJob(parentJob) + Dispatchers.Default +
+            CoroutineExceptionHandler { context, exception ->
+                when (exception) {
+                    is CancellationException -> {
+                        log.warn("{} was cancelled", context[CoroutineName])
+                    }
 
-                else -> {
-                    log.warn("with {}", context[CoroutineName], exception)
+                    else -> {
+                        log.warn("with {}", context[CoroutineName], exception)
+                    }
                 }
-            }
-        })
+            })
 
     val status = MutableStateFlow<BotStatus>(Initializing)
 
     private val loginLock = Mutex()
 
     lateinit var qqBot: Bot
-
-    private val workerScope = CoroutineScope(coroutineContext + CoroutineName("qq-message-worker"))
-    private val messageDispatcher = MessageDispatcher(scope = workerScope, name = "qq-message-dispatcher")
+    private val messageDispatcher = MessageDispatcher(parentScope = qqScope, name = "qq-message-dispatcher")
 
     private suspend fun buildBot(): Bot {
         val url = "ws://${qqProperties.host}:${qqProperties.port}/"

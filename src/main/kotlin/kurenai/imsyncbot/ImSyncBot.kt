@@ -11,10 +11,9 @@ import org.apache.logging.log4j.Level
 import org.apache.logging.log4j.core.config.Configurator
 import java.net.InetSocketAddress
 import java.net.Proxy
-import java.util.concurrent.Executors
+import kotlin.collections.remove
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.coroutineContext
 
 /**
  * @author Kurenai
@@ -23,32 +22,28 @@ import kotlin.coroutines.coroutineContext
 
 class ImSyncBot(
     internal val configProperties: ConfigProperties
-) : CoroutineScope, AbstractCoroutineContextElement(ImSyncBot) {
+) {
 
-    companion object Key : CoroutineContext.Key<ImSyncBot>
-
-    override val coroutineContext: CoroutineContext =
-        Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("ImSyncBot").factory())
-            .asCoroutineDispatcher()
-        .plus(SupervisorJob())
-        .apply {
-            job.invokeOnCompletion {
-                kotlin.runCatching {
-                    instants.remove(this)
-                }.onFailure {
-                    if (it !is CancellationException) TelegramBot.log.error(it.message, it)
-                }
-            }
-        }
+    private val serverScope = CoroutineScope(
+        SupervisorJob() +
+                Dispatchers.Default +
+                CoroutineName("ImSyncBot") +
+                CoroutineExceptionHandler { ctx, ex ->
+                    runCatching {
+                        kotlin.runCatching {
+                            instants.remove(this)
+                        }.onFailure {
+                            if (it !is CancellationException) TelegramBot.log.error(it.message, it)
+                        }
+                    }
+                })
 
     internal val userConfigService: UserConfigService = UserConfigService(configProperties)
     internal val groupConfigService: GroupConfigService = GroupConfigService(this)
     internal val tg: TelegramBot = TelegramBot(configProperties.bot.telegram, this)
     internal var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
-    internal val qq: QQBot = QQBot(configProperties.bot.qq, this)
-//    internal val satori: SatoriBot = SatoriBot(this)
+    internal val qq: QQBot = QQBot(configProperties.bot.qq, serverScope.coroutineContext[Job], this)
 //    internal val discord: DiscordBot = DiscordBot(this)
-//    internal val privateHandle = PrivateChatHandler(configProperties)
 
     init {
         //mirai使用log4j2
@@ -60,14 +55,13 @@ class ImSyncBot(
         configProxy()
     }
 
-    suspend fun start() {
-        withContext(this@ImSyncBot.coroutineContext) {
+    fun start() {
+        serverScope.launch {
             log.info("Start im-sync-bot ...")
             log.info("Telegram bot ${configProperties.bot.telegram.username}")
 //            log.info("QQ bot ${configProperties.bot.qq.account}")
             tg.start()
             qq.start()
-//            satori.start()
 //            discord.start()
         }
     }
@@ -81,6 +75,3 @@ class ImSyncBot(
         }
     }
 }
-
-suspend fun getBot(): ImSyncBot? = runCatching { getBotOrThrow() }.getOrNull()
-suspend fun getBotOrThrow(): ImSyncBot = coroutineContext[ImSyncBot] ?: throw IllegalArgumentException("找不到当前Bot实例")
