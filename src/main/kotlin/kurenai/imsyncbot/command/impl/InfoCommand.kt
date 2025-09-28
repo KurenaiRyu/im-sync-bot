@@ -70,7 +70,7 @@ class InfoCommand : AbstractTelegramCommand() {
                             if (config?.status?.isNotEmpty() == true)
                                 list.add("状态: ${config.status.toString().escapeMarkdown()}")
 
-                            val path = withIO {
+                            val path = withVT {
                                 BotUtil.downloadImg(
                                     "user-avatar-${member.id}.png",
                                     member.avatarUrl,
@@ -117,7 +117,7 @@ class InfoCommand : AbstractTelegramCommand() {
                 list.add("状态: ${config.status.toString().escapeMarkdown()}")
 
             val path =
-                withIO { BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl, overwrite = true) }
+                withVT { BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl, overwrite = true) }
             bot.tg.send {
                 messagePhoto(message.chatId, path.pathString, list.joinToString("\n").fmt(ParseMode.MARKDOWN_V2))
             }

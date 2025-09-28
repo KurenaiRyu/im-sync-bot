@@ -1,5 +1,6 @@
 package kurenai.imsyncbot.bot.qq
 
+import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.handler.Handler
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import net.mamoe.mirai.event.events.MessageRecallEvent
@@ -14,6 +15,7 @@ interface QQHandler : Handler {
 //        return CONTINUE
 //    }
 
+    context(bot: ImSyncBot)
     suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {
         return CONTINUE
     }

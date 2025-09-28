@@ -105,7 +105,7 @@ fun inputMessageDocument(chatId: Long, document: InputFile): InputMessageDocumen
     }
 }
 
-fun messageText(formattedText: FormattedText, chatId: Long) = SendMessage().apply {
+fun messageText(formattedText: FormattedText, chatId: Long): SendMessage = SendMessage().apply {
     this.chatId = chatId
     inputMessageContent = InputMessageText().apply {
         this.text = formattedText
@@ -200,26 +200,41 @@ fun Update.info(): String {
 }
 
 //////////////  message reply  //////////////
-fun SendMessage.setReplyToMessageId(messageId: Long?, chatId: Long? = null) {
-    this.replyTo ?: run { this.replyTo = InputMessageReplyToMessage() }
-    this.replyTo.setMessageId(messageId, chatId)
-}
+var SendMessage.replyToMessageId
+    get() = this.replyTo?.messageId
+    set(id) = run {
+        if (id == null) return
 
-fun SendMessageAlbum.setReplyToMessageId(messageId: Long?, chatId: Long? = null) {
-    this.replyTo ?: run { this.replyTo = InputMessageReplyToMessage() }
-    this.replyTo.setMessageId(messageId, chatId)
-}
+        this.replyTo = InputMessageReplyToMessage().apply {
+            this.messageId = messageId
+        }
+    }
 
-fun Message.replyToMessageId() = this.replyTo?.messageId()
-fun Message.replyInChatId() = this.replyTo?.chatId()
+var SendMessageAlbum.replyToMessageId
+    get() = this.replyTo?.messageId
+    set(id) = run {
+        if (id == null) return
 
-fun InputMessageReplyTo.setMessageId(messageId: Long?, chatId: Long? = null) = (this as? InputMessageReplyToMessage)?.apply {
-    messageId?.also(this::messageId::set)
-    chatId?.also(this::chatId::set)
-}
+        this.replyTo = InputMessageReplyToMessage().apply {
+            this.messageId = messageId
+        }
+    }
 
-fun MessageReplyTo.messageId() = (this as? MessageReplyToMessage)?.messageId
-fun MessageReplyTo.chatId() = (this as? MessageReplyToMessage)?.chatId
+var Message.replyToMessageId
+    get() = this.replyTo?.messageId
+    set(id) = this.replyTo?.messageId = id
+
+var InputMessageReplyTo.messageId
+    get() = (this as? InputMessageReplyToMessage)?.messageId
+    set(id) = run {
+        if (id != null && this is InputMessageReplyToMessage) this.messageId = id
+    }
+
+var MessageReplyTo.messageId: Long?
+    get() = (this as? MessageReplyToMessage)?.messageId
+    set(id) = run {
+        if (id != null && this is MessageReplyToMessage) this.messageId = id
+    }
 
 enum class ParseMode(val ins: TextParseMode?) {
     TEXT(null),

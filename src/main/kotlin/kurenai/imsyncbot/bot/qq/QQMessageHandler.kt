@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.ImSyncBot
+import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
@@ -13,13 +14,13 @@ import net.mamoe.mirai.event.events.*
 
 class QQMessageHandler(
     configProperties: ConfigProperties,
-    internal val bot: ImSyncBot
+    val parentScope: CoroutineScope,
 ) : QQHandler {
 
     private val log = getLogger()
 
-    private var tgMsgFormat = "\$name: \$msg"
-    private var qqMsgFormat = "\$name: \$msg"
+    private var tgMsgFormat = $$"$name: $msg"
+    private var qqMsgFormat = $$"$name: $msg"
     private var enableRecall = configProperties.bot.enableRecall
 
     init {
@@ -33,7 +34,7 @@ class QQMessageHandler(
         val messageType = context.getReadyToSendMessage()
         val list = if (messageType is GroupMessageContext.Forward) messageType.contextList else listOf(context)
         if (list.size > 5) {
-            CoroutineScope(bot.qq.coroutineContext).launch {
+            parentScope.launch {
                 sendMessage(list, context)
             }
         } else {
@@ -47,7 +48,7 @@ class QQMessageHandler(
             when (resolvedContext.getReadyToSendMessage()) {
                 is GroupMessageContext.ShortVideo,
                 is GroupMessageContext.Video,
-                is GroupMessageContext.File -> CoroutineScope(bot.qq.coroutineContext).launch {
+                is GroupMessageContext.File -> parentScope.launch {
                     sendMessage(
                         resolvedContext,
                         context
@@ -76,7 +77,7 @@ class QQMessageHandler(
                         )?.replace("\n", "\\n")
                     }"
                 })
-            CoroutineScope(bot.coroutineContext).launch {
+            parentScope.launch {
                 MessageService.cache(context.messageChain, messages)
             }
         }
@@ -130,14 +131,16 @@ class QQMessageHandler(
 //        return CONTINUE
 //    }
 
+    context(bot: ImSyncBot)
     override suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {
+        val tg = bot.tg
         MessageService.findRelationByRecall(event)?.let { message ->
             if (enableRecall) {
-                bot.tg.deleteMessages(message.tgGrpId, message.tgMsgId)
+                tg.deleteMessages(message.tgGrpId, message.tgMsgId)
             } else {
-                val originMsg = bot.tg.getMessage(message.tgGrpId, message.tgMsgId)
-                if (originMsg.userSender()?.userId != bot.tg.getMe().id) return CONTINUE
-                bot.tg.send {
+                val originMsg = tg.getMessage(message.tgGrpId, message.tgMsgId)
+                if (originMsg.userSender()?.userId != tg.getMe().id) return CONTINUE
+                tg.send {
                     val content = originMsg.content
                     if (content is MessageText) {
                         EditMessageText().apply {
@@ -177,6 +180,7 @@ class QQMessageHandler(
         return CONTINUE
     }
 
+    context(bot: ImSyncBot, tg: TelegramBot)
     suspend fun onGroupEvent(event: GroupEvent) {
         val chatId = bot.groupConfigService.findByQQ(event.group.id)?.telegramGroupId ?: return
         val msg = when (event) {
@@ -206,7 +210,6 @@ class QQMessageHandler(
                         "$tag`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick).escapeMarkdown()}`退出群`${event.group.name}`"
                     }
 
-                    else -> return
                 }
             }
 
@@ -239,7 +242,7 @@ class QQMessageHandler(
                 return
             }
         }
-        bot.tg.sendMessageText(msg.fmt(), chatId)
+        tg.sendMessageText(msg.fmt(), chatId)
     }
 
     override fun order(): Int {

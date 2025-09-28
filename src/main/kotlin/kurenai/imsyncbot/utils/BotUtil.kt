@@ -63,7 +63,7 @@ object BotUtil {
         val path = Path.of(getImagePath(tmpPath.crc32c() + if (e.isNotBlank()) ".$e" else ""))
         if (path.exists()) tmpPath.deleteExisting()
         else {
-            withContext(Dispatchers.IO) {
+            withContext(Dispatchers.VT) {
                 Files.move(tmpPath, path)
             }
         }

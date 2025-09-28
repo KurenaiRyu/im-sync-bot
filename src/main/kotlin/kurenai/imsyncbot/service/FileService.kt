@@ -31,7 +31,7 @@ import kotlin.io.path.toPath
 
 object FileService {
 
-    suspend fun download(image: Image, ext: String = "png") = withIO {
+    suspend fun download(image: Image, ext: String = "png") = withVT {
 //        FileCacheRepository.findById(image.md5.toHex()).getOrNull()?.let {
 //            InputFileRemote(it.fileId)
 //        } ?: run {
@@ -90,7 +90,7 @@ object FileService {
 
         val path = Path.of(getImagePath("$crc32c.$extension"))
         if (!path.exists()) {
-            withContext(Dispatchers.IO) {
+            withContext(Dispatchers.VT) {
                 Files.move(tmpPath, path)
             }
         }
@@ -117,7 +117,7 @@ object FileService {
     }
 
     suspend fun cacheImage(id: String, message: TdApi.Message, type: String? = null) {
-        withIO {
+        withVT {
             message.content.file()?.remote?.id?.takeIf { it.isNotBlank() }?.let { fileId ->
                 val exist: FileCache? = FileCacheRepository.findById(id)
                 if (exist != null && (exist.fileId != fileId || exist.fileType != type.toString())) {

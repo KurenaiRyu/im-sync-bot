@@ -2,12 +2,12 @@ package kurenai.imsyncbot.bot.telegram
 
 import com.sksamuel.aedile.core.caffeineBuilder
 import it.tdlight.client.*
-import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kurenai.imsyncbot.*
+import kurenai.imsyncbot.bot.telegram.TgMessageHandler.ListenerResult
 import kurenai.imsyncbot.service.FileService
 import kurenai.imsyncbot.utils.*
 import okhttp3.internal.toHexString
@@ -15,7 +15,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.util.*
-import kotlin.Result
+import kotlin.coroutines.CoroutineContext
 import kotlin.io.path.pathString
 import kotlin.io.path.writeBytes
 import kotlin.time.Duration
@@ -34,12 +34,12 @@ import it.tdlight.client.Result as TdResult
 lateinit var defaultTelegramBot: TelegramBot
 
 class TelegramBot(
-    private val telegramProperties: TelegramProperties,
-    internal val bot: ImSyncBot,
-) : CoroutineScope {
+    botProperties: BotProperties,
+    private val coroutineContext: CoroutineContext,
+) {
 
     companion object {
-        internal val log = getLogger()
+        val log = getLogger()
         val DEFAULT_TIMEOUT = 10.seconds
     }
 
@@ -50,25 +50,28 @@ class TelegramBot(
 
     private lateinit var client: SimpleTelegramClient
 
-    internal val messageHandler: TgMessageHandler = TgMessageHandler(bot)
+    private val telegramProperties = botProperties.telegram
+    private val tgScope = CoroutineScope(
+        SupervisorJob(coroutineContext[Job]) +
+                CoroutineName("TelegramBot") +
+                CoroutineExceptionHandler { context, ex ->
+                    when (ex) {
+                        is CancellationException -> {
+                            log.warn("{} was cancelled", context[CoroutineName])
+                        }
 
-    override val coroutineContext = bot.coroutineContext
-        .plus(CoroutineName("TelegramBot"))
-        .plus(SupervisorJob(bot.coroutineContext[Job]))
-        .plus(CoroutineExceptionHandler { context, ex ->
-            when (ex) {
-                is CancellationException -> {
-                    log.warn("{} was cancelled", context[CoroutineName])
+                        else -> {
+                            log.warn("with {}", context[CoroutineName], ex)
+                        }
+                    }
                 }
+    )
 
-                else -> {
-                    log.warn("with {}", context[CoroutineName], ex)
-                }
-            }
-        })
+    internal val messageHandler: TgMessageHandler = TgMessageHandler(botProperties, tgScope)
+
 
     val status = MutableStateFlow<BotStatus>(Initializing)
-    val token: String = telegramProperties.token
+    val token: String = botProperties.telegram.token
 
     val disposableHandlers = LinkedList<TelegramDisposableHandler>()
 
@@ -82,6 +85,7 @@ class TelegramBot(
         expireAfterWrite = 1.minutes
     }.build()
 
+    context(bot: ImSyncBot, tg: TelegramBot)
     fun start() {
         apiToken = APIToken(
             telegramProperties.apiId ?: 94575,
@@ -103,12 +107,22 @@ class TelegramBot(
                 log.info("Telegram bot started.")
                 status.update { Running }
                 if (!::defaultTelegramBot.isInitialized) defaultTelegramBot = this@TelegramBot
-                client.addUpdatesHandler(messageHandler::handle)
-                launch {
+                client.addUpdatesHandler {
+                    messageHandler.handle(it, bot, tg)
+                }
+                tgScope.launch {
                     updateCommand()
                 }
             }
         }
+    }
+
+    fun <R : Object?, Event : Update> addListener(
+        timeout: Duration? = 5L.seconds,
+        matchBlock: ((Update) -> Boolean)? = null,
+        handleBlock: (Event) -> ListenerResult<R>
+    ): Deferred<R> {
+        return messageHandler.addListener(timeout, matchBlock, handleBlock)
     }
 
     suspend inline fun sendMessageText(
@@ -123,13 +137,13 @@ class TelegramBot(
     suspend inline fun sendMessageText(
         formattedText: FormattedText,
         chatId: Long,
-        replayToMessageId: Long? = null,
+        replyToMessageId: Long? = null,
         messageThreadId: Long? = null,
         untilPersistent: Boolean = false,
     ) = send(untilPersistent) {
         messageText(formattedText, chatId).apply {
-            replayToMessageId?.let { this.setReplyToMessageId(it) }
-            messageThreadId?.let { this.messageThreadId = it }
+            this.replyToMessageId = replyToMessageId
+            this.messageThreadId = messageThreadId ?: 0
         }
     }
 
@@ -157,13 +171,13 @@ class TelegramBot(
         formattedText: FormattedText,
         chatId: Long,
         filename: String = System.currentTimeMillis().toHexString(),
-        replayToMessageId: Long? = null,
+        replyToMessageId: Long? = null,
         messageThreadId: Long? = null,
         untilPersistent: Boolean = false,
     ): Message {
         SendMessage().apply {
-            replayToMessageId?.let { this.setReplyToMessageId(it) }
-            messageThreadId?.let { this.messageThreadId = it }
+            this.replyToMessageId = replyToMessageId
+            this.messageThreadId = messageThreadId ?: 0
             this.inputMessageContent = InputMessagePhoto().apply {
                 this.photo = FileService.download(url).inputFile
                 this.caption = formattedText
@@ -171,8 +185,8 @@ class TelegramBot(
         }
         return send(untilPersistent = untilPersistent) {
             messageText(formattedText, chatId).apply {
-                replayToMessageId?.let { this.setReplyToMessageId(it) }
-                messageThreadId?.let { this.messageThreadId = it }
+                this.replyToMessageId = replyToMessageId
+                this.messageThreadId = messageThreadId ?: 0
             }
         }
     }
@@ -182,14 +196,14 @@ class TelegramBot(
         formattedText: FormattedText,
         chatId: Long,
         filename: String = "${System.currentTimeMillis()}",
-        replayToMessageId: Long? = null,
+        replyToMessageId: Long? = null,
         untilPersistent: Boolean = false,
     ) = send(untilPersistent = untilPersistent) {
         val path = Path.of(BotUtil.getImagePath(filename))
         path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
         SendMessage().apply {
             this.chatId = chatId
-            this.setReplyToMessageId(replayToMessageId)
+            this.replyToMessageId = replyToMessageId
             this.inputMessageContent = InputMessagePhoto().apply {
                 this.caption = formattedText
                 this.photo = InputFileLocal(path.pathString)
@@ -202,14 +216,14 @@ class TelegramBot(
         formattedText: FormattedText,
         chatId: Long,
         filename: String = "${System.currentTimeMillis()}",
-        replayToMessageId: Long? = null,
+        replyToMessageId: Long? = null,
         untilPersistent: Boolean = false,
     ) = send(untilPersistent = untilPersistent) {
         val path = Path.of(BotUtil.getDocumentPath(filename))
         path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
         SendMessage().apply {
             this.chatId = chatId
-            this.setReplyToMessageId(replayToMessageId)
+            this.replyToMessageId = replyToMessageId
             this.inputMessageContent = InputMessageVideo().apply {
                 this.caption = formattedText
                 this.video = InputFileLocal(path.pathString)
@@ -253,7 +267,7 @@ class TelegramBot(
             this.priority = priority
             this.synchronous = synchronous
         }
-        return if (synchronous) withIO { send(downloadFile) }
+        return if (synchronous) withVT { send(downloadFile) }
         else send(downloadFile)
     }
 
@@ -283,7 +297,7 @@ class TelegramBot(
 
     fun getUsername(): String = client.me.usernames.activeUsernames.first()
 
-    suspend inline fun <R : Object, Fun : TdApi.Function<R>> send(
+    suspend inline fun <R : Object, Fun : Function<R>> send(
         function: Fun,
         untilPersistent: Boolean = false,
         timeout: Duration = DEFAULT_TIMEOUT
@@ -291,68 +305,66 @@ class TelegramBot(
 
     @Suppress("UNCHECKED_CAST")
     @OptIn(ExperimentalTime::class)
-    suspend fun <R : Object> send(
+    suspend inline fun <R : Object> send(
         untilPersistent: Boolean = false,
         timeout: Duration = DEFAULT_TIMEOUT,
-        block: () -> TdApi.Function<R>
+        crossinline block: () -> Function<R>
     ): R {
         val params = block()
         val (value, duration) = measureTimedValue {
-            withContext(this.coroutineContext) {
-                runCatching {
-                    suspendCancellableCoroutine { con: CancellableContinuation<R> ->
-                        var obj: R? = null
-                        CoroutineScope(Dispatchers.IO).launch {
-                            client.send(params) { result ->
-                                if (untilPersistent && !result.isError) {
-                                    obj = result.get()
-                                    val message = obj as? Message
-                                    if (message?.sendingState?.constructor == MessageSendingStatePending.CONSTRUCTOR) {
-                                        pendingMessage[message.id] =
-                                            con as CancellableContinuation<Object>
-                                    } else {
-                                        con.resumeWith(Result.success(obj!!))
-                                    }
+            runCatching {
+                suspendCancellableCoroutine { con: CancellableContinuation<R> ->
+                    var obj: R? = null
+                    CoroutineScope(Dispatchers.VT).launch {
+                        client.send(params) { result ->
+                            if (untilPersistent && !result.isError) {
+                                obj = result.get()
+                                val message = obj as? Message
+                                if (message?.sendingState?.constructor == MessageSendingStatePending.CONSTRUCTOR) {
+                                    pendingMessage[message.id] =
+                                        con as CancellableContinuation<Object>
                                 } else {
-                                    con.resumeWith(
-                                        runCatching {
-                                            result.get()
-                                        }.onFailure {
-                                            log.warn("{}: {}: \n{}", result.error.code, result.error.message, params)
-                                        }
-                                    )
+                                    con.resumeWith(Result.success(obj!!))
                                 }
-                            }
-                        }
-                        CoroutineScope(Dispatchers.IO).launch {
-                            delay(timeout)
-                            if (con.isActive) {
-                                obj?.also {
-                                    con.resumeWith(Result.success(it))
-                                } ?: run {
-                                    con.cancel(CancellationException("Timeout with $timeout"))
-                                }
-                            }
-                        }
-                        con.invokeOnCancellation {
-                            if (log.isTraceEnabled) {
-                                log.warn("Send job cancelled: {}", params)
                             } else {
-                                log.warn("Send job cancelled.")
+                                con.resumeWith(
+                                    runCatching {
+                                        result.get()
+                                    }.onFailure {
+                                        log.warn("{}: {}: \n{}", result.error.code, result.error.message, params)
+                                    }
+                                )
                             }
                         }
                     }
-                }.recoverCatching { ex: Throwable ->
-                    if (ex.message?.contains("retry after") == true) {
-                        val seconds = ex.message!!.substringAfterLast(" ").toLongOrNull() ?: 5
-                        log.warn("Wait for {}s", seconds)
-                        delay(seconds * 1000)
-                        return@recoverCatching send<R>(untilPersistent, timeout, block)
-                    } else {
-                        throw ex
+                    CoroutineScope(Dispatchers.VT).launch {
+                        delay(timeout)
+                        if (con.isActive) {
+                            obj?.also {
+                                con.resumeWith(Result.success(it))
+                            } ?: run {
+                                con.cancel(CancellationException("Timeout with $timeout"))
+                            }
+                        }
                     }
-                }.getOrThrow()
-            }
+                    con.invokeOnCancellation {
+                        if (log.isTraceEnabled) {
+                            log.warn("Send job cancelled: {}", params)
+                        } else {
+                            log.warn("Send job cancelled.")
+                        }
+                    }
+                }
+            }.recoverCatching { ex: Throwable ->
+                if (ex.message?.contains("retry after") == true) {
+                    val seconds = ex.message!!.substringAfterLast(" ").toLongOrNull() ?: 5
+                    log.warn("Wait for {}s", seconds)
+                    delay(seconds * 1000)
+                    return@recoverCatching send<R>(untilPersistent, timeout, block)
+                } else {
+                    throw ex
+                }
+            }.getOrThrow()
         }
         if (log.isTraceEnabled) {
             log.trace("in {}, Execute {}", duration, params)
@@ -365,7 +377,7 @@ class TelegramBot(
         return value as R
     }
 
-    private suspend fun <R : Object> doSend(params: TdApi.Function<R>): TdResult<R> {
+    private suspend fun <R : Object> doSend(params: Function<R>): TdResult<R> {
         return suspendCancellableCoroutine { con: CancellableContinuation<TdResult<R>> ->
             CoroutineScope(this.coroutineContext).launch {
                 client.send(params, { result -> con.resumeWith(Result.success(result)) }) { e: Throwable ->
@@ -416,7 +428,7 @@ class TelegramBot(
 
             send {
                 messageText(errorMsg.asFmtText(), message.chatId).apply {
-                    this.setReplyToMessageId(message.id)
+                    this.replyToMessageId = message.id
                     this.options = MessageSendOptions().apply {
                         this.fromBackground = true
                     }

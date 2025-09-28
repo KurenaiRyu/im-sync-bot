@@ -1,17 +1,23 @@
 package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
-import kurenai.imsyncbot.domain.*
+import kurenai.imsyncbot.domain.QQMessage
+import kurenai.imsyncbot.domain.QQTg
+import kurenai.imsyncbot.domain.by
+import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.QQMessageRepository
 import kurenai.imsyncbot.repository.QQTgRepository
 import kurenai.imsyncbot.sqlClient
 import kurenai.imsyncbot.utils.BotUtil.toEntity
 import kurenai.imsyncbot.utils.BotUtil.toMessageChain
 import kurenai.imsyncbot.utils.getLogger
-import kurenai.imsyncbot.utils.withIO
+import kurenai.imsyncbot.utils.withVT
 import net.mamoe.mirai.event.events.MessageRecallEvent
 import net.mamoe.mirai.message.MessageReceipt
-import net.mamoe.mirai.message.data.*
+import net.mamoe.mirai.message.data.MessageChain
+import net.mamoe.mirai.message.data.MessageSource
+import net.mamoe.mirai.message.data.QuoteReply
+import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.message.sourceMessage
 import org.babyfish.jimmer.kt.new
 
@@ -20,7 +26,7 @@ object MessageService {
 
     private val log = getLogger()
 
-    suspend fun save(message: QQMessage) = withIO {
+    suspend fun save(message: QQMessage) = withVT {
         sqlClient.save(message).modifiedEntity
     }
 
@@ -31,7 +37,7 @@ object MessageService {
      * @param messages
      */
     suspend fun cache(chain: MessageChain, messages: Array<TdApi.Message>? = null) = runCatching {
-        withIO {
+        withVT {
             val qqMsg = QQMessageRepository.findByChain(chain)?.also { entity ->
                 save(entity.copy {
                     handled = true

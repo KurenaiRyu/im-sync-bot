@@ -3,7 +3,7 @@ package kurenai.imsyncbot.repository
 import kurenai.imsyncbot.domain.UserConfig
 import kurenai.imsyncbot.domain.qq
 import kurenai.imsyncbot.domain.tg
-import kurenai.imsyncbot.utils.withIO
+import kurenai.imsyncbot.utils.withVT
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.ast.expression.or
 import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
@@ -15,29 +15,29 @@ import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 
 object UserConfigRepository : BaseRepository<UserConfig, Long>() {
 
-    suspend fun findByTg(tg: Long): UserConfig? = withIO {
+    suspend fun findByTg(tg: Long): UserConfig? = withVT {
         createQuery<UserConfig> {
             where(table.tg eq tg)
             select(table)
         }.fetchOneOrNull()
     }
 
-    suspend fun findByQQ(qq: Long): UserConfig? = withIO {
+    suspend fun findByQQ(qq: Long): UserConfig? = withVT {
         createQuery<UserConfig> {
             where(table.qq eq qq)
             select(table)
         }.fetchOneOrNull()
     }
 
-    suspend fun findByTgOrQQ(id: Long): UserConfig? = withIO {
+    suspend fun findByTgOrQQ(id: Long): UserConfig? = withVT {
         createQuery<UserConfig> {
             where(or(table.tg eq id, table.qq eq id))
             select(table)
         }.fetchOneOrNull()
     }
 
-    suspend fun findByTgOrQQ(tgIds: List<Long>, qqIds: List<Long>): List<UserConfig> = withIO {
-        if (tgIds.isEmpty() && qqIds.isEmpty()) return@withIO emptyList()
+    suspend fun findByTgOrQQ(tgIds: List<Long>, qqIds: List<Long>): List<UserConfig> = withVT {
+        if (tgIds.isEmpty() && qqIds.isEmpty()) return@withVT emptyList()
 
         createQuery<UserConfig> {
             if (tgIds.isNotEmpty()) where(table.tg valueIn tgIds)
@@ -46,7 +46,7 @@ object UserConfigRepository : BaseRepository<UserConfig, Long>() {
         }.execute()
     }
 
-    suspend fun findAll() = withIO {
+    suspend fun findAll() = withVT {
         createQuery<UserConfig> {
             select(table)
         }.execute()

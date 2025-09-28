@@ -2,7 +2,6 @@ package kurenai.imsyncbot
 
 import kotlinx.coroutines.*
 import kurenai.imsyncbot.bot.qq.QQBot
-import kurenai.imsyncbot.bot.qq.QQMessageHandler
 import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.service.GroupConfigService
 import kurenai.imsyncbot.service.UserConfigService
@@ -11,9 +10,6 @@ import org.apache.logging.log4j.Level
 import org.apache.logging.log4j.core.config.Configurator
 import java.net.InetSocketAddress
 import java.net.Proxy
-import kotlin.collections.remove
-import kotlin.coroutines.AbstractCoroutineContextElement
-import kotlin.coroutines.CoroutineContext
 
 /**
  * @author Kurenai
@@ -40,9 +36,8 @@ class ImSyncBot(
 
     internal val userConfigService: UserConfigService = UserConfigService(configProperties)
     internal val groupConfigService: GroupConfigService = GroupConfigService(this)
-    internal val tg: TelegramBot = TelegramBot(configProperties.bot.telegram, this)
-    internal var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, this)
-    internal val qq: QQBot = QQBot(configProperties.bot.qq, serverScope.coroutineContext[Job], this)
+    internal val tg: TelegramBot = TelegramBot(configProperties.bot, serverScope.coroutineContext)
+    internal val qq: QQBot = QQBot(configProperties.bot.qq, serverScope.coroutineContext)
 //    internal val discord: DiscordBot = DiscordBot(this)
 
     init {

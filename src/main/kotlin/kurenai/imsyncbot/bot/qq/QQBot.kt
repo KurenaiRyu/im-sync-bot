@@ -22,12 +22,13 @@ import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.PlainText
 import top.mrxiaom.overflow.BotBuilder
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 
 class QQBot(
     private val qqProperties: QQProperties,
-    parentJob: Job? = null,
-    val bot: ImSyncBot
+    coroutineContext: CoroutineContext = EmptyCoroutineContext
 ) {
 
     companion object {
@@ -38,18 +39,22 @@ class QQBot(
         private val log = getLogger()
     }
 
-    private val qqScope = CoroutineScope(SupervisorJob(parentJob) + Dispatchers.Default +
-            CoroutineExceptionHandler { context, exception ->
-                when (exception) {
-                    is CancellationException -> {
-                        log.warn("{} was cancelled", context[CoroutineName])
-                    }
+    private val qqScope = CoroutineScope(
+        SupervisorJob(coroutineContext[Job]) +
+                Dispatchers.Default +
+                CoroutineExceptionHandler { context, exception ->
+                    when (exception) {
+                        is CancellationException -> {
+                            log.warn("{} was cancelled", context[CoroutineName])
+                        }
 
-                    else -> {
-                        log.warn("with {}", context[CoroutineName], exception)
+                        else -> {
+                            log.warn("with {}", context[CoroutineName], exception)
+                        }
                     }
                 }
-            })
+    )
+    internal var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, qqScope)
 
     val status = MutableStateFlow<BotStatus>(Initializing)
 
@@ -64,9 +69,10 @@ class QQBot(
         return BotBuilder.positive(url)
             .token(qqProperties.token)
             .overrideLogger(log)
-            .connect()?:throw BotException("Connect to $url fail!")
+            .connect() ?: throw BotException("Connect to $url fail!")
     }
 
+    context(bot: ImSyncBot)
     suspend fun start(waitForInit: Boolean = false) = loginLock.withLock {
         if (this::qqBot.isInitialized) {
             if (qqBot.isOnline) return@withLock
@@ -127,7 +133,7 @@ class QQBot(
                         handleEvent(event)
                     }
                 } ?: run {
-                    workerScope.launch {
+                    qqScope.launch {
                         handleEvent(event)
                     }
                 }
@@ -136,10 +142,11 @@ class QQBot(
             log.info("Started qq-bot ${qqBot.nick}(${qqBot.id})")
         }
         if (waitForInit) initBot()
-        else workerScope.launch { initBot() }
+        else qqScope.launch { initBot() }
         handleStatus()
     }
 
+    context(bot: ImSyncBot)
     private fun handleStatus() {
         var previous: BotStatus? = null
         status.onEach {
@@ -166,6 +173,7 @@ class QQBot(
         }
     }
 
+    context(bot: ImSyncBot)
     private suspend fun handleEvent(event: Event) {
         try {
             when (event) {
@@ -178,7 +186,7 @@ class QQBot(
                     }
                     when (event) {
                         is FriendMessageEvent -> {
-//                            bot.qqMessageHandler.onFriendMessage(
+//                            qqMessageHandler.onFriendMessage(
 //                                PrivateMessageContext(
 //                                    message,
 //                                    bot,
@@ -189,9 +197,10 @@ class QQBot(
                         }
 
                         is GroupTempMessageEvent -> {
-                            bot.qqMessageHandler.onGroupMessage(
+                            qqMessageHandler.onGroupMessage(
                                 GroupMessageContext(
                                     message,
+                                    qqScope,
                                     bot,
                                     event,
                                     event.group,
@@ -201,9 +210,10 @@ class QQBot(
                         }
 
                         is GroupAwareMessageEvent -> {
-                            bot.qqMessageHandler.onGroupMessage(
+                            qqMessageHandler.onGroupMessage(
                                 GroupMessageContext(
                                     message,
+                                    qqScope,
                                     bot,
                                     event,
                                     event.group,
@@ -220,14 +230,14 @@ class QQBot(
 
                 is MessageRecallEvent.GroupRecall -> {
                     event.messageIds
-                    workerScope.launch {
-                        bot.qqMessageHandler.onRecall(event)
+                    qqScope.launch {
+                        qqMessageHandler.onRecall(event)
                     }
                 }
 
                 is GroupEvent -> {
-                    workerScope.launch {
-                        bot.qqMessageHandler.onGroupEvent(event)
+                    qqScope.launch {
+                        qqMessageHandler.onGroupEvent(event)
                     }
                 }
             }
@@ -238,6 +248,7 @@ class QQBot(
         }
     }
 
+    context(bot: ImSyncBot)
     private suspend fun sendRemindMsg(event: GroupAwareMessageEvent) {
         if (bot.userConfigService.masterUsername.isBlank()) return
         val content = event.message.filterIsInstance<PlainText>().map(PlainText::content).joinToString(separator = "")
@@ -281,6 +292,7 @@ class QQBot(
 
         else -> "${this::class.simpleName}"
     }
+
     private fun Event.idWithGroupOrUserMark() = when (this) {
         is GroupEvent -> {
             "G${this.group.id}"

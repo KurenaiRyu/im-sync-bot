@@ -28,6 +28,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.*
+import java.util.concurrent.Executors
 import java.util.zip.CRC32
 import java.util.zip.CRC32C
 import java.util.zip.Checksum
@@ -135,7 +136,7 @@ fun Long.humanReadableByteCountBin(): String {
     return String.format("%.1f %ciB", value / 1024.0, ci.current())
 }
 
-suspend fun runCommandAwait(vararg args: String) = withIO {
+suspend fun runCommandAwait(vararg args: String) = withVT {
     val builder = ProcessBuilder(*args)
     builder.redirectErrorStream(true)
     val process = builder.start()
@@ -210,7 +211,7 @@ fun ByteArray.toHex(): String = HexFormat.of().formatHex(this)
 
 fun String.parseHex(): ByteArray = HexFormat.of().parseHex(this)
 
-suspend fun <R> withIO(block: suspend () -> R) = withContext(Dispatchers.IO) { block.invoke() }
+suspend fun <R> withVT(block: suspend () -> R) = withContext(Dispatchers.VT) { block.invoke() }
 
 fun <R> runIO(block: suspend () -> R) = CoroutineScope(Dispatchers.IO).launch { block.invoke() }
 
@@ -221,6 +222,9 @@ val httpClient = HttpClient(OkHttp) {
         }
     }
 }
+
+val Dispatchers.VT: CoroutineDispatcher
+    get() = Executors.newVirtualThreadPerTaskExecutor().asCoroutineDispatcher()
 
 val json = Json {
     encodeDefaults = true

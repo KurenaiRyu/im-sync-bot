@@ -10,7 +10,7 @@ import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.GroupConfigRepository
 import kurenai.imsyncbot.utils.getLogger
-import kurenai.imsyncbot.utils.withIO
+import kurenai.imsyncbot.utils.withVT
 import org.babyfish.jimmer.kt.new
 
 class GroupConfigService(
@@ -227,7 +227,7 @@ class GroupConfigService(
      * @param config Group config
      */
     private suspend fun delete(config: GroupConfig) {
-        withIO { GroupConfigRepository.deleteById<GroupConfig>(config.id) }
+        withVT { GroupConfigRepository.deleteById<GroupConfig>(config.id) }
         refresh()
     }
 

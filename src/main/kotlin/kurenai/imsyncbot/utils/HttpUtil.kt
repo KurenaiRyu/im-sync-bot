@@ -37,7 +37,7 @@ object HttpUtil {
 
         val size = getRemoteFileSize(url, enableProxy)
         if (size < 1024 * 1024 * 100) {
-            withContext(Dispatchers.IO) {
+            withContext(Dispatchers.VT) {
                 path.parent.createDirectories()
                 client.get(url).body<InputStream>().buffered().use { input ->
                     path.outputStream(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING).buffered().use {

@@ -5,6 +5,7 @@ import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kurenai.imsyncbot.BotProperties
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.Running
 import kurenai.imsyncbot.command.CommandDispatcher
@@ -29,13 +30,14 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class TgMessageHandler(
-    val bot: ImSyncBot
+    botProperties: BotProperties,
+    private val parentScope: CoroutineScope,
 ) {
 
     private val log = getLogger()
 
-    private var tgMsgFormat = "\$name: \$msg"
-    private var qqMsgFormat = "\$name: \$msg"
+    private var tgMsgFormat = $$"$name: $msg"
+    private var qqMsgFormat = $$"$name: $msg"
 
     private val traceEnabled = TelegramBot.log.isTraceEnabled
 
@@ -43,12 +45,12 @@ class TgMessageHandler(
     private val listeners: MutableList<Listener<out Object?, out Update>> = mutableListOf()
 
     init {
-        if (bot.configProperties.bot.tgMsgFormat.contains("\$msg")) tgMsgFormat = bot.configProperties.bot.tgMsgFormat
-        if (bot.configProperties.bot.qqMsgFormat.contains("\$msg")) qqMsgFormat = bot.configProperties.bot.qqMsgFormat
+        if (botProperties.tgMsgFormat.contains($$"$msg")) tgMsgFormat = botProperties.tgMsgFormat
+        if (botProperties.qqMsgFormat.contains($$"$msg")) qqMsgFormat = botProperties.qqMsgFormat
     }
 
     //TODO: Save telegram message
-    fun handle(update: Update) = bot.tg.launch(CoroutineName(update.idString())) {
+    fun handle(update: Update, bot: ImSyncBot, tg: TelegramBot) = parentScope.launch {
         TelegramBot.log.trace("Incoming update: {}", update.toString().trim())
         val status = bot.tg.status.value
         if (status != Running) {
@@ -86,6 +88,7 @@ class TgMessageHandler(
         }
     }
 
+    context(bot: ImSyncBot, tg: TelegramBot)
     private suspend fun doHandle(update: Update) {
 
         if (traceEnabled.not()) simpleLog(update)
@@ -95,7 +98,7 @@ class TgMessageHandler(
         when (update) {
             is UpdateNewMessage -> {
 
-                bot.tg.disposableHandlers.forEach {
+                tg.disposableHandlers.forEach {
                     if (it.handle(bot, update.message)) {
                         bot.tg.disposableHandlers.remove(it)
                         return
@@ -297,7 +300,7 @@ class TgMessageHandler(
         matchBlock: ((Update) -> Boolean)? = null,
         handleBlock: (Event) -> ListenerResult<R>
     ): Deferred<R> {
-        return CoroutineScope(bot.tg.coroutineContext).async {
+        return parentScope.async {
             return@async suspendCancellableCoroutine { con ->
                 val listener = Listener(con, timeout, matchBlock, handleBlock)
                 listeners.add(listener)
@@ -311,14 +314,7 @@ class TgMessageHandler(
         }
     }
 
-    fun <R : Object?, Event : Update> TelegramBot.addListener(
-        timeout: Duration? = 5L.seconds,
-        matchBlock: ((Update) -> Boolean)? = null,
-        handleBlock: (Event) -> ListenerResult<R>
-    ): Deferred<R> {
-        return this.bot.tg.messageHandler.addListener(timeout, matchBlock, handleBlock)
-    }
-
+    context(bot: ImSyncBot)
     private suspend fun onEditMessage(update: UpdateMessageContent): Int {
         bot.groupConfigService.findByTg(update.chatId) ?: return CONTINUE
 
@@ -335,6 +331,7 @@ class TgMessageHandler(
 
     @Suppress("SameReturnValue")
     @Throws(Exception::class)
+    context(bot: ImSyncBot)
     suspend fun onMessage(message: TdApi.Message): Int {
 
         val userSender = message.userSender()
@@ -351,7 +348,7 @@ class TgMessageHandler(
             return CONTINUE
         }
 
-        val quoteMsgSource = message.replyToMessageId()?.let {
+        val quoteMsgSource = message.replyToMessageId?.let {
             MessageService.findQQByTg(message.chatId, it)?.source
         }
         val groupId = quoteMsgSource?.targetId ?: bot.groupConfigService.findByTg(message.chatId)?.qqGroupId
@@ -470,7 +467,7 @@ class TgMessageHandler(
             runCatching {
                 if (it.sourceIds.isEmpty()) throw BotException("回执消息为空，可能被风控")
 
-                bot.tg.launch {
+                parentScope.launch {
                     MessageService.cache(it, message)
                 }
             }.onFailure {
@@ -680,6 +677,7 @@ class TgMessageHandler(
         }
     }
 
+    context(bot: ImSyncBot)
     private suspend fun getSenderName(message: TdApi.Message): String {
 
         if (message.authorSignature?.isNotBlank() == true) return message.authorSignature
