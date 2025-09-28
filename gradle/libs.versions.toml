@@ -1,6 +1,6 @@
 [versions]
-ktolin = "2.1.21"
-ksp = "2.1.21-2.0.2"
+ktolin = "2.2.20"
+ksp = "2.2.20-2.0.3"
 lombok = "9.0.0-rc2"
 serialization = "1.8.1"
 coroutines = "1.10.2"
