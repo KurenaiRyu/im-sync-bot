@@ -1,6 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
-
 plugins {
     application
     alias(libs.plugins.kotlin.jvm)
@@ -18,6 +15,7 @@ version = "1.3.1-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    google()
     exclusiveContent {
         forRepository {
             maven("https://mvn.mchv.eu/repository/mchv/")
@@ -28,27 +26,6 @@ repositories {
     }
 }
 
-
-kotlin {
-    sourceSets.main {
-        kotlin.srcDir("build/generated/ksp/main/kotlin")
-    }
-
-    compilerOptions {
-        freeCompilerArgs.set(
-            listOf(
-                "-Xjsr305=strict",
-                "-opt-in=kotlin.contracts.ExperimentalContracts",
-                "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
-            )
-        )
-        javaParameters.set(true)
-    }
-}
-
-object Versions {
-    const val KORD = "0.9.0"
-}
 dependencies {
 
     implementation(libs.kotlin.bom)
@@ -68,9 +45,6 @@ dependencies {
 
     implementation(platform(libs.mirai.bom))
     implementation(libs.bundles.mirai)
-
-    compileOnly(libs.lombok)
-    annotationProcessor(libs.lombok)
 
     implementation(libs.bundles.jimmer)
     implementation(libs.hikaricp)
@@ -97,9 +71,6 @@ dependencies {
     implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
     implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "linux_amd64_gnu_ssl1")
 
-    //discord
-    implementation("dev.kord:kord-core:${Versions.KORD}")
-
     testImplementation(kotlin("test"))
 }
 
@@ -109,22 +80,6 @@ allOpen {
 
 noArg {
     annotation("javax.persistence.Entity")
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
-
-
-tasks.withType<JavaCompile> {
-    options.encoding = "UTF-8"
-    options.compilerArgs.add("-parameters")
-}
-
-tasks.register<Sync>("syncLib") {
-    from(configurations.runtimeClasspath)
-    into("${layout.buildDirectory.get()}/libs/lib")
 }
 
 tasks.test {
@@ -139,6 +94,11 @@ tasks.jacocoTestReport {
     }
 }
 
+tasks.register<Sync>("syncLib") {
+    from(configurations.compileClasspath)
+    into("${layout.buildDirectory.get()}/libs/lib")
+}
+
 tasks.jar {
     dependsOn("syncLib")
     exclude("**/*.jar")
@@ -146,12 +106,26 @@ tasks.jar {
         attributes["Manifest-Version"] = "1.0"
         attributes["Multi-Release"] = "true"
         attributes["Main-Class"] = "kurenai.imsyncbot.BotKt"
-        attributes["Class-Path"] =
-            configurations.runtimeClasspath.get().files.joinToString(" ") { "lib/${it.name}" }
+        attributes["Class-Path"] = configurations.runtimeClasspath.get().files.joinToString(" ") { "lib/${it.name}" }
     }
     archiveFileName.set("${rootProject.name}.jar")
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
+kotlin {
+
+    compilerOptions {
+        freeCompilerArgs.set(
+            listOf(
+                "-Xjsr305=strict",
+                "-Xcontext-parameters",
+            )
+        )
+        optIn.set(
+            listOf(
+                "kotlin.contracts.ExperimentalContracts",
+                "kotlinx.coroutines.ExperimentalCoroutinesApi"
+            )
+        )
+        javaParameters.set(true)
+    }
 }

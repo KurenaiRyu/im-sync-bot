@@ -1,7 +1,7 @@
 [versions]
 ktolin = "2.1.21"
 ksp = "2.1.21-2.0.2"
-lombok = "1.18.38"
+lombok = "9.0.0-rc2"
 serialization = "1.8.1"
 coroutines = "1.10.2"
 ktor = "3.2.0"
@@ -42,7 +42,7 @@ zxing-core = { group = "com.google.zxing", name = "core", version = "3.5.2" }
 zxing-javase = { group = "com.google.zxing", name = "javase", version = "3.5.2" }
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version = "2.0.6" }
 diruptor = { group = "com.lmax", name = "disruptor", version = "3.4.4" }
-tdlight-bom = { module = "it.tdlight:tdlight-java-bom", version = "3.4.0+td.1.8.26" }
+tdlight-bom = { module = "it.tdlight:tdlight-java-bom", version = "3.4.4+td.1.8.52" }
 tdlight = { module = "it.tdlight:tdlight-java" }
 jimmer-kotlin = { module = "org.babyfish.jimmer:jimmer-sql-kotlin", version.ref = "jimmer" }
 jimmer-ksp = { module = "org.babyfish.jimmer:jimmer-ksp", version.ref = "jimmer" }
@@ -56,7 +56,6 @@ mirai-bom = { group = "net.mamoe", name = "mirai-bom", version.ref = "mirai" }
 mirai-api = { group = "net.mamoe", name = "mirai-core-api" }
 mirai-utils = { group = "net.mamoe", name = "mirai-core-utils" }
 mirai-bridge-overflow = { group = "top.mrxiaom.mirai", name = "overflow-core", version = "1.0.7" }
-lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
 reflections = { group = "org.reflections", name = "reflections", version = "0.10.2" }
 
 [bundles]
@@ -75,5 +74,5 @@ kotlin-lombok = { id = "org.jetbrains.kotlin.plugin.lombok", version.ref = "ktol
 kotlin-openall = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "ktolin" }
 kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref = "ktolin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
-lombok = { id = "io.freefair.lombok", version = "5.3.0" }
+lombok = { id = "io.freefair.lombok", version.ref = "lombok" }
 openapi-generator = { id = "org.openapi.generator", version = "7.13.0" }
