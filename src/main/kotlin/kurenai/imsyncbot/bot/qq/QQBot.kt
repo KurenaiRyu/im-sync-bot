@@ -27,7 +27,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 
 class QQBot(
-    private val qqProperties: QQProperties,
+    private val botProperties: BotProperties,
     coroutineContext: CoroutineContext = EmptyCoroutineContext
 ) {
 
@@ -54,7 +54,7 @@ class QQBot(
                     }
                 }
     )
-    internal var qqMessageHandler: QQMessageHandler = QQMessageHandler(configProperties, qqScope)
+    internal var messageHandler: QQMessageHandler = QQMessageHandler(botProperties, qqScope)
 
     val status = MutableStateFlow<BotStatus>(Initializing)
 
@@ -64,10 +64,10 @@ class QQBot(
     private val messageDispatcher = MessageDispatcher(parentScope = qqScope, name = "qq-message-dispatcher")
 
     private suspend fun buildBot(): Bot {
-        val url = "ws://${qqProperties.host}:${qqProperties.port}/"
+        val url = "ws://${botProperties.qq.host}:${botProperties.qq.port}/"
         log.info("Connecting to $url")
         return BotBuilder.positive(url)
-            .token(qqProperties.token)
+            .token(botProperties.qq.token)
             .overrideLogger(log)
             .connect() ?: throw BotException("Connect to $url fail!")
     }
@@ -79,7 +79,7 @@ class QQBot(
             if (qqBot.isActive) qqBot.close()
         }
         qqBot = buildBot()
-        log.info("Login qq ${qqProperties.account}...")
+        log.info("Login qq ${botProperties.qq.account}...")
 
         qqBot.login()
         status.update { Running }
@@ -197,7 +197,7 @@ class QQBot(
                         }
 
                         is GroupTempMessageEvent -> {
-                            qqMessageHandler.onGroupMessage(
+                            messageHandler.onGroupMessage(
                                 GroupMessageContext(
                                     message,
                                     qqScope,
@@ -210,7 +210,7 @@ class QQBot(
                         }
 
                         is GroupAwareMessageEvent -> {
-                            qqMessageHandler.onGroupMessage(
+                            messageHandler.onGroupMessage(
                                 GroupMessageContext(
                                     message,
                                     qqScope,
@@ -231,13 +231,13 @@ class QQBot(
                 is MessageRecallEvent.GroupRecall -> {
                     event.messageIds
                     qqScope.launch {
-                        qqMessageHandler.onRecall(event)
+                        messageHandler.onRecall(event)
                     }
                 }
 
                 is GroupEvent -> {
                     qqScope.launch {
-                        qqMessageHandler.onGroupEvent(event)
+                        messageHandler.onGroupEvent(event)
                     }
                 }
             }

@@ -123,7 +123,7 @@ class GroupMessageContext(
 
     private lateinit var readyToSendMessage: ReadyToSendMessage
     private val isTempMessage = event is GroupTempMessageEvent
-    private val replayToMessageId by lazy {
+    private val replayToMessageId: Long by lazy {
         runBlocking {
             // QuoteReply's source not contain target info
             MessageService.findRelationByQuote(messageChain)?.also {
@@ -327,7 +327,7 @@ class GroupMessageContext(
 
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.replyToMessage(it) }
+                this.replyToMessageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContent = if (type == ImageUtil.ImageType.GIF) {
                     InputMessageAnimation().apply {
                         this.caption = content.caption
@@ -387,7 +387,7 @@ class GroupMessageContext(
             val formattedText = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
             val func = SendMessageAlbum().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.replyToMessage(it) }
+                this.replyToMessageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContents = buildContents().also {
                     when (val last = it.last()) {
                         is InputMessageDocument -> {
@@ -428,7 +428,7 @@ class GroupMessageContext(
             val info = FileService.download(image, "gif")
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.replyToMessage(it) }
+                this.replyToMessageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContent = buildGifContent(info.inputFile)
             }
             return arrayOf(bot.tg.send(func, untilPersistent = true).also {
@@ -452,7 +452,7 @@ class GroupMessageContext(
             val url = shortVideo.urlForDownload
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.replyToMessage(it) }
+                this.replyToMessageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContent = InputMessageVideo().apply {
                     this.caption = "${shortVideo.filename}.${shortVideo.fileFormat}"
                         .escapeMarkdown().formatMsg(senderId, senderName).fmt()
@@ -470,7 +470,7 @@ class GroupMessageContext(
             require(url != null) { "获取视频地址失败" }
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this@GroupMessageContext.replayToMessageId.takeIf { it > 0 }?.let { this.replyToMessage(it) }
+                this.replyToMessageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContent = InputMessageVideo().apply {
                     this.caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
                     this.video = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)

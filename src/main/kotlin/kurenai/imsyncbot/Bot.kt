@@ -3,7 +3,6 @@ package kurenai.imsyncbot
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import it.tdlight.Init
-import kurenai.imsyncbot.bot.qq.QQHandler
 import kurenai.imsyncbot.bot.qq.QQMessageHandler
 import kurenai.imsyncbot.command.AbstractInlineCommand
 import kurenai.imsyncbot.command.AbstractQQCommand
@@ -47,7 +46,6 @@ internal val dfs: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH
 internal val tgCommands = ArrayList<AbstractTelegramCommand>()
 internal val qqCommands = ArrayList<AbstractQQCommand>()
 internal val inlineCommands = HashMap<String, AbstractInlineCommand>()
-internal val qqHandlers = ArrayList<QQHandler>()
 lateinit var configProperties: ConfigProperties
 lateinit var sqlClient: KSqlClient
 
@@ -100,16 +98,6 @@ private fun commonInit() {
 //    registerInlineCommand()
 //    registerQQHandler()
     setUpTimer()
-}
-
-private fun registerQQHandler() {
-    reflections.getSubTypesOf(QQHandler::class.java)
-        .filter { it != QQMessageHandler::class.java }
-        .map { it.getDeclaredConstructor().newInstance() }
-        .forEach {
-            qqHandlers.add(it)
-            log.info("Registered qq handler:  ${it.handleName()}(${it::class.java.simpleName})")
-        }
 }
 
 private fun registerTgCommand() {

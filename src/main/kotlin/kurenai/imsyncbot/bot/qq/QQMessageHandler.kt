@@ -3,6 +3,7 @@ package kurenai.imsyncbot.bot.qq
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kurenai.imsyncbot.BotProperties
 import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.bot.telegram.TelegramBot
@@ -13,23 +14,23 @@ import net.mamoe.mirai.contact.remarkOrNameCardOrNick
 import net.mamoe.mirai.event.events.*
 
 class QQMessageHandler(
-    configProperties: ConfigProperties,
+    botProperties: BotProperties,
     val parentScope: CoroutineScope,
-) : QQHandler {
+) {
 
     private val log = getLogger()
 
     private var tgMsgFormat = $$"$name: $msg"
     private var qqMsgFormat = $$"$name: $msg"
-    private var enableRecall = configProperties.bot.enableRecall
+    private var enableRecall = botProperties.enableRecall
 
     init {
-        if (configProperties.bot.tgMsgFormat.contains("\$msg")) tgMsgFormat = configProperties.bot.tgMsgFormat
-        if (configProperties.bot.qqMsgFormat.contains("\$msg")) qqMsgFormat = configProperties.bot.qqMsgFormat
+        if (botProperties.tgMsgFormat.contains($$"$msg")) tgMsgFormat = botProperties.tgMsgFormat
+        if (botProperties.qqMsgFormat.contains($$"$msg")) qqMsgFormat = botProperties.qqMsgFormat
     }
 
     @Throws(Exception::class)
-    override suspend fun onGroupMessage(context: GroupMessageContext): Int {
+    suspend fun onGroupMessage(context: GroupMessageContext): Int {
         if (context.bot.groupConfigService.bannedGroups.contains(context.group.id)) return CONTINUE
         val messageType = context.getReadyToSendMessage()
         val list = if (messageType is GroupMessageContext.Forward) messageType.contextList else listOf(context)
@@ -132,7 +133,7 @@ class QQMessageHandler(
 //    }
 
     context(bot: ImSyncBot)
-    override suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {
+    suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {
         val tg = bot.tg
         MessageService.findRelationByRecall(event)?.let { message ->
             if (enableRecall) {
@@ -180,7 +181,7 @@ class QQMessageHandler(
         return CONTINUE
     }
 
-    context(bot: ImSyncBot, tg: TelegramBot)
+    context(bot: ImSyncBot)
     suspend fun onGroupEvent(event: GroupEvent) {
         val chatId = bot.groupConfigService.findByQQ(event.group.id)?.telegramGroupId ?: return
         val msg = when (event) {
@@ -242,11 +243,7 @@ class QQMessageHandler(
                 return
             }
         }
-        tg.sendMessageText(msg.fmt(), chatId)
-    }
-
-    override fun order(): Int {
-        return 150
+        bot.tg.sendMessageText(msg.fmt(), chatId)
     }
 
 }

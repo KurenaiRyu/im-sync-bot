@@ -19,7 +19,6 @@ import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.util.*
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -29,8 +28,6 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
-import kotlin.time.measureTimedValue
-import it.tdlight.client.Result as TdResult
 
 /**
  * Telegram 机器人实例
@@ -42,7 +39,7 @@ lateinit var defaultTelegramBot: TelegramBot
 
 class TelegramBot(
     botProperties: BotProperties,
-    private val coroutineContext: CoroutineContext,
+    coroutineContext: CoroutineContext,
 ) {
 
     companion object {
@@ -75,7 +72,6 @@ class TelegramBot(
     )
 
     internal val messageHandler: TgMessageHandler = TgMessageHandler(botProperties, tgScope)
-
 
     val status = MutableStateFlow<BotStatus>(Initializing)
     val token: String = botProperties.telegram.token
@@ -422,9 +418,4 @@ class TelegramBot(
             log.error("Report error failed: {}", message.toString().trim(), e)
         }
     }
-
-    data class ChannelMessage<T>(
-        val request: Function<T>,
-        val result: CompletableDeferred<Result<T>>
-    )
 }

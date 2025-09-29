@@ -37,7 +37,7 @@ class ImSyncBot(
     internal val userConfigService: UserConfigService = UserConfigService(configProperties)
     internal val groupConfigService: GroupConfigService = GroupConfigService(this)
     internal val tg: TelegramBot = TelegramBot(configProperties.bot, serverScope.coroutineContext)
-    internal val qq: QQBot = QQBot(configProperties.bot.qq, serverScope.coroutineContext)
+    internal val qq: QQBot = QQBot(configProperties.bot, serverScope.coroutineContext)
 //    internal val discord: DiscordBot = DiscordBot(this)
 
     init {
