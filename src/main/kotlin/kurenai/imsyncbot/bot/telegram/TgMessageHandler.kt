@@ -50,7 +50,8 @@ class TgMessageHandler(
     }
 
     //TODO: Save telegram message
-    fun handle(update: Update, bot: ImSyncBot, tg: TelegramBot) = parentScope.launch {
+    context(bot: ImSyncBot)
+    fun handle(update: Update) = parentScope.launch {
         TelegramBot.log.trace("Incoming update: {}", update.toString().trim())
         val status = bot.tg.status.value
         if (status != Running) {
@@ -88,7 +89,7 @@ class TgMessageHandler(
         }
     }
 
-    context(bot: ImSyncBot, tg: TelegramBot)
+    context(bot: ImSyncBot)
     private suspend fun doHandle(update: Update) {
 
         if (traceEnabled.not()) simpleLog(update)
@@ -98,7 +99,7 @@ class TgMessageHandler(
         when (update) {
             is UpdateNewMessage -> {
 
-                tg.disposableHandlers.forEach {
+                bot.tg.disposableHandlers.forEach {
                     if (it.handle(bot, update.message)) {
                         bot.tg.disposableHandlers.remove(it)
                         return
@@ -147,7 +148,7 @@ class TgMessageHandler(
                     bot.tg.pendingMessage.invalidate(update.oldMessageId)
                     if (it.isActive) {
                         log.trace("Resume {}", it)
-                        it.resumeWith(Result.success(update.message))
+                        it.complete(update.message)
                     } else {
                         QQTgRepository.findByTgMsgId(update.oldMessageId).map { exist ->
                             exist.copy {
@@ -164,7 +165,7 @@ class TgMessageHandler(
                 bot.tg.pendingMessage.getIfPresent(update.oldMessageId)?.let {
                     bot.tg.pendingMessage.invalidate(update.oldMessageId)
                     if (it.isActive) {
-                        it.resumeWith(Result.failure(BotException("[${update.error}] ${update.error.message}")))
+                        it.completeExceptionally(BotException("[${update.error}] ${update.error.message}"))
                     }
                 }
             }

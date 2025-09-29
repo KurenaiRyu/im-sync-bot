@@ -1,7 +1,10 @@
 package kurenai.imsyncbot.bot.telegram
 
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.sksamuel.aedile.core.asCache
 import com.sksamuel.aedile.core.caffeineBuilder
 import it.tdlight.client.*
+import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +18,11 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
 import java.util.*
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlin.io.path.pathString
 import kotlin.io.path.writeBytes
 import kotlin.time.Duration
@@ -80,12 +87,12 @@ class TelegramBot(
         expireAfterWrite = 1.minutes
     }.build()
 
-    val pendingMessage = caffeineBuilder<Long, CancellableContinuation<Object>> {
-        maximumSize = 50
-        expireAfterWrite = 1.minutes
-    }.build()
+    val pendingMessage = Caffeine.newBuilder()
+        .maximumSize(50)
+        .expireAfterWrite(1, TimeUnit.MINUTES)
+        .asCache<Long, CompletableDeferred<Message>>()
 
-    context(bot: ImSyncBot, tg: TelegramBot)
+    context(bot: ImSyncBot)
     fun start() {
         apiToken = APIToken(
             telegramProperties.apiId ?: 94575,
@@ -108,7 +115,7 @@ class TelegramBot(
                 status.update { Running }
                 if (!::defaultTelegramBot.isInitialized) defaultTelegramBot = this@TelegramBot
                 client.addUpdatesHandler {
-                    messageHandler.handle(it, bot, tg)
+                    with(bot) { messageHandler.handle(it) }
                 }
                 tgScope.launch {
                     updateCommand()
@@ -140,7 +147,7 @@ class TelegramBot(
         replyToMessageId: Long? = null,
         messageThreadId: Long? = null,
         untilPersistent: Boolean = false,
-    ) = send(untilPersistent) {
+    ): Message = send(untilPersistent) {
         messageText(formattedText, chatId).apply {
             this.replyToMessageId = replyToMessageId
             this.messageThreadId = messageThreadId ?: 0
@@ -297,7 +304,7 @@ class TelegramBot(
 
     fun getUsername(): String = client.me.usernames.activeUsernames.first()
 
-    suspend inline fun <R : Object, Fun : Function<R>> send(
+    suspend inline fun <reified R : Object, reified Fun : TdApi.Function<R>> send(
         function: Fun,
         untilPersistent: Boolean = false,
         timeout: Duration = DEFAULT_TIMEOUT
@@ -308,82 +315,59 @@ class TelegramBot(
     suspend inline fun <R : Object> send(
         untilPersistent: Boolean = false,
         timeout: Duration = DEFAULT_TIMEOUT,
-        crossinline block: () -> Function<R>
+        crossinline block: () -> TdApi.Function<R>
     ): R {
         val params = block()
-        val (value, duration) = measureTimedValue {
-            runCatching {
-                suspendCancellableCoroutine { con: CancellableContinuation<R> ->
-                    var obj: R? = null
-                    CoroutineScope(Dispatchers.VT).launch {
-                        client.send(params) { result ->
-                            if (untilPersistent && !result.isError) {
-                                obj = result.get()
-                                val message = obj as? Message
-                                if (message?.sendingState?.constructor == MessageSendingStatePending.CONSTRUCTOR) {
-                                    pendingMessage[message.id] =
-                                        con as CancellableContinuation<Object>
-                                } else {
-                                    con.resumeWith(Result.success(obj!!))
-                                }
-                            } else {
-                                con.resumeWith(
-                                    runCatching {
-                                        result.get()
-                                    }.onFailure {
-                                        log.warn("{}: {}: \n{}", result.error.code, result.error.message, params)
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    CoroutineScope(Dispatchers.VT).launch {
-                        delay(timeout)
-                        if (con.isActive) {
-                            obj?.also {
-                                con.resumeWith(Result.success(it))
-                            } ?: run {
-                                con.cancel(CancellationException("Timeout with $timeout"))
-                            }
-                        }
-                    }
-                    con.invokeOnCancellation {
-                        if (log.isTraceEnabled) {
-                            log.warn("Send job cancelled: {}", params)
-                        } else {
-                            log.warn("Send job cancelled.")
-                        }
-                    }
-                }
-            }.recoverCatching { ex: Throwable ->
-                if (ex.message?.contains("retry after") == true) {
-                    val seconds = ex.message!!.substringAfterLast(" ").toLongOrNull() ?: 5
-                    log.warn("Wait for {}s", seconds)
-                    delay(seconds * 1000)
-                    return@recoverCatching send<R>(untilPersistent, timeout, block)
-                } else {
-                    throw ex
-                }
-            }.getOrThrow()
-        }
-        if (log.isTraceEnabled) {
-            log.trace("in {}, Execute {}", duration, params)
-        } else {
-            if (duration > 10.seconds) {
-                log.warn("Send job cost over 10s: {}", duration)
-            }
-            log.debug("Execute {} in {}", params::class.simpleName, duration)
-        }
-        return value as R
+        return doSend(untilPersistent, timeout, params)
     }
 
-    private suspend fun <R : Object> doSend(params: Function<R>): TdResult<R> {
-        return suspendCancellableCoroutine { con: CancellableContinuation<TdResult<R>> ->
-            CoroutineScope(this.coroutineContext).launch {
-                client.send(params, { result -> con.resumeWith(Result.success(result)) }) { e: Throwable ->
-                    con.resumeWith(Result.failure(e))
-                }
+    @Suppress("UNCHECKED_CAST")
+    suspend fun <R: Object> doSend(
+        untilPersistent: Boolean = false,
+        timeout: Duration = DEFAULT_TIMEOUT,
+        params: TdApi.Function<R>): R {
+        var deferred: CompletableDeferred<Message>? = null
+        var result: R? = null
+        try {
+            result = withTimeout(timeout) {
+                client.sendSuspend(params)
             }
+
+            if (untilPersistent && result is Message &&
+                result.sendingState.constructor == MessageSendingStatePending.CONSTRUCTOR
+            ) {
+                deferred = CompletableDeferred()
+                pendingMessage[result.id] = deferred
+                return withTimeout(timeout) {
+                    deferred.await() as R
+                }
+            } else {
+                return result
+            }
+        } catch (ex: Throwable) {
+            if (ex.message?.contains("retry after") == true) {
+                val seconds = ex.message!!.substringAfterLast(" ").toLongOrNull() ?: 5
+                log.warn("Wait for {}s", seconds)
+                delay(seconds * 1000)
+                return doSend(untilPersistent, timeout, params)
+            } else {
+                deferred?.completeExceptionally(ex)
+                throw ex
+            }
+        } finally {
+            if (deferred?.isCompleted?:false && result != null && result is Message) {
+                pendingMessage.invalidate(result.id)
+            }
+        }
+    }
+
+    suspend inline fun <R : TdApi.Object> SimpleTelegramClient.sendSuspend(
+        params: TdApi.Function<R>
+    ): R = suspendCancellableCoroutine { cont ->
+        send<R>(params) { result ->
+            runCatching { result.get() }
+                .onSuccess { cont.resume(it) }
+                .onFailure { cont.resumeWithException(it) }
         }
     }
 
