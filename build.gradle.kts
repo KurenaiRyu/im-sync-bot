@@ -1,11 +1,13 @@
+@file:OptIn(KspExperimental::class)
+
+import com.google.devtools.ksp.KspExperimental
+
 plugins {
     application
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.kotlin.lombok)
     alias(libs.plugins.kotlin.openall)
     alias(libs.plugins.kotlin.noarg)
-    alias(libs.plugins.lombok)
     alias(libs.plugins.ksp)
     jacoco
 }
@@ -46,7 +48,8 @@ dependencies {
     implementation(platform(libs.mirai.bom))
     implementation(libs.bundles.mirai)
 
-    implementation(libs.bundles.jimmer)
+    implementation(libs.jimmer.sql.kotlin)
+    ksp(libs.jimmer.ksp)
     implementation(libs.hikaricp)
     implementation(libs.sqlite)
 
@@ -56,20 +59,21 @@ dependencies {
     implementation(libs.caffeine)
     implementation(libs.jsoup)
     implementation(libs.apache.commons.pool2)
+    implementation(libs.apache.commons.lang3)
     implementation(libs.reflections)
 
     //tdlib
     implementation(platform(libs.tdlight.bom))
     implementation(libs.tdlight)
-    val hostOs = System.getProperty("os.name")
-    val isWin = hostOs.startsWith("Windows")
-    val classifier = when {
-        hostOs == "Linux" -> "linux_amd64_gnu_ssl1"
-        isWin -> "windows_amd64"
-        else -> throw GradleException("[$hostOs] is not support!")
-    }
-    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
-    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "linux_amd64_gnu_ssl1")
+//    val hostOs = System.getProperty("os.name")
+//    val isWin = hostOs.startsWith("Windows")
+//    val classifier = when {
+//        hostOs == "Linux" -> "linux_amd64_gnu_ssl1"
+//        isWin -> "windows_amd64"
+//        else -> throw GradleException("[$hostOs] is not support!")
+//    }
+//    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
+    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "windows_amd64")
 
     testImplementation(kotlin("test"))
 }
@@ -80,6 +84,10 @@ allOpen {
 
 noArg {
     annotation("javax.persistence.Entity")
+}
+
+ksp {
+    useKsp2 = true
 }
 
 tasks.test {
@@ -111,8 +119,14 @@ tasks.jar {
     archiveFileName.set("${rootProject.name}.jar")
 }
 
-kotlin {
+application {
+    applicationDefaultJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
+}
 
+kotlin {
+    sourceSets.main {
+        kotlin.srcDir("build/generated/ksp/main/kotlin")
+    }
     compilerOptions {
         freeCompilerArgs.set(
             listOf(
@@ -123,7 +137,7 @@ kotlin {
         optIn.set(
             listOf(
                 "kotlin.contracts.ExperimentalContracts",
-                "kotlinx.coroutines.ExperimentalCoroutinesApi"
+                "kotlinx.coroutines.ExperimentalCoroutinesApi",
             )
         )
         javaParameters.set(true)

@@ -13,7 +13,6 @@ import kurenai.imsyncbot.*
 import kurenai.imsyncbot.bot.telegram.TgMessageHandler.ListenerResult
 import kurenai.imsyncbot.service.FileService
 import kurenai.imsyncbot.utils.*
-import okhttp3.internal.toHexString
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
@@ -28,6 +27,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
+import it.tdlight.jni.TdApi.Function as TdFunction
 
 /**
  * Telegram 机器人实例
@@ -86,7 +86,7 @@ class TelegramBot(
     val pendingMessage = Caffeine.newBuilder()
         .maximumSize(50)
         .expireAfterWrite(1, TimeUnit.MINUTES)
-        .asCache<Long, CompletableDeferred<Message>>()
+        .asCache<Long, CompletableDeferred<TdApi.Message>>()
 
     context(bot: ImSyncBot)
     fun start() {
@@ -105,7 +105,7 @@ class TelegramBot(
         }
         client =
             SimpleTelegramClientFactory().builder(settings).build(AuthenticationSupplier.bot(telegramProperties.token))
-        client.addUpdateHandler(UpdateAuthorizationState::class.java) { update ->
+        client.addUpdateHandler(TdApi.UpdateAuthorizationState::class.java) { update ->
             if (update.authorizationState.constructor == AuthorizationStateReady.CONSTRUCTOR) {
                 log.info("Telegram bot started.")
                 status.update { Running }
@@ -120,9 +120,9 @@ class TelegramBot(
         }
     }
 
-    fun <R : Object?, Event : Update> addListener(
+    fun <R : TdApi.Object?, Event : TdApi.Update> addListener(
         timeout: Duration? = 5L.seconds,
-        matchBlock: ((Update) -> Boolean)? = null,
+        matchBlock: ((TdApi.Update) -> Boolean)? = null,
         handleBlock: (Event) -> ListenerResult<R>
     ): Deferred<R> {
         return messageHandler.addListener(timeout, matchBlock, handleBlock)
@@ -132,21 +132,21 @@ class TelegramBot(
         text: String,
         chatId: Long,
         parseMode: ParseMode = ParseMode.TEXT,
-        replayToMessageId: Long? = null,
-        messageThreadId: Long? = null,
+        replayToMessageId: Long = 0,
+        messageThreadId: Long = 0,
         untilPersistent: Boolean = false,
     ) = sendMessageText(text.fmt(parseMode), chatId, replayToMessageId, messageThreadId, untilPersistent)
 
     suspend inline fun sendMessageText(
-        formattedText: FormattedText,
+        formattedText: TdApi.FormattedText,
         chatId: Long,
-        replyToMessageId: Long? = null,
-        messageThreadId: Long? = null,
+        replyToMessageId: Long = 0,
+        messageThreadId: Long = 0,
         untilPersistent: Boolean = false,
-    ): Message = send(untilPersistent) {
+    ): TdApi.Message = send(untilPersistent) {
         messageText(formattedText, chatId).apply {
-            this.replyToMessageId = replyToMessageId
-            this.messageThreadId = messageThreadId ?: 0
+            this.replyTo.messageId = replyToMessageId
+            this.messageThreadId = messageThreadId
         }
     }
 
@@ -155,15 +155,13 @@ class TelegramBot(
         text: String,
         chatId: Long,
         parseMode: ParseMode = ParseMode.TEXT,
-        filename: String = System.currentTimeMillis().toHexString(),
-        replayToMessageId: Long? = null,
-        messageThreadId: Long? = null,
+        replayToMessageId: Long = 0,
+        messageThreadId: Long = 0,
         untilPersistent: Boolean = false,
     ) = sendMessagePhoto(
         url,
         text.fmt(parseMode),
         chatId,
-        filename,
         replayToMessageId,
         messageThreadId,
         untilPersistent
@@ -173,14 +171,13 @@ class TelegramBot(
         url: String,
         formattedText: FormattedText,
         chatId: Long,
-        filename: String = System.currentTimeMillis().toHexString(),
-        replyToMessageId: Long? = null,
-        messageThreadId: Long? = null,
+        replyToMessageId: Long = 0,
+        messageThreadId: Long = 0,
         untilPersistent: Boolean = false,
     ): Message {
         SendMessage().apply {
-            this.replyToMessageId = replyToMessageId
-            this.messageThreadId = messageThreadId ?: 0
+            this.replyTo.messageId = replyToMessageId
+            this.messageThreadId = messageThreadId
             this.inputMessageContent = InputMessagePhoto().apply {
                 this.photo = FileService.download(url).inputFile
                 this.caption = formattedText
@@ -188,8 +185,8 @@ class TelegramBot(
         }
         return send(untilPersistent = untilPersistent) {
             messageText(formattedText, chatId).apply {
-                this.replyToMessageId = replyToMessageId
-                this.messageThreadId = messageThreadId ?: 0
+                this.replyTo.messageId = replyToMessageId
+                this.messageThreadId = messageThreadId
             }
         }
     }
@@ -199,14 +196,14 @@ class TelegramBot(
         formattedText: FormattedText,
         chatId: Long,
         filename: String = "${System.currentTimeMillis()}",
-        replyToMessageId: Long? = null,
+        replyToMessageId: Long = 0,
         untilPersistent: Boolean = false,
     ) = send(untilPersistent = untilPersistent) {
         val path = Path.of(BotUtil.getImagePath(filename))
         path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
         SendMessage().apply {
             this.chatId = chatId
-            this.replyToMessageId = replyToMessageId
+            this.replyTo.messageId = replyToMessageId
             this.inputMessageContent = InputMessagePhoto().apply {
                 this.caption = formattedText
                 this.photo = InputFileLocal(path.pathString)
@@ -219,14 +216,14 @@ class TelegramBot(
         formattedText: FormattedText,
         chatId: Long,
         filename: String = "${System.currentTimeMillis()}",
-        replyToMessageId: Long? = null,
+        replyToMessageId: Long = 0,
         untilPersistent: Boolean = false,
     ) = send(untilPersistent = untilPersistent) {
         val path = Path.of(BotUtil.getDocumentPath(filename))
         path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
         SendMessage().apply {
             this.chatId = chatId
-            this.replyToMessageId = replyToMessageId
+            this.replyTo.messageId = replyToMessageId
             this.inputMessageContent = InputMessageVideo().apply {
                 this.caption = formattedText
                 this.video = InputFileLocal(path.pathString)
@@ -274,7 +271,7 @@ class TelegramBot(
         else send(downloadFile)
     }
 
-    suspend inline fun getMessage(chatId: Long, messageId: Long) = send {
+    suspend inline fun getMessage(chatId: Long, messageId: Long): Message = send {
         GetMessage(chatId, messageId)
     }
 
@@ -286,10 +283,8 @@ class TelegramBot(
         GetUser(userId)
     }
 
-    suspend inline fun getUser(message: Message) = message.userSender()?.let { user ->
-        send {
-            GetUser(user.userId)
-        }
+    suspend inline fun getUser(message: Message): User = send {
+        GetUser(message.senderUserId)
     }
 
     fun getMe(): User = client.me
@@ -300,18 +295,17 @@ class TelegramBot(
 
     fun getUsername(): String = client.me.usernames.activeUsernames.first()
 
-    suspend inline fun <reified R : Object, reified Fun : TdApi.Function<R>> send(
+    suspend inline fun <reified R : Object, reified Fun : TdFunction<R>> send(
         function: Fun,
         untilPersistent: Boolean = false,
         timeout: Duration = DEFAULT_TIMEOUT
     ): R = send(untilPersistent, timeout) { function }
 
-    @Suppress("UNCHECKED_CAST")
     @OptIn(ExperimentalTime::class)
     suspend inline fun <R : Object> send(
         untilPersistent: Boolean = false,
         timeout: Duration = DEFAULT_TIMEOUT,
-        crossinline block: () -> TdApi.Function<R>
+        crossinline block: () -> TdFunction<R>
     ): R {
         val params = block()
         return doSend(untilPersistent, timeout, params)
@@ -321,7 +315,8 @@ class TelegramBot(
     suspend fun <R: Object> doSend(
         untilPersistent: Boolean = false,
         timeout: Duration = DEFAULT_TIMEOUT,
-        params: TdApi.Function<R>): R {
+        params: TdFunction<R>
+    ): R {
         var deferred: CompletableDeferred<Message>? = null
         var result: R? = null
         try {
@@ -357,8 +352,8 @@ class TelegramBot(
         }
     }
 
-    suspend inline fun <R : TdApi.Object> SimpleTelegramClient.sendSuspend(
-        params: TdApi.Function<R>
+    suspend inline fun <R : Object> SimpleTelegramClient.sendSuspend(
+        params: TdFunction<R>
     ): R = suspendCancellableCoroutine { cont ->
         send<R>(params) { result ->
             runCatching { result.get() }
@@ -408,7 +403,7 @@ class TelegramBot(
 
             send {
                 messageText(errorMsg.asFmtText(), message.chatId).apply {
-                    this.replyToMessageId = message.id
+                    this.replyTo.messageId = message.id
                     this.options = MessageSendOptions().apply {
                         this.fromBackground = true
                     }

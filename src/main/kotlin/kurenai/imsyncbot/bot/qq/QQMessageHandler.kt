@@ -4,9 +4,7 @@ import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.BotProperties
-import kurenai.imsyncbot.ConfigProperties
 import kurenai.imsyncbot.ImSyncBot
-import kurenai.imsyncbot.bot.telegram.TelegramBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
@@ -72,7 +70,7 @@ class QQMessageHandler(
             log.debug("{} Sent {}", context.infoString,
                 messages.joinToString(",") {
                     "[${it.chatId}] ${it.sendUserId()} ${
-                        it.content.textOrCaption()?.text?.replace(
+                        it.content.formattedText?.text?.replace(
                             "\r",
                             "\\r"
                         )?.replace("\n", "\\n")
@@ -140,7 +138,7 @@ class QQMessageHandler(
                 tg.deleteMessages(message.tgGrpId, message.tgMsgId)
             } else {
                 val originMsg = tg.getMessage(message.tgGrpId, message.tgMsgId)
-                if (originMsg.userSender()?.userId != tg.getMe().id) return CONTINUE
+                if (originMsg.senderUserId != tg.getMe().id) return CONTINUE
                 tg.send {
                     val content = originMsg.content
                     if (content is MessageText) {
@@ -163,7 +161,7 @@ class QQMessageHandler(
                         EditMessageCaption().apply {
                             this.chatId = originMsg.chatId
                             this.messageId = originMsg.id
-                            val caption = content.textOrCaption()
+                            val caption = content.formattedText
                             this.caption = caption?.apply {
                                 val size = this.entities.size + 1
                                 this.entities = Array<TextEntity>(size) {

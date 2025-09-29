@@ -4,6 +4,7 @@ import kurenai.imsyncbot.sqlClient
 import kurenai.imsyncbot.utils.withVT
 import org.babyfish.jimmer.sql.kt.ast.query.KConfigurableRootQuery
 import org.babyfish.jimmer.sql.kt.ast.query.KMutableRootQuery
+import org.babyfish.jimmer.sql.kt.ast.table.KNonNullTable
 
 open class BaseRepository<T : Any, ID : Any> {
 
@@ -33,8 +34,8 @@ open class BaseRepository<T : Any, ID : Any> {
         sqlClient.deleteByIds(R::class, ids).totalAffectedRowCount
     }
 
-    protected inline fun <reified E : T> createQuery(
-        noinline block: KMutableRootQuery<E>.() -> KConfigurableRootQuery<E, E>
-    ) = sqlClient.createQuery(E::class, block)
+    protected inline fun <reified C : T, reified R> createQuery(
+        noinline block: KMutableRootQuery.ForEntity<C>.() -> KConfigurableRootQuery<KNonNullTable<C>, R>
+    ): KConfigurableRootQuery<KNonNullTable<C>, R> = sqlClient.createQuery(entityType = C::class, block = block)
 
 }

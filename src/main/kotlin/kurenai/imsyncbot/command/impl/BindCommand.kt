@@ -21,30 +21,32 @@ class BindCommand : AbstractTelegramCommand() {
     override val parseMode: ParseMode = ParseMode.MARKDOWN_V2
 
     override suspend fun execute(bot: ImSyncBot, message: Message, sender: MessageSenderUser, input: String): String? {
-        val param = message.content.textOrCaption()?.text?.substringAfter(' ') ?: return "参数错误"
+        val param = message.content.formattedText?.text?.substringAfter(' ') ?: return "参数错误"
         val qqBot = bot.qq.qqBot
         val tg = bot.tg
         val chat = tg.getChat(message.chatId)
         return if (chat.type.constructor == ChatTypeSupergroup.CONSTRUCTOR
             || chat.type.constructor == ChatTypeBasicGroup.CONSTRUCTOR
         ) {
-            if (message.replyToMessageId() != null) {
-                tg.getMessage(message.replyInChatId()!!, message.replyToMessageId()!!)?.let { replyMessage ->
-                    if (param.isNotBlank()) {
-                        val user = tg.getUser(replyMessage) ?: return "找不到用户"
-                        if (user.id == tg.getMe().id) {
-                            val qqMsgSource =
-                                MessageService.findQQByTg(replyMessage)?.sourceOrNull ?: return "找不到该qq信息"
-                            bot.userConfigService.bindName(qq = qqMsgSource.fromId, bindingName = param)
-                            "qq`${qqMsgSource.fromId}` 绑定名称为 `${param.escapeMarkdown()}`"
+            if (message.replyTo.messageId != 0L) {
+                runCatching {
+                    tg.getMessage(message.replyTo.chatId, message.replyTo.messageId).let { replyMessage ->
+                        if (param.isNotBlank()) {
+                            val user = runCatching { tg.getUser(replyMessage) }.getOrNull() ?: return "找不到用户"
+                            if (user.id == tg.getMe().id) {
+                                val qqMsgSource =
+                                    MessageService.findQQByTg(replyMessage)?.sourceOrNull ?: return "找不到该qq信息"
+                                bot.userConfigService.bindName(qq = qqMsgSource.fromId, bindingName = param)
+                                "qq`${qqMsgSource.fromId}` 绑定名称为 `${param.escapeMarkdown()}`"
+                            } else {
+                                bot.userConfigService.bindName(user.id, null, param)
+                                "`${user.firstName.escapeMarkdown()}` 绑定名称为 `${param.escapeMarkdown()}`"
+                            }
                         } else {
-                            bot.userConfigService.bindName(user.id, null, param)
-                            "`${user.firstName.escapeMarkdown()}` 绑定名称为 `${param.escapeMarkdown()}`"
+                            "绑定名称不能为空"
                         }
-                    } else {
-                        "绑定名称不能为空"
                     }
-                } ?: "找不到引用的消息"
+                }.getOrNull() ?: "找不到引用的消息"
             } else {
                 if (bot.userConfigService.findByTg(message.userSender()?.userId)?.isAdmin() == true) {
                     try {
@@ -90,7 +92,7 @@ class UnbindCommand : AbstractTelegramCommand() {
     override val onlySupperAdmin = true
 
     override suspend fun execute(bot: ImSyncBot, message: Message, sender: MessageSenderUser, input: String): String? {
-        val param = message.content.textOrCaption()?.text ?: return "参数错误"
+        val param = message.content.formattedText?.text ?: return "参数错误"
         return if (param.isNotBlank()) {
             try {
                 bot.groupConfigService.remove(param.toLong())
@@ -100,8 +102,8 @@ class UnbindCommand : AbstractTelegramCommand() {
                 "参数错误"
             }
         } else {
-            if (message.replyToMessageId() != 0L) {
-                bot.tg.getMessage(message.replyInChatId()!!, message.replyToMessageId()!!)?.let { reply ->
+            if (message.replyTo.messageId != 0L) {
+                bot.tg.getMessage(message.replyTo.chatId!!, message.replyTo.messageId!!)?.let { reply ->
                     val userId = reply.userSender()?.userId!!
                     if (userId == bot.tg.getMe().id) {
                         val qqMsgSource = MessageService.findQQByTg(reply)?.sourceOrNull

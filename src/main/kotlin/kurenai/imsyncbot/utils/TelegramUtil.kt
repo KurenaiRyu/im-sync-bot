@@ -127,25 +127,45 @@ fun Message.sendUserId() = when (val sender = this.senderId) {
 
 fun Message.userSender(): MessageSenderUser? = this.senderId as? MessageSenderUser
 
-fun MessageContent.file() = when (this) {
-    is MessageAnimation -> this.animation.animation
-    is MessageAudio -> this.audio.audio
-    is MessageDocument -> this.document.document
-    is MessagePhoto -> this.photo.sizes.maxBy { it.photo.size }.photo
-    is MessageSticker -> this.sticker.sticker
-    is MessageVideo -> this.video.video
-    else -> null
-}
+val Message.senderUserId: Long
+    get() = (this.senderId as? MessageSenderUser)?.userId ?: 0
 
-fun MessageContent.textOrCaption() = when (this) {
-    is MessageAnimation -> this.caption
-    is MessageAudio -> this.caption
-    is MessageDocument -> this.caption
-    is MessagePhoto -> this.caption
-    is MessageVideo -> this.caption
-    is MessageText -> this.text
-    else -> null
-}
+val Message.senderChartId: Long
+    get() = (this.senderId as? MessageSenderChat)?.chatId ?: 0
+
+val MessageContent.file: File?
+    get() = when (this) {
+        is MessageAnimation -> this.animation.animation
+        is MessageAudio -> this.audio.audio
+        is MessageDocument -> this.document.document
+        is MessagePhoto -> this.photo.sizes.maxBy { it.photo.size }.photo
+        is MessageSticker -> this.sticker.sticker
+        is MessageVideo -> this.video.video
+        else -> null
+    }
+
+var MessageContent.formattedText: FormattedText?
+    get() = when (this) {
+        is MessageAnimation -> this.caption
+        is MessageAudio -> this.caption
+        is MessageDocument -> this.caption
+        is MessagePhoto -> this.caption
+        is MessageVideo -> this.caption
+        is MessageText -> this.text
+        else -> null
+    }
+    set(value) = run {
+        if (value == null) return@run
+        when (this) {
+            is MessageAnimation -> this.caption = value
+            is MessageAudio -> this.caption = value
+            is MessageDocument -> this.caption = value
+            is MessagePhoto -> this.caption = value
+            is MessageVideo -> this.caption = value
+            is MessageText -> this.text = value
+            else -> {}
+        }
+    }
 
 fun User.username() = this.usernames.activeUsernames.firstOrNull() ?: this.id.toString()
 
@@ -200,40 +220,23 @@ fun Update.info(): String {
 }
 
 //////////////  message reply  //////////////
-var SendMessage.replyToMessageId
-    get() = this.replyTo?.messageId
-    set(id) = run {
-        if (id == null) return
 
-        this.replyTo = InputMessageReplyToMessage().apply {
-            this.messageId = messageId
-        }
+var InputMessageReplyTo.messageId: Long
+    get() = (this as? InputMessageReplyToMessage)?.messageId ?: 0
+    set(id) = run {
+        if (this is InputMessageReplyToMessage) this.messageId = id
     }
 
-var SendMessageAlbum.replyToMessageId
-    get() = this.replyTo?.messageId
+var MessageReplyTo.messageId: Long
+    get() = (this as? MessageReplyToMessage)?.messageId ?: 0
     set(id) = run {
-        if (id == null) return
-
-        this.replyTo = InputMessageReplyToMessage().apply {
-            this.messageId = messageId
-        }
+        if (this is MessageReplyToMessage) this.messageId = id
     }
 
-var Message.replyToMessageId
-    get() = this.replyTo?.messageId
-    set(id) = this.replyTo?.messageId = id
-
-var InputMessageReplyTo.messageId
-    get() = (this as? InputMessageReplyToMessage)?.messageId
+var MessageReplyTo.chatId: Long
+    get() = (this as? MessageReplyToMessage)?.chatId ?: 0
     set(id) = run {
-        if (id != null && this is InputMessageReplyToMessage) this.messageId = id
-    }
-
-var MessageReplyTo.messageId: Long?
-    get() = (this as? MessageReplyToMessage)?.messageId
-    set(id) = run {
-        if (id != null && this is MessageReplyToMessage) this.messageId = id
+        if (this is MessageReplyToMessage) this.chatId = id
     }
 
 enum class ParseMode(val ins: TextParseMode?) {

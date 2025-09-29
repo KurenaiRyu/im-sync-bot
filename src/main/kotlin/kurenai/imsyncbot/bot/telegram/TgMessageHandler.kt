@@ -349,7 +349,7 @@ class TgMessageHandler(
             return CONTINUE
         }
 
-        val quoteMsgSource = message.replyToMessageId?.let {
+        val quoteMsgSource = message.replyTo.messageId?.let {
             MessageService.findQQByTg(message.chatId, it)?.source
         }
         val groupId = quoteMsgSource?.targetId ?: bot.groupConfigService.findByTg(message.chatId)?.qqGroupId

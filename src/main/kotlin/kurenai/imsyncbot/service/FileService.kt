@@ -102,7 +102,7 @@ object FileService {
         messages.mapIndexedNotNull { index, message ->
             val image = images[index]
 
-            message.content.file()?.takeIf {
+            message.content.file?.takeIf {
                 it.remote.id?.isNotBlank() == true && image.imageId.isNotBlank()
             }?.let {
                 new(FileCache::class).by {
@@ -116,24 +116,22 @@ object FileService {
         }
     }
 
-    suspend fun cacheImage(id: String, message: TdApi.Message, type: String? = null) {
-        withVT {
-            message.content.file()?.remote?.id?.takeIf { it.isNotBlank() }?.let { fileId ->
-                val exist: FileCache? = FileCacheRepository.findById(id)
-                if (exist != null && (exist.fileId != fileId || exist.fileType != type.toString())) {
-                    FileCacheRepository.save(exist.copy {
+    suspend fun cacheImage(id: String, message: TdApi.Message, type: String? = null) = withVT {
+        message.content.file?.remote?.id?.takeIf { it.isNotBlank() }?.let { fileId ->
+            val exist: FileCache? = FileCacheRepository.findById(id)
+            if (exist != null && (exist.fileId != fileId || exist.fileType != type.toString())) {
+                FileCacheRepository.save(exist.copy {
+                    this.fileId = fileId
+                    fileType = type.toString()
+                })
+            }
+            if (exist == null) {
+                FileCacheRepository.save(
+                    new(FileCache::class).by {
+                        this.id = id
                         this.fileId = fileId
-                        fileType = type.toString()
+                        this.fileType = type.toString()
                     })
-                }
-                if (exist == null) {
-                    FileCacheRepository.save(
-                        new(FileCache::class).by {
-                            this.id = id
-                            this.fileId = fileId
-                            this.fileType = type.toString()
-                        })
-                }
             }
         }
     }

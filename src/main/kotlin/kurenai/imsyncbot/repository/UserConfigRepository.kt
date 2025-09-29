@@ -3,6 +3,7 @@ package kurenai.imsyncbot.repository
 import kurenai.imsyncbot.domain.UserConfig
 import kurenai.imsyncbot.domain.qq
 import kurenai.imsyncbot.domain.tg
+import kurenai.imsyncbot.sqlClient
 import kurenai.imsyncbot.utils.withVT
 import org.babyfish.jimmer.sql.kt.ast.expression.eq
 import org.babyfish.jimmer.sql.kt.ast.expression.or
@@ -16,21 +17,21 @@ import org.babyfish.jimmer.sql.kt.ast.expression.valueIn
 object UserConfigRepository : BaseRepository<UserConfig, Long>() {
 
     suspend fun findByTg(tg: Long): UserConfig? = withVT {
-        createQuery<UserConfig> {
+        sqlClient.createQuery(UserConfig::class) {
             where(table.tg eq tg)
             select(table)
         }.fetchOneOrNull()
     }
 
     suspend fun findByQQ(qq: Long): UserConfig? = withVT {
-        createQuery<UserConfig> {
+        sqlClient.createQuery(UserConfig::class) {
             where(table.qq eq qq)
             select(table)
         }.fetchOneOrNull()
     }
 
     suspend fun findByTgOrQQ(id: Long): UserConfig? = withVT {
-        createQuery<UserConfig> {
+        sqlClient.createQuery(UserConfig::class) {
             where(or(table.tg eq id, table.qq eq id))
             select(table)
         }.fetchOneOrNull()
@@ -39,7 +40,7 @@ object UserConfigRepository : BaseRepository<UserConfig, Long>() {
     suspend fun findByTgOrQQ(tgIds: List<Long>, qqIds: List<Long>): List<UserConfig> = withVT {
         if (tgIds.isEmpty() && qqIds.isEmpty()) return@withVT emptyList()
 
-        createQuery<UserConfig> {
+        sqlClient.createQuery(UserConfig::class) {
             if (tgIds.isNotEmpty()) where(table.tg valueIn tgIds)
             if (qqIds.isNotEmpty()) where(table.qq valueIn qqIds)
             select(table)
@@ -47,7 +48,7 @@ object UserConfigRepository : BaseRepository<UserConfig, Long>() {
     }
 
     suspend fun findAll() = withVT {
-        createQuery<UserConfig> {
+        sqlClient.createQuery(UserConfig::class) {
             select(table)
         }.execute()
     }

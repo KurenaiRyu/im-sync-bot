@@ -52,7 +52,7 @@ object CommandDispatcher {
                     "该命令只允许私聊执行"
                 } else if (cmd.onlyGroupMessage && !(typeConstructor == ChatTypeBasicGroup.CONSTRUCTOR || typeConstructor == ChatTypeSupergroup.CONSTRUCTOR)) {
                     "该命令只允许群组执行"
-                } else if (cmd.onlyReply && message.replyToMessageId() != 0L) {
+                } else if (cmd.onlyReply && message.replyTo.messageId != 0L) {
                     "需要引用一条消息"
                 } else {
                     try {
@@ -71,7 +71,7 @@ object CommandDispatcher {
         }
 
         responseMsg?.takeIf { it.isNotBlank() }?.let {
-            bot.tg.sendMessageText(it, chat.id, parseMode, replayToMessageId = if (reply) message.id else null)
+            bot.tg.sendMessageText(it, chat.id, parseMode, replayToMessageId = if (reply) message.id else 0)
         }
     }
 
