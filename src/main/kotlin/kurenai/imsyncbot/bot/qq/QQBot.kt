@@ -141,16 +141,21 @@ class QQBot(
 
             log.info("Started qq-bot ${qqBot.nick}(${qqBot.id})")
         }
-        if (waitForInit) initBot()
-        else qqScope.launch { initBot() }
-        handleStatus()
+        val job = qqScope.launch {
+            initBot()
+        }
+
+        if (waitForInit) job.join()
+        qqScope.launch {
+            handleStatus()
+        }
     }
 
     context(bot: ImSyncBot)
-    private fun handleStatus() {
+    private suspend fun handleStatus() {
         var previous: BotStatus? = null
-        status.onEach {
-            if (bot.groupConfigService.defaultTgGroup < 0) return@onEach
+        status.collect {
+            if (bot.groupConfigService.defaultTgGroup < 0) return@collect
             when (it) {
                 Initializing -> {}
                 Running -> {
