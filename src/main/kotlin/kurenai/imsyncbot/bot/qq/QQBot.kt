@@ -191,14 +191,14 @@ class QQBot(
                     }
                     when (event) {
                         is FriendMessageEvent -> {
-//                            qqMessageHandler.onFriendMessage(
-//                                PrivateMessageContext(
-//                                    message,
-//                                    bot,
-//                                    event.message,
-//                                    event.friend,
-//                                )
-//                            )
+                            messageHandler.onFriendMessage(
+                                PrivateMessageContext(
+                                    message,
+                                    qqScope,
+                                    bot.configProperties.bot,
+                                    event,
+                                )
+                            )
                         }
 
                         is GroupTempMessageEvent -> {

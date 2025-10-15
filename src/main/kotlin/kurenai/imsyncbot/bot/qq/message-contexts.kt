@@ -145,8 +145,9 @@ class GroupMessageContext(
     }
     val normalType: Normal by lazy { Normal() }
 
-    fun getReadyToSendMessage() = if (::readyToSendMessage.isInitialized) readyToSendMessage
-    else handleType(messageChain).also { readyToSendMessage = it }
+    fun getReadyToSendMessage() =
+        if (::readyToSendMessage.isInitialized) readyToSendMessage
+        else handleType(messageChain).also { readyToSendMessage = it }
 
     @OptIn(MiraiExperimentalApi::class)
     private fun handleType(messageChain: MessageChain): ReadyToSendMessage {
