@@ -1,5 +1,6 @@
 package kurenai.imsyncbot.bot.qq
 
+import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -7,9 +8,11 @@ import kotlinx.coroutines.launch
 import kurenai.imsyncbot.BotProperties
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
+import kurenai.imsyncbot.service.FriendConfigService
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
 import net.mamoe.mirai.contact.remarkOrNameCardOrNick
+import net.mamoe.mirai.contact.remarkOrNick
 import net.mamoe.mirai.event.events.*
 
 class QQMessageHandler(
@@ -41,11 +44,6 @@ class QQMessageHandler(
         } else {
             sendMessage(list, context)
         }
-    }
-
-    context(bot: ImSyncBot)
-    fun onFriendMessage(context: PrivateMessageContext) {
-
     }
 
     private suspend fun sendMessage(list: List<GroupMessageContext>, context: GroupMessageContext) {
@@ -88,53 +86,22 @@ class QQMessageHandler(
         }
     }
 
-//    @Throws(Exception::class)
-//    override suspend fun onFriendMessage(context: PrivateMessageContext): Int {
-//
-//        val messageType = context.getType()
-//        val list = if (messageType is PrivateMessageContext.Forward) messageType.contextList else listOf(context)
-//        for (resolvedContext in list) {
-//            val type = resolvedContext.getType()
-//            val tg = bot.tg
-//            kotlin.runCatching {
-//                when (type) {
-//                    is PrivateMessageContext.JsonMessage -> type.telegramMessage.send(tg)
-//                    is PrivateMessageContext.GifImage -> type.getTelegramMessage().send(tg)
-//                    is PrivateMessageContext.MultiImage -> kotlin.runCatching {
-//                        type.getTelegramMessage().send(tg)
-//                    }.recoverCatching {
-//                        type.resolvedHttpUrlInvalidByModifyUrl().send(tg)
-//                    }.recover {
-//                        type.resolvedHttpUrlInvalidByLocalDownload().send(tg)
-//                    }.getOrThrow()
-//
-//                    is PrivateMessageContext.XmlMessage -> type.telegramMessage.send(tg)
-//                    is PrivateMessageContext.SingleImage -> kotlin.runCatching {
-//                        type.getTelegramMessage().send(tg)
-//                    }.recoverCatching {
-//                        type.resolvedHttpUrlInvalidByModifyUrl().send(tg)
-//                    }.recover {
-//                        type.resolvedHttpUrlInvalidByLocalDownload().send(tg)
-//                    }.getOrThrow()
-//
-//                    is PrivateMessageContext.Normal -> type.telegramMessage.send(tg)
-//                    else -> null
-//                }
-//            }.recoverCatching {
-//                resolvedContext.normalType.telegramMessage.send(tg)
-//            }.getOrThrow()?.also { message ->
-//                log.debug("${context.infoString} Sent ${mapper.writeValueAsString(message)}")
-//                if (context.entity == null) return@also
-//                if (message is Message) {
-//                    MessageService.cache(context.entity, context.messageChain, message)
-//                } else {
-//                    message as List<Message>
-//                    MessageService.cache(context.entity, context.messageChain, message.first())
-//                }
-//            }
-//        }
-//        return CONTINUE
-//    }
+    context(bot: ImSyncBot)
+    suspend fun onFriendMessage(context: PrivateMessageContext) {
+        val contents = context.handle()
+        val event = context.event
+        for (content in contents) {
+            bot.tg.send(params = TdApi.SendMessage().apply {
+                this.chatId = FriendConfigService.findByQQ(event.sender.id)?.telegramGroupId?: throw IllegalStateException("${event.sender.remarkOrNick}(${event.sender.id}) telegram mapping not found!")
+                this.inputMessageContent = content
+                context.replyMessage?.let {
+                    this.replyTo = TdApi.InputMessageReplyToMessage().apply {
+                        this.messageId = context.replyMessage?.id?:0
+                    }
+                }
+            })
+        }
+    }
 
     context(bot: ImSyncBot)
     suspend fun onRecall(event: MessageRecallEvent.GroupRecall): Int {

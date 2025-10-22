@@ -267,8 +267,8 @@ class TelegramBot(
             this.priority = priority
             this.synchronous = synchronous
         }
-        return if (synchronous) withVT { send(downloadFile) }
-        else send(downloadFile)
+        return if (synchronous) withVT { send(params = downloadFile) }
+        else send(params = downloadFile)
     }
 
     suspend inline fun getMessage(chatId: Long, messageId: Long): Message = send {
@@ -295,24 +295,17 @@ class TelegramBot(
 
     fun getUsername(): String = client.me.usernames.activeUsernames.first()
 
-    suspend inline fun <reified R : Object, reified Fun : TdFunction<R>> send(
-        function: Fun,
-        untilPersistent: Boolean = false,
-        timeout: Duration = DEFAULT_TIMEOUT
-    ): R = send(untilPersistent, timeout) { function }
-
     @OptIn(ExperimentalTime::class)
     suspend inline fun <R : Object> send(
         untilPersistent: Boolean = false,
         timeout: Duration = DEFAULT_TIMEOUT,
         crossinline block: () -> TdFunction<R>
     ): R {
-        val params = block()
-        return doSend(untilPersistent, timeout, params)
+        return send(untilPersistent, timeout, block())
     }
 
     @Suppress("UNCHECKED_CAST")
-    suspend fun <R: Object> doSend(
+    suspend fun <R: Object> send(
         untilPersistent: Boolean = false,
         timeout: Duration = DEFAULT_TIMEOUT,
         params: TdFunction<R>
@@ -340,7 +333,7 @@ class TelegramBot(
                 val seconds = ex.message!!.substringAfterLast(" ").toLongOrNull() ?: 5
                 log.warn("Wait for {}s", seconds)
                 delay(seconds * 1000)
-                return doSend(untilPersistent, timeout, params)
+                return send(untilPersistent, timeout, params)
             } else {
                 deferred?.completeExceptionally(ex)
                 throw ex

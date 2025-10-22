@@ -14,7 +14,7 @@ import kurenai.imsyncbot.utils.withVT
 import org.babyfish.jimmer.kt.new
 
 class GroupConfigService(
-    val bot: ImSyncBot,
+    private val bot: ImSyncBot,
 ) : AbstractConfig<GroupConfig>() {
 
     //TODO: resolve group change to supper group

@@ -1,6 +1,7 @@
 package kurenai.imsyncbot.service
 
 import it.tdlight.jni.TdApi
+import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.domain.QQTg
 import kurenai.imsyncbot.domain.by
@@ -17,6 +18,7 @@ import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.QuoteReply
+import net.mamoe.mirai.message.data.bot
 import net.mamoe.mirai.message.data.source
 import net.mamoe.mirai.message.sourceMessage
 import org.babyfish.jimmer.kt.new
@@ -68,6 +70,17 @@ object MessageService {
      */
     suspend fun cache(receipt: MessageReceipt<*>, message: TdApi.Message) {
         cache(receipt.source.plus(receipt.sourceMessage), arrayOf(message))
+    }
+
+    context(bot: ImSyncBot)
+    suspend fun findTgMessageByQQQuote(chain: MessageChain): TdApi.Message? {
+        return findRelationByQuote(chain)?.let { relation ->
+            runCatching {
+                bot.tg.getMessage(relation.tgGrpId, relation.tgMsgId)
+            }.onFailure {
+                log.error("findTgMessageByQQQuote", it)
+            }.getOrNull()
+        }
     }
 
     suspend fun findRelationByQuote(chain: MessageChain): QQTg? {

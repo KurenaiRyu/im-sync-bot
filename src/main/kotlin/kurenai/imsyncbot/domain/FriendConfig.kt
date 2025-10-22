@@ -10,6 +10,7 @@ interface FriendConfig {
     @Id
     @GeneratedValue(generatorType = SnowFlakeGenerator::class)
     val id: Long
+    val botId: Long
     val qqId: Long
     val name: String
     val telegramGroupId: Long

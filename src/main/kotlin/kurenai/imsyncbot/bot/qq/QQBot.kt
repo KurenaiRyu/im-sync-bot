@@ -5,7 +5,6 @@ import it.tdlight.jni.TdApi.TextEntity
 import it.tdlight.jni.TdApi.TextEntityTypeMentionName
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -61,7 +60,7 @@ class QQBot(
     private val loginLock = Mutex()
 
     lateinit var qqBot: Bot
-    private val messageDispatcher = MessageDispatcher(parentScope = qqScope, name = "qq-message-dispatcher")
+    private val messageDispatcher = MessageDispatcher(parentScope = qqScope, name = "qq-group-message-dispatcher")
 
     private suspend fun buildBot(): Bot {
         val url = "ws://${botProperties.qq.host}:${botProperties.qq.port}/"
@@ -234,10 +233,7 @@ class QQBot(
                 }
 
                 is MessageRecallEvent.GroupRecall -> {
-                    event.messageIds
-                    qqScope.launch {
-                        messageHandler.onRecall(event)
-                    }
+                    messageHandler.onRecall(event)
                 }
 
                 is GroupEvent -> {

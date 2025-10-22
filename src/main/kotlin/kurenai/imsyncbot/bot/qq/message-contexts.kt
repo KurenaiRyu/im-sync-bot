@@ -40,8 +40,8 @@ import kotlin.io.path.pathString
  */
 sealed class MessageContext(
     val entity: QQMessage?,
-    private val parentScope: CoroutineScope,
-    properties: BotProperties
+    protected val parentScope: CoroutineScope,
+    protected val properties: BotProperties
 ) {
 
     private var tgMsgFormat =
@@ -109,7 +109,7 @@ private const val MAX_IMAGE_RATIO = 2.7
 
 class GroupMessageContext(
     entity: QQMessage?,
-    val parentScope: CoroutineScope,
+    parentScope: CoroutineScope,
     val bot: ImSyncBot,
     val event: GroupAwareMessageEvent,
     val group: Group,
@@ -126,14 +126,10 @@ class GroupMessageContext(
     private val replayToMessageId: Long by lazy {
         runBlocking {
             // QuoteReply's source not contain target info
-            MessageService.findRelationByQuote(messageChain)?.also {
-                log.info("Find relation: $it")
-                runCatching {
-                    val message = bot.tg.getMessage(it.tgGrpId, it.tgGrpId)
-                    log.info("Find telegram message: $message")
-                }.getOrNull()
+            with(bot) {
+                MessageService.findTgMessageByQQQuote(messageChain)
             }
-        }?.tgMsgId ?: 0
+        }?.id ?: 0
     }
 
     val infoString by lazy { "[${group.name}(${this.group.id})]" }
@@ -336,7 +332,7 @@ class GroupMessageContext(
                     }
                 } else content
             }
-            return arrayOf(bot.tg.send(untilPersistent = true, function = func).also {
+            return arrayOf(bot.tg.send(untilPersistent = true, params = func).also {
                 // Send file if necessary
 //                if (!isGif && shouldBeFile && fileSize > 800 * 1024) {
 //                    parentScope.launch {
@@ -403,7 +399,7 @@ class GroupMessageContext(
                     }
                 }
             }
-            return bot.tg.send(func, untilPersistent = true).messages.also {
+            return bot.tg.send(untilPersistent = true, params = func).messages.also {
                 parentScope.launch {
                     FileService.cacheImage(images, it)
                 }
@@ -432,7 +428,7 @@ class GroupMessageContext(
                 this.replyTo.messageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContent = buildGifContent(info.inputFile)
             }
-            return arrayOf(bot.tg.send(func, untilPersistent = true).also {
+            return arrayOf(bot.tg.send(untilPersistent = true, params = func).also {
                 parentScope.launch {
                     FileService.cacheImage(info.id, it, info.type.toString())
                 }
@@ -460,7 +456,7 @@ class GroupMessageContext(
                     this.video = InputFileLocal(BotUtil.downloadDoc(name, url).pathString)
                 }
             }
-            return arrayOf(bot.tg.send(func, true))
+            return arrayOf(bot.tg.send(true, params = func))
         }
     }
 
@@ -477,7 +473,7 @@ class GroupMessageContext(
                     this.video = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
                 }
             }
-            return arrayOf(bot.tg.send(func, true))
+            return arrayOf(bot.tg.send(true, params = func))
         }
     }
 
@@ -497,7 +493,7 @@ class GroupMessageContext(
                     this.document = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
                 }
             }
-            return arrayOf(bot.tg.send(func, true))
+            return arrayOf(bot.tg.send(true, params = func))
         }
 
         private suspend fun getUrl(): String {

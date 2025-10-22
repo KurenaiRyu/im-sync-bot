@@ -28,7 +28,7 @@ fun String.escapeMarkdown(): String {
  */
 fun String.fmt(parseMode: ParseMode = ParseMode.MARKDOWN_V2): FormattedText = parseMode.ins?.let {
     runBlocking {
-        defaultTelegramBot.send(ParseTextEntities(this@fmt, it))
+        defaultTelegramBot.send(params = ParseTextEntities(this@fmt, it))
     }
 } ?: this.asFmtText()
 
