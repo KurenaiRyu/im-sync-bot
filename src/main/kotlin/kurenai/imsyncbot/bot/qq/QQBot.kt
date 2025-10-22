@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
 import kurenai.imsyncbot.bot.MessageDispatcher
 import kurenai.imsyncbot.exception.BotException
+import kurenai.imsyncbot.service.FriendConfigService
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil.toEntity
 import kurenai.imsyncbot.utils.getLogger

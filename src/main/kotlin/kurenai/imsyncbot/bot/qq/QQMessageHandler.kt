@@ -90,9 +90,10 @@ class QQMessageHandler(
     suspend fun onFriendMessage(context: PrivateMessageContext) {
         val contents = context.handle()
         val event = context.event
+        val chatId = FriendConfigService.findByQQ(event.sender.id)?.telegramGroupId?: return
         for (content in contents) {
             bot.tg.send(params = TdApi.SendMessage().apply {
-                this.chatId = FriendConfigService.findByQQ(event.sender.id)?.telegramGroupId?: throw IllegalStateException("${event.sender.remarkOrNick}(${event.sender.id}) telegram mapping not found!")
+                this.chatId = chatId
                 this.inputMessageContent = content
                 context.replyMessage?.let {
                     this.replyTo = TdApi.InputMessageReplyToMessage().apply {
