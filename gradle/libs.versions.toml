@@ -58,6 +58,7 @@ mirai-api = { group = "net.mamoe", name = "mirai-core-api" }
 mirai-utils = { group = "net.mamoe", name = "mirai-core-utils" }
 mirai-bridge-overflow = { group = "top.mrxiaom.mirai", name = "overflow-core", version = "1.0.7" }
 reflections = { group = "org.reflections", name = "reflections", version = "0.10.2" }
+okio = { group = "com.squareup.okio", name = "okio", version = "3.16.2" }
 
 [bundles]
 ktorClient = ["ktor-client-core", "ktor-client-okhttp", "ktor-serialization-kotlinx-json", "ktor-client-negotiation"]

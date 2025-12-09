@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.apache.commons.pool2)
     implementation(libs.apache.commons.lang3)
     implementation(libs.reflections)
+    implementation(libs.okio)
 
     //tdlib
     implementation(platform(libs.tdlight.bom))
