@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
-import kurenai.imsyncbot.bot.MessageDispatcher
+import kurenai.imsyncbot.utils.MessageDispatcher
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.service.FriendConfigService
 import kurenai.imsyncbot.service.MessageService

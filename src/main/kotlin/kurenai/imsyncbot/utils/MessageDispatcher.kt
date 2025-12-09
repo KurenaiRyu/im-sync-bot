@@ -1,11 +1,14 @@
-package kurenai.imsyncbot.bot
+package kurenai.imsyncbot.utils
 
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kurenai.imsyncbot.exception.BotException
-import kurenai.imsyncbot.utils.getLogger
-import net.mamoe.mirai.utils.ConcurrentHashMap
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 class MessageDispatcher(
@@ -61,7 +64,7 @@ class MessageDispatcher(
     }
 
     private fun addWorkerIfNeed(id: String) = workers.computeIfAbsent(id) {
-        val channel = Channel<suspend () -> Unit>(Channel.BUFFERED, BufferOverflow.SUSPEND)
+        val channel = Channel<suspend () -> Unit>(Channel.Factory.BUFFERED, BufferOverflow.SUSPEND)
         val job = parentScope.launch {
             for (f in channel) {
                 runCatching { f() }.onFailure { log.error("{}-{} execute error: {}", name, id, it.message, it) }
