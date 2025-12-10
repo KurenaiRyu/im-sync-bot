@@ -15,6 +15,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
 import okhttp3.internal.toHexString
+import okio.ByteString
 import org.reflections.Reflections
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -273,4 +274,10 @@ fun setEnv(newenv: Properties) {
             }
         }
     }
+}
+
+fun ByteString.crc32c(): Int {
+    val checksum = CRC32()
+    checksum.update(this.toByteArray())
+    return checksum.value.toInt()
 }
