@@ -64,7 +64,7 @@ class MessageDispatcher(
     }
 
     private fun addWorkerIfNeed(id: String) = workers.computeIfAbsent(id) {
-        val channel = Channel<suspend () -> Unit>(Channel.Factory.BUFFERED, BufferOverflow.SUSPEND)
+        val channel = Channel<suspend () -> Unit>(Channel.BUFFERED, BufferOverflow.SUSPEND)
         val job = parentScope.launch {
             for (f in channel) {
                 runCatching { f() }.onFailure { log.error("{}-{} execute error: {}", name, id, it.message, it) }

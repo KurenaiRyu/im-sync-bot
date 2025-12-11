@@ -9,11 +9,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
-import kurenai.imsyncbot.utils.MessageDispatcher
 import kurenai.imsyncbot.exception.BotException
-import kurenai.imsyncbot.service.FriendConfigService
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil.toEntity
+import kurenai.imsyncbot.utils.MessageDispatcher
+import kurenai.imsyncbot.utils.SpilloverChannel
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.Bot
 import net.mamoe.mirai.contact.nameCardOrNick
@@ -62,6 +62,7 @@ class QQBot(
 
     lateinit var qqBot: Bot
     private val messageDispatcher = MessageDispatcher(parentScope = qqScope, name = "qq-group-message-dispatcher")
+    private val channel = SpilloverChannel<String>("qq-event")
 
     private suspend fun buildBot(): Bot {
         val url = "ws://${botProperties.qq.host}:${botProperties.qq.port}/"
