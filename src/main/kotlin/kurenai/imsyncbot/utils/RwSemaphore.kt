@@ -3,9 +3,7 @@ package kurenai.imsyncbot.utils
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class WritePriorityRwMutex(
-    permits: Int = 1,
-) {
+class WritePriorityRwMutex {
 
     private val stateMutex = Mutex()
 
@@ -16,7 +14,7 @@ class WritePriorityRwMutex(
     private var writers = 0
     private var waitingWriters = 0
 
-    suspend fun <T> read(block: suspend () -> T): T {
+    suspend fun <T> withRead(block: suspend () -> T): T {
         readGate.withLock { stateMutex.withLock {
             readers++
             if (readers == 1) {
@@ -36,7 +34,7 @@ class WritePriorityRwMutex(
         }
     }
 
-    suspend fun write(block: suspend () -> Unit) {
+    suspend fun withWrite(block: suspend () -> Unit) {
         stateMutex.withLock {
             waitingWriters++
             if (waitingWriters == 1) {
