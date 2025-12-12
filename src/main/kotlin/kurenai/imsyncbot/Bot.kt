@@ -3,7 +3,6 @@ package kurenai.imsyncbot
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import it.tdlight.Init
-import kurenai.imsyncbot.bot.qq.QQMessageHandler
 import kurenai.imsyncbot.command.AbstractInlineCommand
 import kurenai.imsyncbot.command.AbstractQQCommand
 import kurenai.imsyncbot.command.AbstractTelegramCommand
@@ -12,7 +11,6 @@ import kurenai.imsyncbot.domain.UserConfig
 import kurenai.imsyncbot.jimmer.SqliteDialect
 import kurenai.imsyncbot.jimmer.scalar.GroupStatusScalarProvider
 import kurenai.imsyncbot.jimmer.scalar.UserStatusScalarProvider
-import kurenai.imsyncbot.reflections
 import kurenai.imsyncbot.utils.*
 import org.babyfish.jimmer.sql.event.TriggerType
 import org.babyfish.jimmer.sql.kt.KSqlClient
@@ -52,7 +50,7 @@ lateinit var sqlClient: KSqlClient
 internal lateinit var instants: MutableList<ImSyncBot>
 internal lateinit var imSyncBot: ImSyncBot
 
-fun main() {
+suspend fun main() {
     Init.init() //td-lib
     initProperties()
     initDB()

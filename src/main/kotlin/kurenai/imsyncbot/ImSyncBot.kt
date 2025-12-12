@@ -50,15 +50,13 @@ class ImSyncBot(
         configProxy()
     }
 
-    fun start() {
-        serverScope.launch {
-            log.info("Start im-sync-bot ...")
-            log.info("Telegram bot ${configProperties.bot.telegram.username}")
+    suspend fun start() {
+        log.info("Start im-sync-bot ...")
+        log.info("Telegram bot ${configProperties.bot.telegram.username}")
 //            log.info("QQ bot ${configProperties.bot.qq.account}")
-            tg.start()
-            qq.start()
+        tg.start()
+        qq.start()
 //            discord.start()
-        }
     }
 
     private fun configProxy(): Proxy? {
