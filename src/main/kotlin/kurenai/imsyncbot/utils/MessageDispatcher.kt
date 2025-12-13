@@ -10,13 +10,16 @@ import java.util.concurrent.atomic.AtomicInteger
 class MessageDispatcher(
     private val parentScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val idleTimeoutMillis: Long = 60_000L,
-    private val name: String = "MessageDispatcher-${count.getAndIncrement()}"
+    private val name: String = "MessageDispatcher-${count.getAndIncrement()}",
+    private val capacityEachChannel: Int = 64
 ) {
     private data class Worker(
         val id: String,
+        val name: String,
         val channel: Channel<suspend () -> Unit>,
         val job: Job
     ) {
+        val nameWithId = if (id == name) id else "$name($id)"
         var lastAccessTime: Long = 0L
     }
 
@@ -30,12 +33,12 @@ class MessageDispatcher(
                     if (now - worker.lastAccessTime > idleTimeoutMillis && worker.channel.isEmpty) {
                         workers.remove(worker.id)
                         worker.channel.close()
-                        log.debug("Clean worker({}-{})", name, worker.id)
+                        log.debug("Clean worker({}-{})", name, worker.nameWithId)
                     } else {
                         log.debug(
                             "Worker({}-{}) remaining idle timeout is {}s, channel empty: {}",
                             name,
-                            worker.id,
+                            worker.nameWithId,
                             (worker.lastAccessTime + idleTimeoutMillis - now) / 1000.0,
                             worker.channel.isEmpty
                         )
@@ -48,9 +51,8 @@ class MessageDispatcher(
         }
     }
 
-    tailrec suspend fun submit(id: String, task: suspend () -> Unit) {
-        val worker = addWorkerIfNeed(id)
-        log.debug("Worker({}-{}) reached full capacity", name, worker.id)
+    suspend fun submit(id: String, name: String = id, task: suspend () -> Unit) {
+        val worker = addWorkerIfNeed(id, name)
         worker.lastAccessTime = System.currentTimeMillis()
         try {
             return worker.channel.send(task)
@@ -60,7 +62,7 @@ class MessageDispatcher(
     }
 
     @OptIn(DelicateCoroutinesApi::class)
-    private fun addWorkerIfNeed(id: String): Worker = workers.compute(id) { key, prev ->
+    private fun addWorkerIfNeed(id: String, name: String): Worker = workers.compute(id) { key, prev ->
         if (prev != null && !(prev.channel.isClosedForSend)) return@compute prev
 
         val channel = Channel<suspend () -> Unit>(Channel.BUFFERED, BufferOverflow.SUSPEND)
@@ -69,11 +71,11 @@ class MessageDispatcher(
                 runCatching { f() }.onFailure { log.error("{}-{} execute error: {}", name, id, it.message, it) }
             }
         }
-        log.debug("New worker: {}-{}", name, id)
-        Worker(id, channel, job).also { w ->
+        Worker(id, name, channel, job).also { w ->
             channel.invokeOnClose {
                 workers.remove(w.id, w)
             }
+            log.debug("New worker: {}-{}", name, w.nameWithId)
         }
     }!!
 

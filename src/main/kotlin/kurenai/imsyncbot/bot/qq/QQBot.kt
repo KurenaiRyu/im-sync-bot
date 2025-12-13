@@ -61,7 +61,7 @@ class QQBot(
     private val loginLock = Mutex()
 
     lateinit var qqBot: Bot
-    private val messageDispatcher = MessageDispatcher(parentScope = qqScope, name = "qq-group-message-dispatcher")
+    private val messageDispatcher = MessageDispatcher(parentScope = qqScope, name = "qq")
 
     private suspend fun buildBot(): Bot {
         val url = "ws://${botProperties.qq.host}:${botProperties.qq.port}/"
@@ -128,14 +128,26 @@ class QQBot(
                     log.error(it.message, it)
                 }.getOrDefault(false)
             }.subscribeAlways<Event> { event ->
-                event.idWithGroupOrUserMark()?.also {
-                    messageDispatcher.submit(it) {
-                        handleEvent(event)
+                when (event) {
+                    is UserEvent -> {
+                        messageDispatcher.submit(
+                            id = event.user.id.toString(),
+                            name = event.user.nameCardOrNick
+                        ) {
+                            handleEvent(event)
+                        }
                     }
-                } ?: run {
-                    qqScope.launch {
-                        handleEvent(event)
+
+                    is GroupEvent -> {
+                        messageDispatcher.submit(
+                            id = event.group.id.toString(),
+                            name = event.group.name
+                        ) {
+                            handleEvent(event)
+                        }
                     }
+
+                    else -> {}
                 }
             }
 
@@ -307,7 +319,8 @@ class QQBot(
         else -> null
     }
 
-    private fun Event.id() = when (this) {
+    private val Event.subjectId
+        get() = when (this) {
         is GroupEvent -> {
             this.group.id
         }
