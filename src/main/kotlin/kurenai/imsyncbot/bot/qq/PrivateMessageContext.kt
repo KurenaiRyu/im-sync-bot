@@ -6,10 +6,8 @@ import kurenai.imsyncbot.BotProperties
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.service.FileService
-import kurenai.imsyncbot.service.FriendConfigService
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.asFmtText
-import net.mamoe.mirai.contact.remarkOrNick
+import kurenai.imsyncbot.utils.telegram.asFmtText
 import net.mamoe.mirai.event.events.FriendMessageEvent
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl

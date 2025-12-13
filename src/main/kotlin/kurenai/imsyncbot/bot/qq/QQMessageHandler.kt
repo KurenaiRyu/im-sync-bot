@@ -3,16 +3,15 @@ package kurenai.imsyncbot.bot.qq
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kurenai.imsyncbot.BotProperties
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.handler.Handler.Companion.CONTINUE
 import kurenai.imsyncbot.service.FriendConfigService
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.*
+import kurenai.imsyncbot.utils.getLogger
+import kurenai.imsyncbot.utils.telegram.*
 import net.mamoe.mirai.contact.remarkOrNameCardOrNick
-import net.mamoe.mirai.contact.remarkOrNick
 import net.mamoe.mirai.event.events.*
 
 class QQMessageHandler(

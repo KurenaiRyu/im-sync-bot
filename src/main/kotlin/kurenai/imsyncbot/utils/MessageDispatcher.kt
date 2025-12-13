@@ -1,12 +1,8 @@
 package kurenai.imsyncbot.utils
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kurenai.imsyncbot.exception.BotException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -52,18 +48,21 @@ class MessageDispatcher(
         }
     }
 
-    tailrec fun submit(id: String, task: suspend () -> Unit) {
+    tailrec suspend fun submit(id: String, task: suspend () -> Unit) {
         val worker = addWorkerIfNeed(id)
+        log.debug("Worker({}-{}) reached full capacity", name, worker.id)
         worker.lastAccessTime = System.currentTimeMillis()
-        val result = worker.channel.trySend(task)
-        if (result.isClosed) {
-            submit(id, task)
-        } else if (result.isFailure) {
-            throw BotException("Dispatch message($id) failed", result.exceptionOrNull())
+        try {
+            return worker.channel.send(task)
+        } catch (e: Exception) {
+            throw BotException("Dispatch message($id) failed", e)
         }
     }
 
-    private fun addWorkerIfNeed(id: String) = workers.computeIfAbsent(id) {
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun addWorkerIfNeed(id: String): Worker = workers.compute(id) { key, prev ->
+        if (prev != null && !(prev.channel.isClosedForSend)) return@compute prev
+
         val channel = Channel<suspend () -> Unit>(Channel.BUFFERED, BufferOverflow.SUSPEND)
         val job = parentScope.launch {
             for (f in channel) {
@@ -71,8 +70,12 @@ class MessageDispatcher(
             }
         }
         log.debug("New worker: {}-{}", name, id)
-        Worker(id, channel, job)
-    }
+        Worker(id, channel, job).also { w ->
+            channel.invokeOnClose {
+                workers.remove(w.id, w)
+            }
+        }
+    }!!
 
 
     companion object {

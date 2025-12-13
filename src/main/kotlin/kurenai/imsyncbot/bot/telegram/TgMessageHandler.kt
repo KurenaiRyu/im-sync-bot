@@ -17,6 +17,8 @@ import kurenai.imsyncbot.repository.QQTgRepository
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
 import kurenai.imsyncbot.utils.BotUtil.toSource
+import kurenai.imsyncbot.utils.telegram.messageId
+import kurenai.imsyncbot.utils.telegram.userSender
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
 import net.mamoe.mirai.message.data.MessageSource.Key.recall

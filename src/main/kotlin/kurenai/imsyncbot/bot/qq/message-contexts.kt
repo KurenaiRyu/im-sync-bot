@@ -15,8 +15,14 @@ import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.service.FileService
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.*
+import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.BotUtil.formatUsername
+import kurenai.imsyncbot.utils.ImageUtil
+import kurenai.imsyncbot.utils.telegram.asFmtText
+import kurenai.imsyncbot.utils.telegram.escapeMarkdown
+import kurenai.imsyncbot.utils.telegram.fmt
+import kurenai.imsyncbot.utils.telegram.replyToMessageId
+import kurenai.imsyncbot.utils.toHex
 import net.mamoe.mirai.contact.*
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.GroupTempMessageEvent
@@ -324,7 +330,7 @@ class GroupMessageContext(
 
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this.replyTo.messageId = this@GroupMessageContext.replayToMessageId
+                this.replyToMessageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContent = if (type == ImageUtil.ImageType.GIF) {
                     InputMessageAnimation().apply {
                         this.caption = content.caption
@@ -384,7 +390,7 @@ class GroupMessageContext(
             val formattedText = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
             val func = SendMessageAlbum().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this.replyTo.messageId = this@GroupMessageContext.replayToMessageId
+                this.replyToMessageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContents = buildContents().also {
                     when (val last = it.last()) {
                         is InputMessageDocument -> {
@@ -425,7 +431,7 @@ class GroupMessageContext(
             val info = FileService.download(image, "gif")
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this.replyTo.messageId = this@GroupMessageContext.replayToMessageId
+                this.replyToMessageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContent = buildGifContent(info.inputFile)
             }
             return arrayOf(bot.tg.send(untilPersistent = true, params = func).also {
@@ -449,7 +455,7 @@ class GroupMessageContext(
             val url = shortVideo.urlForDownload
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this.replyTo.messageId = this@GroupMessageContext.replayToMessageId
+                this.replyToMessageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContent = InputMessageVideo().apply {
                     this.caption = "${shortVideo.filename}.${shortVideo.fileFormat}"
                         .escapeMarkdown().formatMsg(senderId, senderName).fmt()
@@ -467,7 +473,7 @@ class GroupMessageContext(
             require(url != null) { "获取视频地址失败" }
             val func = SendMessage().apply {
                 this.chatId = this@GroupMessageContext.chatId
-                this.replyTo.messageId = this@GroupMessageContext.replayToMessageId
+                this.replyToMessageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContent = InputMessageVideo().apply {
                     this.caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
                     this.video = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)

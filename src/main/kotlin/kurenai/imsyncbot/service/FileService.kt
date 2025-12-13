@@ -12,6 +12,7 @@ import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.FileCacheRepository
 import kurenai.imsyncbot.utils.*
 import kurenai.imsyncbot.utils.BotUtil.getImagePath
+import kurenai.imsyncbot.utils.telegram.file
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.utils.MiraiInternalApi

@@ -6,7 +6,11 @@ import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.exception.CommandException
 import kurenai.imsyncbot.service.Permission
 import kurenai.imsyncbot.tgCommands
-import kurenai.imsyncbot.utils.*
+import kurenai.imsyncbot.utils.getLogger
+import kurenai.imsyncbot.utils.telegram.ParseMode
+import kurenai.imsyncbot.utils.telegram.messageId
+import kurenai.imsyncbot.utils.telegram.text
+import kurenai.imsyncbot.utils.telegram.userSender
 
 object CommandDispatcher {
 

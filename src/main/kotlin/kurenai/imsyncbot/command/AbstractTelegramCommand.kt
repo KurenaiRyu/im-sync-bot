@@ -3,7 +3,7 @@ package kurenai.imsyncbot.command
 import it.tdlight.jni.TdApi.Message
 import it.tdlight.jni.TdApi.MessageSenderUser
 import kurenai.imsyncbot.ImSyncBot
-import kurenai.imsyncbot.utils.ParseMode
+import kurenai.imsyncbot.utils.telegram.ParseMode
 
 abstract class AbstractTelegramCommand {
 

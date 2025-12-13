@@ -10,7 +10,7 @@ import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.UserConfigRepository
 import kurenai.imsyncbot.utils.getLogger
-import kurenai.imsyncbot.utils.isBot
+import kurenai.imsyncbot.utils.telegram.isBot
 import org.babyfish.jimmer.kt.new
 
 /**

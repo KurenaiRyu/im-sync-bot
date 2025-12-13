@@ -6,7 +6,9 @@ import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.dfs
 import kurenai.imsyncbot.service.MessageService
-import kurenai.imsyncbot.utils.*
+import kurenai.imsyncbot.utils.BotUtil
+import kurenai.imsyncbot.utils.telegram.*
+import kurenai.imsyncbot.utils.withVT
 import net.mamoe.mirai.message.data.sourceOrNull
 import java.time.Instant
 import java.time.ZoneId

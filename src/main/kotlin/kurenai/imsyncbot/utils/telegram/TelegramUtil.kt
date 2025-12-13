@@ -1,4 +1,4 @@
-package kurenai.imsyncbot.utils
+package kurenai.imsyncbot.utils.telegram
 
 import it.tdlight.jni.TdApi.*
 import kotlinx.coroutines.runBlocking
@@ -219,25 +219,6 @@ fun Update.info(): String {
     }
 }
 
-//////////////  message reply  //////////////
-
-var InputMessageReplyTo.messageId: Long
-    get() = (this as? InputMessageReplyToMessage)?.messageId ?: 0
-    set(id) = run {
-        if (this is InputMessageReplyToMessage) this.messageId = id
-    }
-
-var MessageReplyTo.messageId: Long
-    get() = (this as? MessageReplyToMessage)?.messageId ?: 0
-    set(id) = run {
-        if (this is MessageReplyToMessage) this.messageId = id
-    }
-
-var MessageReplyTo.chatId: Long
-    get() = (this as? MessageReplyToMessage)?.chatId ?: 0
-    set(id) = run {
-        if (this is MessageReplyToMessage) this.chatId = id
-    }
 
 enum class ParseMode(val ins: TextParseMode?) {
     TEXT(null),

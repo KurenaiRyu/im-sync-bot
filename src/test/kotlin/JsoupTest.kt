@@ -1,4 +1,4 @@
-import kurenai.imsyncbot.utils.escapeMarkdown
+import kurenai.imsyncbot.utils.telegram.escapeMarkdown
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 import org.junit.jupiter.api.Assertions.assertEquals

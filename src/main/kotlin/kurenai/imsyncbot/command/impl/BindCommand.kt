@@ -6,7 +6,8 @@ import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.service.isAdmin
 import kurenai.imsyncbot.service.isSuperAdmin
-import kurenai.imsyncbot.utils.*
+import kurenai.imsyncbot.utils.getLogger
+import kurenai.imsyncbot.utils.telegram.*
 import net.mamoe.mirai.message.data.sourceOrNull
 
 private val log = getLogger()

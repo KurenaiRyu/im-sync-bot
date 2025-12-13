@@ -12,7 +12,10 @@ import kotlinx.coroutines.flow.update
 import kurenai.imsyncbot.*
 import kurenai.imsyncbot.bot.telegram.TgMessageHandler.ListenerResult
 import kurenai.imsyncbot.service.FileService
-import kurenai.imsyncbot.utils.*
+import kurenai.imsyncbot.utils.BotUtil
+import kurenai.imsyncbot.utils.getLogger
+import kurenai.imsyncbot.utils.telegram.*
+import kurenai.imsyncbot.utils.withVT
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
@@ -145,7 +148,7 @@ class TelegramBot(
         untilPersistent: Boolean = false,
     ): TdApi.Message = send(untilPersistent) {
         messageText(formattedText, chatId).apply {
-            this.replyTo.messageId = replyToMessageId
+            this.replyToMessageId = replyToMessageId
             this.messageThreadId = messageThreadId
         }
     }
@@ -176,7 +179,7 @@ class TelegramBot(
         untilPersistent: Boolean = false,
     ): Message {
         SendMessage().apply {
-            this.replyTo.messageId = replyToMessageId
+            this.replyToMessageId = replyToMessageId
             this.messageThreadId = messageThreadId
             this.inputMessageContent = InputMessagePhoto().apply {
                 this.photo = FileService.download(url).inputFile
@@ -185,7 +188,7 @@ class TelegramBot(
         }
         return send(untilPersistent = untilPersistent) {
             messageText(formattedText, chatId).apply {
-                this.replyTo.messageId = replyToMessageId
+                this.replyToMessageId = replyToMessageId
                 this.messageThreadId = messageThreadId
             }
         }
@@ -203,7 +206,7 @@ class TelegramBot(
         path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
         SendMessage().apply {
             this.chatId = chatId
-            this.replyTo.messageId = replyToMessageId
+            this.replyToMessageId = replyToMessageId
             this.inputMessageContent = InputMessagePhoto().apply {
                 this.caption = formattedText
                 this.photo = InputFileLocal(path.pathString)
@@ -223,7 +226,7 @@ class TelegramBot(
         path.writeBytes(data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
         SendMessage().apply {
             this.chatId = chatId
-            this.replyTo.messageId = replyToMessageId
+            this.replyToMessageId = replyToMessageId
             this.inputMessageContent = InputMessageVideo().apply {
                 this.caption = formattedText
                 this.video = InputFileLocal(path.pathString)
@@ -396,7 +399,7 @@ class TelegramBot(
 
             send {
                 messageText(errorMsg.asFmtText(), message.chatId).apply {
-                    this.replyTo.messageId = message.id
+                    this.replyToMessageId = message.id
                     this.options = MessageSendOptions().apply {
                         this.fromBackground = true
                     }
