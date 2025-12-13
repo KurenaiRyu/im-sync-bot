@@ -20,6 +20,7 @@ import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.At
 import net.mamoe.mirai.message.data.PlainText
+import org.slf4j.LoggerFactory
 import top.mrxiaom.overflow.BotBuilder
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -67,7 +68,7 @@ class QQBot(
         log.info("Connecting to $url")
         return BotBuilder.positive(url)
             .token(botProperties.qq.token)
-            .overrideLogger(log)
+            .overrideLogger(LoggerFactory.getLogger("net.mamoe.mirai.Bot"))
             .connect() ?: throw BotException("Connect to $url fail!")
     }
 
