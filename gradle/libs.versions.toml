@@ -56,7 +56,7 @@ jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "
 mirai-bom = { group = "net.mamoe", name = "mirai-bom", version.ref = "mirai" }
 mirai-api = { group = "net.mamoe", name = "mirai-core-api" }
 mirai-utils = { group = "net.mamoe", name = "mirai-core-utils" }
-mirai-bridge-overflow = { group = "top.mrxiaom.mirai", name = "overflow-core", version = "1.0.7" }
+mirai-bridge-overflow = { group = "top.mrxiaom.mirai", name = "overflow-core", version = "1.0.8" }
 reflections = { group = "org.reflections", name = "reflections", version = "0.10.2" }
 okio = { group = "com.squareup.okio", name = "okio", version = "3.16.2" }
 
