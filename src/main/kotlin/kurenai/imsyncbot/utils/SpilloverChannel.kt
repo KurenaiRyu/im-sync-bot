@@ -8,20 +8,15 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ChannelResult
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.Json
 import okio.ByteString
 import okio.ByteString.Companion.encodeUtf8
 import kotlin.math.min
 
 class SpilloverChannel<V> (
     val name: String,
-    val serializer: Serializer<V>,
     val capacity: Int = 64,
     val folder: String = "./messages",
-    val json: Json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    },
+    val serializerSupplier: () -> Serializer<V>,
 ): Closeable {
 
     private val lock = WritePriorityRwMutex()
@@ -29,6 +24,7 @@ class SpilloverChannel<V> (
     private val diskQueue = DiskQueue(folder, name, json)
     private val bufferChannel = Channel<V>(capacity)
     private val fetchDiskQueueNum = min(capacity, 20)
+    private val serializer = serializerSupplier()
 
     suspend fun receive(): V = lock.withRead {
         restoreFromDiskIfNeed()

@@ -13,9 +13,13 @@ import kurenai.imsyncbot.*
 import kurenai.imsyncbot.bot.telegram.TgMessageHandler.ListenerResult
 import kurenai.imsyncbot.service.FileService
 import kurenai.imsyncbot.utils.BotUtil
+import kurenai.imsyncbot.utils.SpilloverChannel
+import kurenai.imsyncbot.utils.buildSerialize
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.telegram.*
 import kurenai.imsyncbot.utils.withVT
+import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
@@ -74,6 +78,21 @@ class TelegramBot(
                 }
     )
 
+    private val channel = SpilloverChannel<TdApi.Object>("telegramChannel") {
+        object : SpilloverChannel.Serializer<TdApi.Object> {
+            override fun serialize(value: Object): ByteString {
+                return value.serialize().toByteString()
+            }
+
+            override fun deserialize(byteString: ByteString): Object? {
+                return runCatching {
+
+                }
+            }
+
+        }
+    }
+
     internal val messageHandler: TgMessageHandler = TgMessageHandler(botProperties, tgScope)
 
     val status = MutableStateFlow<BotStatus>(Initializing)
@@ -121,6 +140,8 @@ class TelegramBot(
                 }
             }
         }
+
+
     }
 
     fun <R : TdApi.Object?, Event : TdApi.Update> addListener(
