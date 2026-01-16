@@ -62,6 +62,7 @@ dependencies {
     implementation(libs.apache.commons.lang3)
     implementation(libs.reflections)
     implementation(libs.okio)
+    implementation(libs.moshi)
 
     //tdlib
     implementation(platform(libs.tdlight.bom))
