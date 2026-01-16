@@ -29,7 +29,7 @@ class BindCommand : AbstractTelegramCommand() {
         return if (chat.type.constructor == ChatTypeSupergroup.CONSTRUCTOR
             || chat.type.constructor == ChatTypeBasicGroup.CONSTRUCTOR
         ) {
-            if (message.replyTo.messageId != 0L) {
+            if ((message.replyTo?.messageId ?: 0) != 0L) {
                 runCatching {
                     tg.getMessage(message.replyTo.chatId, message.replyTo.messageId).let { replyMessage ->
                         if (param.isNotBlank()) {
@@ -103,7 +103,7 @@ class UnbindCommand : AbstractTelegramCommand() {
                 "参数错误"
             }
         } else {
-            if (message.replyTo.messageId != 0L) {
+            if ((message.replyTo?.messageId ?: 0) != 0L) {
                 bot.tg.getMessage(message.replyTo.chatId!!, message.replyTo.messageId!!)?.let { reply ->
                     val userId = reply.userSender()?.userId!!
                     if (userId == bot.tg.getMe().id) {

@@ -56,7 +56,7 @@ object CommandDispatcher {
                     "该命令只允许私聊执行"
                 } else if (cmd.onlyGroupMessage && !(typeConstructor == ChatTypeBasicGroup.CONSTRUCTOR || typeConstructor == ChatTypeSupergroup.CONSTRUCTOR)) {
                     "该命令只允许群组执行"
-                } else if (cmd.onlyReply && message.replyTo.messageId != 0L) {
+                } else if (cmd.onlyReply && (message.replyTo?.messageId ?: 0) != 0L) {
                     "需要引用一条消息"
                 } else {
                     try {

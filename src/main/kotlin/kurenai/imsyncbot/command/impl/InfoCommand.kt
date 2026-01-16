@@ -28,8 +28,8 @@ class InfoCommand : AbstractTelegramCommand() {
         input: String
     ): String? {
         val qqBot = bot.qq.qqBot
-        val replyToMessageId = message.replyTo.messageId
-        return if (replyToMessageId != null) {
+        val replyToMessageId = message.replyTo?.messageId ?: 0
+        return if (replyToMessageId > 0) {
             val replyMessage = bot.tg.getMessage(message.chatId, replyToMessageId)
             if (sender.userId == bot.tg.getMe().id) {
                 val qqMsgSource = MessageService.findQQByTg(replyMessage)?.sourceOrNull
