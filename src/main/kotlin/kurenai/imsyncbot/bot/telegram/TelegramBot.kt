@@ -2,7 +2,6 @@ package kurenai.imsyncbot.bot.telegram
 
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.sksamuel.aedile.core.asCache
-import com.sksamuel.aedile.core.caffeineBuilder
 import it.tdlight.client.*
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.*
@@ -11,15 +10,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kurenai.imsyncbot.*
 import kurenai.imsyncbot.bot.telegram.TgMessageHandler.ListenerResult
+import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.service.FileService
 import kurenai.imsyncbot.utils.BotUtil
-import kurenai.imsyncbot.utils.SpilloverChannel
-import kurenai.imsyncbot.utils.buildSerialize
 import kurenai.imsyncbot.utils.getLogger
 import kurenai.imsyncbot.utils.telegram.*
 import kurenai.imsyncbot.utils.withVT
-import okio.ByteString
-import okio.ByteString.Companion.toByteString
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
@@ -31,7 +27,6 @@ import kotlin.coroutines.resumeWithException
 import kotlin.io.path.pathString
 import kotlin.io.path.writeBytes
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import it.tdlight.jni.TdApi.Function as TdFunction
@@ -78,21 +73,6 @@ class TelegramBot(
                 }
     )
 
-    private val channel = SpilloverChannel<TdApi.Object>("telegramChannel") {
-        object : SpilloverChannel.Serializer<TdApi.Object> {
-            override fun serialize(value: Object): ByteString {
-                return value.serialize().toByteString()
-            }
-
-            override fun deserialize(byteString: ByteString): Object? {
-                return runCatching {
-
-                }
-            }
-
-        }
-    }
-
     internal val messageHandler: TgMessageHandler = TgMessageHandler(botProperties, tgScope)
 
     val status = MutableStateFlow<BotStatus>(Initializing)
@@ -100,10 +80,10 @@ class TelegramBot(
 
     val disposableHandlers = LinkedList<TelegramDisposableHandler>()
 
-    val editedMessages = caffeineBuilder<String, Boolean> {
-        maximumSize = 50
-        expireAfterWrite = 1.minutes
-    }.build()
+    val editedMessages = Caffeine.newBuilder()
+        .maximumSize(50)
+        .expireAfterWrite(1, TimeUnit.MINUTES)
+        .asCache<String, Boolean>()
 
     val pendingMessage = Caffeine.newBuilder()
         .maximumSize(50)
@@ -336,37 +316,38 @@ class TelegramBot(
     ): R {
         var deferred: CompletableDeferred<Message>? = null
         var result: R? = null
-        try {
-            result = withTimeout(timeout) {
-                client.sendSuspend(params)
-            }
-
-            if (untilPersistent && result is Message &&
-                result.sendingState.constructor == MessageSendingStatePending.CONSTRUCTOR
-            ) {
-                deferred = CompletableDeferred()
-                pendingMessage[result.id] = deferred
+        while (status.value is Running) {
+            try {
                 return withTimeout(timeout) {
-                    deferred.await() as R
+                    result = client.sendSuspend(params)
+
+                    if (untilPersistent && result is Message &&
+                        result.sendingState.constructor == MessageSendingStatePending.CONSTRUCTOR
+                    ) {
+                        deferred = CompletableDeferred()
+                        pendingMessage[result.id] = deferred
+                        deferred.await() as R
+                    } else {
+                        result
+                    }
                 }
-            } else {
-                return result
-            }
-        } catch (ex: Throwable) {
-            if (ex.message?.contains("retry after") == true) {
-                val seconds = ex.message!!.substringAfterLast(" ").toLongOrNull() ?: 5
-                log.warn("Wait for {}s", seconds)
-                delay(seconds * 1000)
-                return send(untilPersistent, timeout, params)
-            } else {
-                deferred?.completeExceptionally(ex)
-                throw ex
-            }
-        } finally {
-            if (deferred?.isCompleted?:false && result != null && result is Message) {
-                pendingMessage.invalidate(result.id)
+            } catch (ex: Throwable) {
+                if (ex.message?.contains("retry after") == true) {
+                    val seconds = ex.message!!.substringAfterLast(" ").toLongOrNull() ?: 5
+                    log.warn("Wait for {}s", seconds)
+                    delay(seconds * 1000)
+                    continue
+                } else {
+                    deferred?.completeExceptionally(ex)
+                    throw ex
+                }
+            } finally {
+                if (deferred?.isCompleted ?: false && result != null && result is Message) {
+                    pendingMessage.invalidate(result.id)
+                }
             }
         }
+        throw BotException("Telegram not in running: ${status.value}")
     }
 
     suspend inline fun <R : Object> SimpleTelegramClient.sendSuspend(
@@ -430,4 +411,10 @@ class TelegramBot(
             log.error("Report error failed: {}", message.toString().trim(), e)
         }
     }
+
+    private data class TdRequest<R : TdApi.Object>(
+        val untilPersistent: Boolean = false,
+        val timeout: Duration = DEFAULT_TIMEOUT,
+        val params: TdFunction<R>
+    )
 }
