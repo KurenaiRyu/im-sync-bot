@@ -10,6 +10,8 @@ jimmer = "0.9.111"
 jackson = "2.19.2"
 mirai = "2.16.0"
 serialize-xml = "0.91.2"
+vertx = "5.0.6"
+moshi = "1.15.2"
 
 [libraries]
 kotlin-bom = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "ktolin" }
@@ -59,8 +61,12 @@ mirai-utils = { group = "net.mamoe", name = "mirai-core-utils" }
 mirai-bridge-overflow = { group = "top.mrxiaom.mirai", name = "overflow-core", version = "1.0.8" }
 reflections = { group = "org.reflections", name = "reflections", version = "0.10.2" }
 okio = { group = "com.squareup.okio", name = "okio", version = "3.16.2" }
-moshi = { group = "com.squareup.moshi", name = "moshi-kotlin", version = "1.15.2" }
-moshi-codegen = { group = "com.squareup.moshi", name = "moshi-kotlin-codegen", version = "1.15.2" }
+moshi = { group = "com.squareup.moshi", name = "moshi-kotlin", version.ref = "moshi" }
+moshi-codegen = { group = "com.squareup.moshi", name = "moshi-kotlin-codegen", version.ref = "moshi" }
+vertx-bom = { group = "io.vertx", name = "vertx-stack-depchain", version.ref = "vertx" }
+vertx-web = { group = "io.vertx", name = "vertx-web" }
+vertx-kotlin = { group = "io.vertx", name = "vertx-lang-kotlin" }
+vertx-kotlin-coroutines = { group = "io.vertx", name = "vertx-lang-kotlin-coroutines" }
 
 [bundles]
 ktorClient = ["ktor-client-core", "ktor-client-okhttp", "ktor-serialization-kotlinx-json", "ktor-client-negotiation"]

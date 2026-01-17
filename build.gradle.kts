@@ -64,6 +64,12 @@ dependencies {
     implementation(libs.okio)
     implementation(libs.moshi)
 
+    // web
+    implementation(platform(libs.vertx.bom))
+    implementation(libs.vertx.web)
+    implementation(libs.vertx.kotlin)
+    implementation(libs.vertx.kotlin.coroutines)
+
     //tdlib
     implementation(platform(libs.tdlight.bom))
     implementation(libs.tdlight)
@@ -75,7 +81,8 @@ dependencies {
 //        else -> throw GradleException("[$hostOs] is not support!")
 //    }
 //    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
-    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "windows_amd64")
+    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "linux_amd64_gnu_ssl3")
+//    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "windows_amd64")
 
     testImplementation(kotlin("test"))
 }

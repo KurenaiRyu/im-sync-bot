@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.*
 import kurenai.imsyncbot.exception.BotException
+import kurenai.imsyncbot.service.HttpFileService
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil.toEntity
 import kurenai.imsyncbot.utils.MessageDispatcher
@@ -33,7 +34,7 @@ class QQBot(
 
     companion object {
         init {
-            LocalFileService.register()
+            HttpFileService.register()
         }
 
         private val log = getLogger()

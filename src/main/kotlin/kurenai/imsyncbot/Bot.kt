@@ -2,6 +2,7 @@ package kurenai.imsyncbot
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import io.vertx.core.Vertx
 import it.tdlight.Init
 import kurenai.imsyncbot.command.AbstractInlineCommand
 import kurenai.imsyncbot.command.AbstractQQCommand
@@ -46,6 +47,7 @@ internal val qqCommands = ArrayList<AbstractQQCommand>()
 internal val inlineCommands = HashMap<String, AbstractInlineCommand>()
 lateinit var configProperties: ConfigProperties
 lateinit var sqlClient: KSqlClient
+lateinit var vertx: Vertx
 
 internal lateinit var instants: MutableList<ImSyncBot>
 internal lateinit var imSyncBot: ImSyncBot
@@ -54,6 +56,7 @@ suspend fun main() {
     Init.init() //td-lib
     initProperties()
     initDB()
+    initFileServer()
     imSyncBot = ImSyncBot(configProperties)
     imSyncBot.start()
     commonInit()
@@ -72,6 +75,11 @@ private fun initProperties() {
 
     val configPath = Path.of("config.yaml")
     configProperties = yamlMapper.readValue(Files.readString(configPath), ConfigProperties::class.java)
+}
+
+private suspend fun initFileServer() {
+    vertx = Vertx.vertx()
+    vertx.deployVerticle(WebApplication::class.qualifiedName)
 }
 
 private fun initDB() {

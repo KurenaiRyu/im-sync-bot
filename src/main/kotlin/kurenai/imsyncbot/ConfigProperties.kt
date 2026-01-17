@@ -19,6 +19,12 @@ data class ConfigProperties(
 )
 
 @Serializable
+data class FileServerProperties(
+    val host: String = "localhost",
+    val port: Int = 13060,
+)
+
+@Serializable
 data class RedisProperties(
     val url: String? = null,
     val host: String = "redis",
@@ -40,6 +46,7 @@ data class BotProperties(
     val privateChatChannel: Long = 0L,
     val picToFileSize: Long = 2,
     val enableRecall: Boolean = true,
+    val fileServer: FileServerProperties = FileServerProperties(),
 )
 
 @Serializable
