@@ -39,6 +39,7 @@ object HttpUtil {
         if (size < 1024 * 1024 * 100) {
             withContext(Dispatchers.VT) {
                 path.parent.createDirectories()
+
                 client.get(url).body<InputStream>().buffered().use { input ->
                     path.outputStream(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING).buffered().use {
                         input.copyTo(it)
