@@ -1,2 +1,2 @@
 #!/bin/bash
-java -Xms150m -Xmx300m -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dconsole.encoding=UTF-8 -jar im-sync-bot.jar
+java -Xms100m -Xmx200m -XX:SoftMaxHeapSize=130M -XX:+UseZGC -XX:StartFlightRecording=filename=./logs/im-sync-bot.jfr,settings=profile,maxsize=1G,maxage=1h,jdk.ObjectCount#enabled=true -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dconsole.encoding=UTF-8 --enable-native-access=ALL-UNNAMED -jar im-sync-bot.jar
