@@ -84,27 +84,23 @@ private suspend fun initFileServer() {
 }
 
 private fun initDB() {
+    val initSql =
+        Bot::class.java.getResourceAsStream("/init.sql").buffered().use { stream -> stream.readAllBytes() }
+            .decodeToString()
+
     val config = HikariConfig()
     config.jdbcUrl = "jdbc:sqlite:im-sync-bot.db"
     config.driverClassName = "org.sqlite.JDBC"
     config.isAutoCommit = true
     config.maximumPoolSize = 1
-
-    val simpleConnectionManager = ConnectionManager.simpleConnectionManager(HikariDataSource(config))
-
-    val initSql =
-        Bot::class.java.getResourceAsStream("/init.sql").buffered().use { stream -> stream.readAllBytes() }
-            .decodeToString()
-    simpleConnectionManager.execute { con ->
-        con.nativeSQL(initSql)
-    }
+    config.connectionInitSql = initSql
 
     sqlClient = newKSqlClient {
         setTriggerType(TriggerType.BINLOG_ONLY)
         setDialect(SqliteDialect())
         setScalarProvider(GroupConfig::status, GroupStatusScalarProvider())
         setScalarProvider(UserConfig::status, UserStatusScalarProvider())
-        setConnectionManager(simpleConnectionManager)
+        setConnectionManager(ConnectionManager.simpleConnectionManager(HikariDataSource(config)))
     }
 }
 
