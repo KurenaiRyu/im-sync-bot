@@ -13,6 +13,8 @@ interface FriendConfig {
     val botId: Long
     val qqId: Long
     val name: String
+
+    @Key
     val telegramGroupId: Long
 
     @Version

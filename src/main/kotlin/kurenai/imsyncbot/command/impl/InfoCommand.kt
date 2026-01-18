@@ -5,10 +5,13 @@ import it.tdlight.jni.TdApi.UserTypeBot
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.dfs
+import kurenai.imsyncbot.exception.BotException
+import kurenai.imsyncbot.service.FriendConfigService
 import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.telegram.*
 import kurenai.imsyncbot.utils.withVT
+import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.message.data.sourceOrNull
 import java.time.Instant
 import java.time.ZoneId
@@ -21,8 +24,8 @@ class InfoCommand : AbstractTelegramCommand() {
     override val onlyGroupMessage = true
     override val parseMode: ParseMode = ParseMode.MARKDOWN_V2
 
+    context(bot: ImSyncBot)
     override suspend fun execute(
-        bot: ImSyncBot,
         message: TdApi.Message,
         sender: TdApi.MessageSenderUser,
         input: String
@@ -108,20 +111,34 @@ class InfoCommand : AbstractTelegramCommand() {
                 list.joinToString("\n")
             }
         } else {
-            val group = bot.groupConfigService.findByTg(message.chatId)?.qqGroupId?.let { qqBot.getGroup(it) }
-                ?: return "找不到绑定的qq群"
             val list = ArrayList<String>()
-            val config = bot.groupConfigService.configs.firstOrNull { it.telegramGroupId == message.chatId }
-            list.add("绑定群id: `${group.id}`")
-            list.add("绑定群名称: `${group.name.escapeMarkdown()}`")
-            list.add("绑定群群主: `${group.owner.nick.escapeMarkdown()}`\\(`${group.owner.id}`\\)")
-            if (config?.status?.isNotEmpty() == true)
-                list.add("状态: ${config.status.toString().escapeMarkdown()}")
+            lateinit var photoUrl: String
+            lateinit var photoName: String
+            val friendConfig = FriendConfigService.findByTG(message.chatId)
+            if (friendConfig != null) {
+                val friend = bot.qq.qqBot.getFriend(friendConfig.qqId)
+                    ?: throw BotException("无法找到好友id(${friendConfig.qqId})")
+                list.add("绑定好用id: `${friend.id}`")
+                list.add("绑定好用名称: `${friend.nameCardOrNick.escapeMarkdown()}`")
+                photoName = "friend-avatar-${friend.id}.png"
+                photoUrl = friend.avatarUrl
+            } else {
+                val group = bot.groupConfigService.findByTg(message.chatId)?.qqGroupId?.let { qqBot.getGroup(it) }
+                    ?: return "找不到绑定的qq群"
+                val config = bot.groupConfigService.configs.firstOrNull { it.telegramGroupId == message.chatId }
+                list.add("绑定群id: `${group.id}`")
+                list.add("绑定群名称: `${group.name.escapeMarkdown()}`")
+                list.add("绑定群群主: `${group.owner.nick.escapeMarkdown()}`\\(`${group.owner.id}`\\)")
+                if (config?.status?.isNotEmpty() == true)
+                    list.add("状态: ${config.status.toString().escapeMarkdown()}")
+                photoName = "group-avatar-${group.id}.png"
+                photoUrl = group.avatarUrl
+            }
 
-            val path =
-                withVT { BotUtil.downloadImg("group-avatar-${group.id}.png", group.avatarUrl, overwrite = true) }
+            val photoPath =
+                withVT { BotUtil.downloadImg(photoName, photoUrl, overwrite = true) }
             bot.tg.send {
-                messagePhoto(message.chatId, path.pathString, list.joinToString("\n").fmt(ParseMode.MARKDOWN_V2))
+                messagePhoto(message.chatId, photoPath.pathString, list.joinToString("\n").fmt(ParseMode.MARKDOWN_V2))
             }
             null
         }

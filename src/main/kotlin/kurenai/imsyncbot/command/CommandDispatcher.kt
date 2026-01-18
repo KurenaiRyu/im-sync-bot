@@ -16,7 +16,8 @@ object CommandDispatcher {
 
     private val log = getLogger()
 
-    suspend fun execute(bot: ImSyncBot, message: Message, commandEntity: TextEntity) {
+    context(bot: ImSyncBot)
+    suspend fun execute(message: Message, commandEntity: TextEntity) {
         val content = message.content
         val sender = message.senderId
         if (content !is MessageText || sender !is MessageSenderUser) return
@@ -36,7 +37,7 @@ object CommandDispatcher {
 
         var responseMsg: String? = null
         for (cmd in tgCommands) {
-            if (cmd.command.lowercase() == command.lowercase()) {
+            if (cmd.command.equals(command, ignoreCase = true)) {
                 log.info("Match ${cmd.name}")
                 val permission = bot.userConfigService.getPermission(
                     bot.tg.getUser(
@@ -60,7 +61,7 @@ object CommandDispatcher {
                     "需要引用一条消息"
                 } else {
                     try {
-                        cmd.execute(bot, message, sender, input)?.also {
+                        cmd.execute(message, sender, input)?.also {
                             reply = cmd.reply
                             parseMode = cmd.parseMode
                         }

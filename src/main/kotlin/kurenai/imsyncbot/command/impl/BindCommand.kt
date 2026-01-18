@@ -21,7 +21,8 @@ class BindCommand : AbstractTelegramCommand() {
     override val onlyGroupMessage: Boolean = true
     override val parseMode: ParseMode = ParseMode.MARKDOWN_V2
 
-    override suspend fun execute(bot: ImSyncBot, message: Message, sender: MessageSenderUser, input: String): String? {
+    context(bot: ImSyncBot)
+    override suspend fun execute(message: Message, sender: MessageSenderUser, input: String): String? {
         val param = message.content.formattedText?.text?.substringAfter(' ') ?: return "参数错误"
         val qqBot = bot.qq.qqBot
         val tg = bot.tg
@@ -92,7 +93,8 @@ class UnbindCommand : AbstractTelegramCommand() {
     override val onlyAdmin = false
     override val onlySupperAdmin = true
 
-    override suspend fun execute(bot: ImSyncBot, message: Message, sender: MessageSenderUser, input: String): String? {
+    context(bot: ImSyncBot)
+    override suspend fun execute(message: Message, sender: MessageSenderUser, input: String): String? {
         val param = message.content.formattedText?.text ?: return "参数错误"
         return if (param.isNotBlank()) {
             try {

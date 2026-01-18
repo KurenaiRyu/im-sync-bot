@@ -14,7 +14,8 @@ class SyncAvatarCommand : AbstractTelegramCommand() {
     override val onlySupperAdmin = false
     override val onlyGroupMessage: Boolean = true
 
-    override suspend fun execute(bot: ImSyncBot, message: Message, sender: MessageSenderUser, input: String): String? {
+    context(bot: ImSyncBot)
+    override suspend fun execute(message: Message, sender: MessageSenderUser, input: String): String? {
         val qqBot = bot.qq.qqBot
         var handled = false
         bot.userConfigService.chatIdFriends[message.chatId]?.let { friendId ->

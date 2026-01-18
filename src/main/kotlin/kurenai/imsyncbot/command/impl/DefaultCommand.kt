@@ -10,8 +10,8 @@ class DefaultCommand : AbstractTelegramCommand() {
     override val help: String = "设置默认群"
     override val onlyGroupMessage = true
 
+    context(bot: ImSyncBot)
     override suspend fun execute(
-        bot: ImSyncBot,
         message: TdApi.Message,
         sender: TdApi.MessageSenderUser,
         input: String

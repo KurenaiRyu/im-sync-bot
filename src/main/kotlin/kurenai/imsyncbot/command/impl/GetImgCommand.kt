@@ -11,8 +11,8 @@ class GetImgCommand : AbstractTelegramCommand() {
     override val onlyGroupMessage = true
     override val onlyReply = true
 
+    context(bot: ImSyncBot)
     override suspend fun execute(
-        bot: ImSyncBot,
         message: TdApi.Message,
         sender: TdApi.MessageSenderUser,
         input: String

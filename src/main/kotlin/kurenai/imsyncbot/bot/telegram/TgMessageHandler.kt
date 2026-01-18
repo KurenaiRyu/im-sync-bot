@@ -117,7 +117,7 @@ class TgMessageHandler(
                 if (content is MessageText) {
                     val commandEntity = content.text.entities.firstOrNull { it.type is TextEntityTypeBotCommand }
                     if (commandEntity != null) {
-                        CommandDispatcher.execute(bot, update.message, commandEntity)
+                        CommandDispatcher.execute(update.message, commandEntity)
                         return
                     }
                 }

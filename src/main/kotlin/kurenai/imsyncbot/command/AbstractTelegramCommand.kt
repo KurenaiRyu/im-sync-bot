@@ -19,7 +19,8 @@ abstract class AbstractTelegramCommand {
     open val parseMode: ParseMode = ParseMode.TEXT
     open val reply: Boolean = false
 
-    abstract suspend fun execute(bot: ImSyncBot, message: Message, sender: MessageSenderUser, input: String): String?
+    context(bot: ImSyncBot)
+    abstract suspend fun execute(message: Message, sender: MessageSenderUser, input: String): String?
 
     fun String.param(): String {
         return this.substringAfter(' ').trim()
