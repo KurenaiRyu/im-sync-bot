@@ -18,6 +18,7 @@ import kurenai.imsyncbot.service.MessageService
 import kurenai.imsyncbot.utils.*
 import kurenai.imsyncbot.utils.BotUtil.toSource
 import kurenai.imsyncbot.utils.telegram.messageId
+import kurenai.imsyncbot.utils.telegram.senderUserId
 import kurenai.imsyncbot.utils.telegram.userSender
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.MessageSource.Key.quote
@@ -54,7 +55,7 @@ class TgMessageHandler(
     //TODO: Save telegram message
     context(bot: ImSyncBot)
     fun handle(update: Update) = parentScope.launch {
-        TelegramBot.log.trace("Incoming update: {}", update.toString().trim())
+        log.trace("Incoming update: {}", update.toString().trim())
         val status = bot.tg.status.value
         if (status != Running) {
             TelegramBot.log.debug(
@@ -100,6 +101,10 @@ class TgMessageHandler(
 
         when (update) {
             is UpdateNewMessage -> {
+
+                if (update.message.senderUserId == bot.tg.getMe().id) { // from bot
+                    return
+                }
 
                 bot.tg.disposableHandlers.forEach {
                     if (it.handle(bot, update.message)) {
