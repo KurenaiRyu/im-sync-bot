@@ -14,9 +14,7 @@ import kotlinx.coroutines.future.await
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
-import okhttp3.internal.toHexString
 import okio.ByteString
-import org.reflections.Reflections
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -42,8 +40,6 @@ import kotlin.math.abs
  * @author Kurenai
  * @since 6/22/2022 18:51:10
  */
-
-val reflections = Reflections("kurenai.imsyncbot")
 
 fun getLogger(name: String = Thread.currentThread().stackTrace[2].className): Logger {
     return LoggerFactory.getLogger(name)

@@ -13,6 +13,7 @@ import kurenai.imsyncbot.jimmer.SqliteDialect
 import kurenai.imsyncbot.jimmer.scalar.GroupStatusScalarProvider
 import kurenai.imsyncbot.jimmer.scalar.UserStatusScalarProvider
 import kurenai.imsyncbot.utils.*
+import net.mamoe.mirai.Bot
 import org.babyfish.jimmer.sql.event.TriggerType
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.newKSqlClient
@@ -88,12 +89,22 @@ private fun initDB() {
     config.driverClassName = "org.sqlite.JDBC"
     config.isAutoCommit = true
     config.maximumPoolSize = 1
+
+    val simpleConnectionManager = ConnectionManager.simpleConnectionManager(HikariDataSource(config))
+
+    val initSql =
+        Bot::class.java.getResourceAsStream("/init.sql").buffered().use { stream -> stream.readAllBytes() }
+            .decodeToString()
+    simpleConnectionManager.execute { con ->
+        con.nativeSQL(initSql)
+    }
+
     sqlClient = newKSqlClient {
         setTriggerType(TriggerType.BINLOG_ONLY)
         setDialect(SqliteDialect())
         setScalarProvider(GroupConfig::status, GroupStatusScalarProvider())
         setScalarProvider(UserConfig::status, UserStatusScalarProvider())
-        setConnectionManager(ConnectionManager.simpleConnectionManager(HikariDataSource(config)))
+        setConnectionManager(simpleConnectionManager)
     }
 }
 

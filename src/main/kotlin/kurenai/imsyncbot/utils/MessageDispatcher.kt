@@ -5,11 +5,12 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kurenai.imsyncbot.exception.BotException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class MessageDispatcher(
     private val parentScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
-    private val idleTimeoutMillis: Long = 60_000L,
+    private val idleTimeoutMillis: Long = TimeUnit.MINUTES.toMillis(60),
     private val name: String = "MessageDispatcher-${count.getAndIncrement()}",
     private val capacityEachChannel: Int = 64
 ) {
@@ -25,7 +26,7 @@ class MessageDispatcher(
 
     private val workers = ConcurrentHashMap<String, Worker>()
     private val cleanerJob = parentScope.launch {
-        delay(30_000)
+        delay(60_000L)
         while (true) {
             runCatching {
                 val now = System.currentTimeMillis()
