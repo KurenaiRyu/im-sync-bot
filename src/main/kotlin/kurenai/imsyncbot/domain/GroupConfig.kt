@@ -19,6 +19,8 @@ interface GroupConfig {
     val id: Long
     val qqGroupId: Long?
     val name: String
+
+    @Key
     val telegramGroupId: Long
     val discordChannelId: Long?
     @Scalar
