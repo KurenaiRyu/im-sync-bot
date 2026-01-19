@@ -1,12 +1,14 @@
 package kurenai.imsyncbot.command.impl
 
 import it.tdlight.jni.TdApi
+import it.tdlight.jni.TdApi.ChatTypePrivate
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.tgCommands
 import kurenai.imsyncbot.utils.telegram.escapeMarkdown
 import kurenai.imsyncbot.utils.telegram.fmt
 import kurenai.imsyncbot.utils.telegram.messageText
+import kurenai.imsyncbot.utils.telegram.senderChartId
 
 class HelpCommand : AbstractTelegramCommand() {
 
@@ -22,7 +24,14 @@ class HelpCommand : AbstractTelegramCommand() {
         input: String
     ): String? {
 
-        val msg = tgCommands.joinToString("\n") {
+        val chat = bot.tg.send(params = TdApi.GetChat(message.chatId))
+        val filteredCommands = if (chat.type.constructor == ChatTypePrivate.CONSTRUCTOR) {
+            tgCommands.filter { !(it.onlyGroupMessage) }
+        } else {
+            tgCommands.filter { !(it.onlyUserMessage) }
+        }
+
+        val msg = filteredCommands.joinToString("\n") {
             "`${it.command}`: _${it.help.escapeMarkdown()}_"
         }
 
