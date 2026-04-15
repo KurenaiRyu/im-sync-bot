@@ -1,8 +1,11 @@
 package kurenai.imsyncbot
 
+import dev.zacsweers.metro.createGraph
 import kotlinx.coroutines.*
+import kurenai.imsyncbot.bot.discord.DiscordBot
 import kurenai.imsyncbot.bot.qq.QQBot
 import kurenai.imsyncbot.bot.telegram.TelegramBot
+import kurenai.imsyncbot.configuration.AppGraph
 import kurenai.imsyncbot.service.GroupConfigService
 import kurenai.imsyncbot.service.UserConfigService
 import net.mamoe.mirai.utils.LoggerAdapters
@@ -38,7 +41,9 @@ class ImSyncBot(
     internal val groupConfigService: GroupConfigService = GroupConfigService(this)
     internal val tg: TelegramBot = TelegramBot(configProperties.bot, serverScope.coroutineContext)
     internal val qq: QQBot = QQBot(configProperties.bot, serverScope.coroutineContext)
-//    internal val discord: DiscordBot = DiscordBot(this)
+    internal val discord: DiscordBot = DiscordBot(this)
+    internal val appGraph by lazy { createGraph<AppGraph>() }
+    internal val commandDispatcher by lazy { appGraph.commandDispatcher }
 
     init {
         //mirai使用log4j2
@@ -56,7 +61,7 @@ class ImSyncBot(
 //            log.info("QQ bot ${configProperties.bot.qq.account}")
         tg.start()
         qq.start()
-//            discord.start()
+        discord.start()
     }
 
     private fun configProxy(): Proxy? {

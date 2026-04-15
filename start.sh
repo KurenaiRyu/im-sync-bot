@@ -1,2 +1,2 @@
 #!/bin/bash
-java -Xms100m -Xmx200m -XX:SoftMaxHeapSize=130M -XX:+UseZGC -XX:+FlightRecorder -XX:StartFlightRecording=filename=./logs/im-sync-bot.jfr,settings=profile,maxsize=1G,maxage=1h -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dconsole.encoding=UTF-8 --enable-native-access=ALL-UNNAMED -jar im-sync-bot.jar
+java -Xms100m -XX:SoftMaxHeapSize=130M -XX:+UseZGC -XX:+FlightRecorder -XX:StartFlightRecording=filename=./logs/im-sync-bot.jfr,settings=profile,maxsize=1G,maxage=1h -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dconsole.encoding=UTF-8 --enable-native-access=ALL-UNNAMED -jar im-sync-bot.jar

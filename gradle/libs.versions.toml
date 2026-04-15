@@ -1,5 +1,5 @@
 [versions]
-ktolin = "2.3.0"
+ktolin = "2.3.21-RC"
 ksp = "2.3.4"
 lombok = "9.0.0-rc2"
 serialization = "1.8.1"
@@ -12,6 +12,7 @@ mirai = "2.16.0"
 serialize-xml = "0.91.2"
 vertx = "5.0.6"
 moshi = "1.15.2"
+kord = "0.18.1"
 
 [libraries]
 kotlin-bom = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "ktolin" }
@@ -67,6 +68,7 @@ vertx-bom = { group = "io.vertx", name = "vertx-stack-depchain", version.ref = "
 vertx-web = { group = "io.vertx", name = "vertx-web" }
 vertx-kotlin = { group = "io.vertx", name = "vertx-lang-kotlin" }
 vertx-kotlin-coroutines = { group = "io.vertx", name = "vertx-lang-kotlin-coroutines" }
+kord = { group = "dev.kord", name = "kord-core", version.ref = "kord" }
 
 [bundles]
 ktorClient = ["ktor-client-core", "ktor-client-okhttp", "ktor-serialization-kotlinx-json", "ktor-client-negotiation"]
@@ -85,3 +87,4 @@ kotlin-noarg = { id = "org.jetbrains.kotlin.plugin.noarg", version.ref = "ktolin
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 lombok = { id = "io.freefair.lombok", version.ref = "lombok" }
 openapi-generator = { id = "org.openapi.generator", version = "7.13.0" }
+metro = { id = "dev.zacsweers.metro", version = "0.13.2" }

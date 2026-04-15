@@ -4,9 +4,9 @@ import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.vertx.core.Vertx
 import it.tdlight.Init
+import kurenai.imsyncbot.bot.discord.DiscordBot
 import kurenai.imsyncbot.command.AbstractInlineCommand
 import kurenai.imsyncbot.command.AbstractQQCommand
-import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.domain.UserConfig
 import kurenai.imsyncbot.jimmer.SqliteDialect
@@ -43,7 +43,6 @@ internal val reflections = Reflections("kurenai.imsyncbot")
 internal val dfs: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
 //internal val callbacks = reflections.getSubTypesOf(Callback::class.java).map { it.getConstructor().newInstance() }
-internal val tgCommands = ArrayList<AbstractTelegramCommand>()
 internal val qqCommands = ArrayList<AbstractQQCommand>()
 internal val inlineCommands = HashMap<String, AbstractInlineCommand>()
 lateinit var configProperties: ConfigProperties
@@ -52,6 +51,7 @@ lateinit var vertx: Vertx
 
 internal lateinit var instants: MutableList<ImSyncBot>
 internal lateinit var imSyncBot: ImSyncBot
+internal lateinit var discordBot: DiscordBot
 
 suspend fun main() {
     Init.init() //td-lib
@@ -105,22 +105,11 @@ private fun initDB() {
 }
 
 private fun commonInit() {
-    registerTgCommand()
 //    registerQQCommand()
     //TODO: 设置 inline 命令
 //    registerInlineCommand()
 //    registerQQHandler()
     setUpTimer()
-}
-
-private fun registerTgCommand() {
-    reflections.getSubTypesOf(AbstractTelegramCommand::class.java)
-        .map { it.getDeclaredConstructor().newInstance() }
-        .forEach { command ->
-            tgCommands.removeIf { it.name == command.name }
-            tgCommands.add(command)
-            log.info("Registered telegram command:  ${command.name}(${command::class.java.simpleName})")
-        }
 }
 
 private fun registerQQCommand() {

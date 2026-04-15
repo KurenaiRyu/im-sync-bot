@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.kotlin.openall)
     alias(libs.plugins.kotlin.noarg)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.metro)
     jacoco
 }
 
@@ -83,6 +84,9 @@ dependencies {
 //    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = classifier)
     implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "linux_amd64_gnu_ssl3")
 //    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "windows_amd64")
+
+    // discord api
+    implementation(libs.kord)
 
     testImplementation(kotlin("test"))
 }

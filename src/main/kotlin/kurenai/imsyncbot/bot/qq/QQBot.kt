@@ -80,7 +80,6 @@ class QQBot(
             if (qqBot.isActive) qqBot.close()
         }
         qqBot = buildBot()
-        log.info("Login qq ${botProperties.qq.account}...")
 
         qqBot.login()
         status.update { Running }

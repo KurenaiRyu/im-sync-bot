@@ -1,5 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.UserTypeBot
 import kurenai.imsyncbot.ImSyncBot
@@ -17,6 +19,7 @@ import java.time.Instant
 import java.time.ZoneId
 import kotlin.io.path.pathString
 
+@ContributesIntoSet(AppScope::class)
 class InfoCommand : AbstractTelegramCommand() {
 
     override val command = "info"

@@ -1,15 +1,16 @@
 package kurenai.imsyncbot.command.impl
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.ChatTypePrivate
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
-import kurenai.imsyncbot.tgCommands
 import kurenai.imsyncbot.utils.telegram.escapeMarkdown
 import kurenai.imsyncbot.utils.telegram.fmt
 import kurenai.imsyncbot.utils.telegram.messageText
-import kurenai.imsyncbot.utils.telegram.senderChartId
 
+@ContributesIntoSet(AppScope::class)
 class HelpCommand : AbstractTelegramCommand() {
 
     override val command = "help"
@@ -26,9 +27,9 @@ class HelpCommand : AbstractTelegramCommand() {
 
         val chat = bot.tg.send(params = TdApi.GetChat(message.chatId))
         val filteredCommands = if (chat.type.constructor == ChatTypePrivate.CONSTRUCTOR) {
-            tgCommands.filter { !(it.onlyGroupMessage) }
+            bot.commandDispatcher.commands.values.filter { !(it.onlyGroupMessage) }
         } else {
-            tgCommands.filter { !(it.onlyUserMessage) }
+            bot.commandDispatcher.commands.values.filter { !(it.onlyUserMessage) }
         }
 
         val msg = filteredCommands.joinToString("\n") {

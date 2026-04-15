@@ -1,11 +1,15 @@
 package kurenai.imsyncbot.command.impl
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.utils.BotUtil
 import kotlin.io.path.pathString
 
+
+@ContributesIntoSet(AppScope::class)
 class SyncAvatarCommand : AbstractTelegramCommand() {
 
     override val command = "syncavatar"

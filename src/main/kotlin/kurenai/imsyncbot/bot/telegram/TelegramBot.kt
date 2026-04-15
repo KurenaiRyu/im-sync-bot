@@ -360,13 +360,14 @@ class TelegramBot(
         }
     }
 
+    context(bot: ImSyncBot)
     private suspend fun updateCommand() = runCatching {
         send { DeleteCommands().apply { this.scope = BotCommandScopeAllPrivateChats() } }
         send { DeleteCommands().apply { this.scope = BotCommandScopeAllGroupChats() } }
         send {
             SetCommands().apply {
                 this.scope = BotCommandScopeAllPrivateChats()
-                this.commands = tgCommands.filter { it.onlyUserMessage }.map { cmd ->
+                this.commands = bot.commandDispatcher.commands.values.filter { it.onlyUserMessage }.map { cmd ->
                     BotCommand().apply {
                         this.command = cmd.name.lowercase()
                         this.description = cmd.help
@@ -378,7 +379,7 @@ class TelegramBot(
         send {
             SetCommands().apply {
                 this.scope = BotCommandScopeAllGroupChats()
-                this.commands = tgCommands.filter { it.onlyGroupMessage }.map { cmd ->
+                this.commands = bot.commandDispatcher.commands.values.filter { it.onlyGroupMessage }.map { cmd ->
                     BotCommand().apply {
                         this.command = cmd.name.lowercase()
                         this.description = cmd.help

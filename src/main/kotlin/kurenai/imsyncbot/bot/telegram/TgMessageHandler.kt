@@ -8,7 +8,6 @@ import kotlinx.coroutines.sync.withLock
 import kurenai.imsyncbot.BotProperties
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.Running
-import kurenai.imsyncbot.command.CommandDispatcher
 import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.exception.CommandException
@@ -46,6 +45,7 @@ class TgMessageHandler(
 
     private val listenerLock = Mutex()
     private val listeners: MutableList<Listener<out Object?, out Update>> = mutableListOf()
+    private val startUpTime = System.currentTimeMillis() / 1000
 
     init {
         if (botProperties.tgMsgFormat.contains($$"$msg")) tgMsgFormat = botProperties.tgMsgFormat
@@ -105,6 +105,9 @@ class TgMessageHandler(
                 if (update.message.senderUserId == bot.tg.getMe().id) { // from bot
                     return
                 }
+                if (update.message.isFromOffline || update.message.date < startUpTime) {
+                    return
+                }
 
                 bot.tg.disposableHandlers.forEach {
                     if (it.handle(bot, update.message)) {
@@ -117,7 +120,7 @@ class TgMessageHandler(
                 if (content is MessageText) {
                     val commandEntity = content.text.entities.firstOrNull { it.type is TextEntityTypeBotCommand }
                     if (commandEntity != null) {
-                        CommandDispatcher.execute(update.message, commandEntity)
+                        bot.commandDispatcher.execute(update.message, commandEntity)
                         return
                     }
                 }
