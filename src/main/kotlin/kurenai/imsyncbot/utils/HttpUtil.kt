@@ -2,6 +2,8 @@ package kurenai.imsyncbot.utils
 
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.engine.okhttp.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +22,11 @@ object HttpUtil {
 
     private val log = getLogger()
 
-    private val client = HttpClient()
+    private val client = HttpClient(OkHttp) {
+        defaultRequest {
+            url.protocol = URLProtocol.HTTPS
+        }
+    }
 
 //    suspend fun download(tgFile: TelegramFile, path: Path): Path {
 //        return download(path, tgFile.getFileUrl(getBotOrThrow().tg.token), true, false)

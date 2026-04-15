@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.bundles.mirai)
 
     implementation(libs.jimmer.sql.kotlin)
+    implementation("io.ktor:ktor-client-okhttp-jvm:3.4.0")
     ksp(libs.jimmer.ksp)
     implementation(libs.hikaricp)
     implementation(libs.sqlite)

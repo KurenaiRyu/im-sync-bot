@@ -103,7 +103,7 @@ class TelegramBot(
             downloadedFilesDirectoryPath = sessionPath.resolve("downloads")
             isFileDatabaseEnabled = true
             isChatInfoDatabaseEnabled = true
-            isMessageDatabaseEnabled = false
+            isMessageDatabaseEnabled = true
         }
         client =
             SimpleTelegramClientFactory().builder(settings).build(AuthenticationSupplier.bot(telegramProperties.token))
