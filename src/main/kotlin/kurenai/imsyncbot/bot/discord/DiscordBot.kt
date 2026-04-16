@@ -6,7 +6,6 @@ import dev.minn.jda.ktx.events.onCommand
 import dev.minn.jda.ktx.generics.getChannel
 import dev.minn.jda.ktx.interactions.commands.upsertCommand
 import dev.minn.jda.ktx.jdabuilder.light
-import dev.minn.jda.ktx.messages.MessageCreateBuilder
 import dev.minn.jda.ktx.messages.reply_
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
@@ -23,7 +22,6 @@ import kurenai.imsyncbot.utils.HttpUtil
 import kurenai.imsyncbot.utils.getLogger
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.entities.Webhook
-import net.dv8tion.jda.api.entities.channel.concrete.Category
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel
 import net.dv8tion.jda.api.events.GenericEvent
 import net.dv8tion.jda.api.events.interaction.command.GenericCommandInteractionEvent
@@ -31,8 +29,9 @@ import net.dv8tion.jda.api.interactions.commands.OptionType
 import net.dv8tion.jda.api.utils.FileUpload
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
-import net.mamoe.mirai.event.events.BotActiveEvent
+import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
+import net.mamoe.mirai.event.events.GroupEvent
 import net.mamoe.mirai.event.events.GroupMessagePostSendEvent
 import net.mamoe.mirai.event.events.GroupTempMessagePostSendEvent
 import net.mamoe.mirai.message.data.FileMessage
@@ -42,7 +41,6 @@ import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.OnlineMessageSource
 import org.babyfish.jimmer.kt.new
 import java.nio.file.Files
-import java.util.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -63,7 +61,8 @@ class DiscordBot(
     }
 
     lateinit var jda: JDA
-    val incomingEventChannel: Channel<GroupAwareMessageEvent> = Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
+    val incomingMessageChannel: Channel<GroupAwareMessageEvent> = Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
+    val incomingEventChannel: Channel<GroupEvent> = Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
     private val syncMessageChannel: Channel<OnlineMessageSource.Outgoing> =
         Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
     override val coroutineContext: CoroutineContext = SupervisorJob(coroutineContext[Job]) +
@@ -80,8 +79,6 @@ class DiscordBot(
                     }
                 }
             }
-
-    private val channelCache = WeakHashMap<Long, TextChannel>()
 
     fun start() {
         val token = bot.configProperties.bot.discord.token
@@ -100,7 +97,7 @@ class DiscordBot(
         }
     }
 
-    private suspend fun initChannel() {
+    private fun initChannel() {
         val guild = jda.guilds.firstOrNull() ?: return
         guild.upsertCommand("bind", "Bind qq group") {
             addOption(OptionType.INTEGER, "group_id", "qq group id", true)
@@ -120,31 +117,52 @@ class DiscordBot(
             handleBindCommand(it)
         }
 
-        bot.qq.qqBot.eventChannel.subscribeAlways<GroupAwareMessageEvent> {
-            incomingEventChannel.trySend(it)
-        }
-
-
-        bot.qq.qqBot.eventChannel.subscribeAlways<BotActiveEvent> { event ->
+        bot.qq.qqBot.eventChannel.subscribeAlways<Event> { event ->
             when (event) {
                 is GroupMessagePostSendEvent -> {
                     event.receipt?.source?.let { syncMessageChannel.trySend(it) }
                 }
-
                 is GroupTempMessagePostSendEvent -> {
                     event.receipt?.source?.let { syncMessageChannel.trySend(it) }
                 }
+                is GroupEvent -> {
+                    when (event) {
+                        is GroupAwareMessageEvent -> incomingMessageChannel.trySend(event)
+                        else -> {
+                            incomingEventChannel.trySend(event)
+                        }
+                    }
+                }
+
+                else -> {}
             }
         }
 
         launch {
             syncMessageChannel.receiveAsFlow().collect { source ->
-                handleSyncMessage(source)
+                runCatching {
+                    handleSyncMessage(source)
+                }.onFailure {
+                    log.error("Handle sync message error", it)
+                }
             }
         }
         launch {
-            incomingEventChannel.receiveAsFlow().collect { event ->
-                handleGroupMessageEvent(event)
+            incomingMessageChannel.receiveAsFlow().collect { event ->
+                runCatching {
+                    handleGroupMessage(event)
+                }.onFailure {
+                    log.error("Handle group message error", it)
+                }
+            }
+        }
+        launch {
+            incomingMessageChannel.receiveAsFlow().collect { event ->
+                runCatching {
+                    handleGroupEvent(event)
+                }.onFailure {
+                    log.error("Handle group message error", it)
+                }
             }
         }
     }
@@ -158,10 +176,9 @@ class DiscordBot(
         if (group != null) {
             val channel = if (enabledNewChannel) {
                 val category =
-                    event.guild!!.channels.filterIsInstance<Category>().firstOrNull { it.name == "forward" }
-                        ?: run {
-                            event.guild!!.createCategory("forward").await()
-                        }
+                    event.guild!!.categories.first { it.name == "forward" } ?: run {
+                        event.guild!!.createCategory("forward").await()
+                    }
                 category.createTextChannel(group.name).await()
             } else event.channel!!
 
@@ -228,7 +245,7 @@ class DiscordBot(
         handleMessage(source.originalMessage, webhook, name, avatarUrl, group)
     }
 
-    suspend fun handleGroupMessageEvent(event: GroupAwareMessageEvent) {
+    suspend fun handleGroupMessage(event: GroupAwareMessageEvent) {
         val group = event.group
         val channelId = GroupConfigRepository.findByQqGroupId(group.id)?.discordChannelId ?: return
         val channel = jda.getChannel<TextChannel>(channelId) ?: return
@@ -238,6 +255,22 @@ class DiscordBot(
         val name = "${bot.userConfigService.idBindings[event.sender.id] ?: event.senderName} #${event.sender.id}"
         val avatarUrl = event.sender.avatarUrl
         handleMessage(event.message, webhook, name, avatarUrl, group)
+    }
+
+    suspend fun handleGroupEvent(event: GroupAwareMessageEvent) {
+        val group = event.group
+        val channelId = GroupConfigRepository.findByQqGroupId(group.id)?.discordChannelId ?: return
+        val channel = jda.getChannel<TextChannel>(channelId) ?: return
+        val webhook =
+            channel.retrieveWebhooks().await().firstOrNull { it.name == "forward" } ?: channel.createWebhook("forward")
+                .await()
+        val name = "Group Event"
+        val avatarUrl = group.avatarUrl
+
+        webhook.sendMessage(event.message.contentToString())
+            .setUsername(name)
+            .setAvatarUrl(avatarUrl)
+            .await()
     }
 
     suspend fun handleMessage(
@@ -259,14 +292,11 @@ class DiscordBot(
                         error("File size is too large")
                     }
 
-                    val msg = MessageCreateBuilder {
-                        files += FileUpload.fromData(path)
-                    }.build()
-
-                    webhook.sendMessage(msg)
+                    webhook.sendMessage("")
+                        .setFiles(FileUpload.fromData(path))
                         .setAvatarUrl(avatarUrl)
                         .setUsername(senderName)
-                        .queue()
+                        .await()
                 }
 
                 is FileMessage -> {
@@ -277,21 +307,20 @@ class DiscordBot(
                     val raw = BotUtil.downloadImg(url)
                     val target = BotUtil.toWebp(raw)
 
-                    val msg = MessageCreateBuilder {
-                        files += FileUpload.fromData(target)
-                    }.build()
-
-                    webhook.sendMessage(msg)
+                    webhook.sendMessage("")
+                        .setFiles(FileUpload.fromData(target))
                         .setAvatarUrl(avatarUrl)
                         .setUsername(senderName)
-                        .queue()
+                        .await()
                 }
 
                 else -> {
-                    webhook.sendMessage(message.contentToString())
+                    val content = message.contentToString()
+                    if (content.isBlank()) return
+                    webhook.sendMessage(content)
                         .setAvatarUrl(avatarUrl)
                         .setUsername(senderName)
-                        .queue()
+                        .await()
                 }
             }.let { receive ->
                 //                QQDiscordRepository.save(
