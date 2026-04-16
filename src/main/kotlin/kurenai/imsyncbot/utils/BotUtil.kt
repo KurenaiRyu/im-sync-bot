@@ -56,11 +56,9 @@ object BotUtil {
         val image = Path.of(getImagePath(snowFlake.nextAlpha()))
         val tmpPath = download(image, url, onlyCache, false)
         val type = ImageUtil.determineImageType(tmpPath)
-        val e = if (type != ImageUtil.ImageType.UNKNOWN) {
-            type.ext
-        } else ext
+        val ext = if (type != ImageUtil.ImageType.UNKNOWN) type.ext else ext
 
-        val path = Path.of(getImagePath(tmpPath.crc32c() + if (e.isNotBlank()) ".$e" else ""))
+        val path = Path.of(getImagePath(tmpPath.crc32c() + if (ext.isNotBlank()) ".$ext" else ""))
         if (path.exists()) tmpPath.deleteExisting()
         else {
             withContext(Dispatchers.VT) {
@@ -128,6 +126,18 @@ object BotUtil {
 //        if (resizeProcess.exitValue() != 0  || !pngFile.exists() || pngFile.fileSize() == 0L) throw BotException("Png resize fail")
 
         return pngFile
+    }
+
+    suspend fun toWebp(src: Path): Path {
+        val webpPath = Path.of(getImagePath(src.nameWithoutExtension + ".webp"))
+        val toPngProcess = runCommandAwait(
+            "cwebp",
+            src.pathString,
+            "-o",
+            webpPath.pathString
+        )
+        if (toPngProcess.exitValue() != 0 || !webpPath.exists() || webpPath.fileSize() == 0L) throw BotException("Webp to png fail")
+        return webpPath
     }
 
     suspend fun mp42gif(width: Int, file: TdApi.File): Path {

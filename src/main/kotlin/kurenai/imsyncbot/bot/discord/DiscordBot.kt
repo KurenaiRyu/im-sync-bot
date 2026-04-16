@@ -29,6 +29,8 @@ import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.GroupConfigRepository
 import kurenai.imsyncbot.snowFlake
+import kurenai.imsyncbot.utils.BotUtil
+import kurenai.imsyncbot.utils.HttpUtil
 import kurenai.imsyncbot.utils.getLogger
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
@@ -37,6 +39,7 @@ import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import org.babyfish.jimmer.kt.new
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 import kotlin.coroutines.CoroutineContext
@@ -55,6 +58,7 @@ class DiscordBot(
 
     companion object {
         val log = getLogger()
+        val IMAGE_SIZE: Int = 10_000_000
     }
 
     lateinit var kord: Kord
@@ -317,7 +321,16 @@ class DiscordBot(
                     webhook.execute(token) {
                         this.username = senderName
                         this.avatarUrl = avatarUrl
-                        addFile(Path.of(message.queryUrl()))
+
+                        val url = message.queryUrl()
+                        var path = BotUtil.downloadImg(url)
+                        if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) {
+                            path = BotUtil.toWebp(path)
+                        }
+                        if (Files.size(path) > IMAGE_SIZE) {
+                            error("File size is too large")
+                        }
+                        addFile(path)
                     }
                 }
 
@@ -326,7 +339,15 @@ class DiscordBot(
                         webhook.execute(token) {
                             this.username = senderName
                             this.avatarUrl = avatarUrl
-                            addFile(Path.of(message.toAbsoluteFile(group)?.getUrl()))
+
+                            val url = message.toAbsoluteFile(group)?.getUrl()?:error("Can't get document url")
+                            if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) {
+                                val raw = BotUtil.downloadImg(url)
+                                val target = BotUtil.toWebp(raw)
+                                addFile(target)
+                            } else {
+                                error("File size is too large")
+                            }
                         }
                     }
                 }

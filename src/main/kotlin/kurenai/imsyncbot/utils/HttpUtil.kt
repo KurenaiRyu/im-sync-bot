@@ -28,10 +28,6 @@ object HttpUtil {
         }
     }
 
-//    suspend fun download(tgFile: TelegramFile, path: Path): Path {
-//        return download(path, tgFile.getFileUrl(getBotOrThrow().tg.token), true, false)
-//    }
-
     suspend fun download(path: Path, url: String, enableProxy: Boolean = false, overwrite: Boolean): Path {
         return if (!overwrite && path.exists()) path
         else if (!url.startsWith("http")) Path.of(url)
@@ -74,7 +70,7 @@ object HttpUtil {
         return path
     }
 
-    private suspend fun getRemoteFileSize(url: String, enableProxy: Boolean = false): Long {
+    suspend fun getRemoteFileSize(url: String, enableProxy: Boolean = false): Long {
         val response = client.head(url)
         return when (response.status) {
             HttpStatusCode.PartialContent -> {
