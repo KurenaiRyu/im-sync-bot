@@ -1,27 +1,16 @@
 package kurenai.imsyncbot.bot.discord
 
-import dev.kord.common.entity.Snowflake
-import dev.kord.core.Kord
-import dev.kord.core.behavior.channel.createTextChannel
-import dev.kord.core.behavior.channel.createWebhook
-import dev.kord.core.behavior.createCategory
-import dev.kord.core.behavior.createChatInputCommand
-import dev.kord.core.behavior.execute
-import dev.kord.core.behavior.interaction.respondEphemeral
-import dev.kord.core.entity.Webhook
-import dev.kord.core.entity.channel.Category
-import dev.kord.core.entity.channel.TextChannel
-import dev.kord.core.event.gateway.ReadyEvent
-import dev.kord.core.event.interaction.GuildChatInputCommandInteractionCreateEvent
-import dev.kord.core.on
-import dev.kord.rest.builder.interaction.boolean
-import dev.kord.rest.builder.interaction.integer
-import dev.kord.rest.builder.message.addFile
+import dev.minn.jda.ktx.coroutines.await
+import dev.minn.jda.ktx.events.listener
+import dev.minn.jda.ktx.events.onCommand
+import dev.minn.jda.ktx.generics.getChannel
+import dev.minn.jda.ktx.interactions.commands.upsertCommand
+import dev.minn.jda.ktx.jdabuilder.light
+import dev.minn.jda.ktx.messages.MessageCreateBuilder
+import dev.minn.jda.ktx.messages.reply_
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.domain.GroupConfig
@@ -32,19 +21,31 @@ import kurenai.imsyncbot.snowFlake
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
 import kurenai.imsyncbot.utils.getLogger
+import net.dv8tion.jda.api.JDA
+import net.dv8tion.jda.api.entities.Webhook
+import net.dv8tion.jda.api.entities.channel.concrete.Category
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel
+import net.dv8tion.jda.api.events.GenericEvent
+import net.dv8tion.jda.api.events.interaction.command.GenericCommandInteractionEvent
+import net.dv8tion.jda.api.interactions.commands.OptionType
+import net.dv8tion.jda.api.utils.FileUpload
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
-import net.mamoe.mirai.event.Event
-import net.mamoe.mirai.event.events.*
-import net.mamoe.mirai.message.data.*
+import net.mamoe.mirai.event.events.BotActiveEvent
+import net.mamoe.mirai.event.events.GroupAwareMessageEvent
+import net.mamoe.mirai.event.events.GroupMessagePostSendEvent
+import net.mamoe.mirai.event.events.GroupTempMessagePostSendEvent
+import net.mamoe.mirai.message.data.FileMessage
+import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
+import net.mamoe.mirai.message.data.MessageChain
+import net.mamoe.mirai.message.data.OnlineMessageSource
 import org.babyfish.jimmer.kt.new
 import java.nio.file.Files
-import java.nio.file.Path
 import java.util.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.time.Duration.Companion.milliseconds
+
 
 /**
  * @author Kurenai
@@ -61,8 +62,8 @@ class DiscordBot(
         val IMAGE_SIZE: Int = 10_000_000
     }
 
-    lateinit var kord: Kord
-    val incomingEventChannel: Channel<Event> = Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
+    lateinit var jda: JDA
+    val incomingEventChannel: Channel<GroupAwareMessageEvent> = Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
     private val syncMessageChannel: Channel<OnlineMessageSource.Outgoing> =
         Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
     override val coroutineContext: CoroutineContext = SupervisorJob(coroutineContext[Job]) +
@@ -82,112 +83,47 @@ class DiscordBot(
 
     private val channelCache = WeakHashMap<Long, TextChannel>()
 
-    suspend fun start() {
+    fun start() {
         val token = bot.configProperties.bot.discord.token
         if (token == null) {
             coroutineContext.cancel(CancellationException("Discord token is null"))
             return
         }
-        kord = Kord(token)
-        kord.gateway.gateways
-        kord.on<ReadyEvent> {
-            initChannel()
+        jda = light(token, true) {
+            this.setAutoReconnect(true)
         }
-        coroutineScope {
-            launch {
-                kord.login()
 
-                var count = 0
-                while (count < 3) {
-                    count++
-                    delay((3000L * count).milliseconds)
-                    runCatching {
-                        kord.login()
-                    }.onFailure {
-                        log.error("Try relogin failed", it)
-                    }
-                }
-
-                bot.qq.qqBot.eventChannel.subscribeAlways<Event> {
-                    incomingEventChannel.trySend(it)
-                }
-
-                log.warn("Discord bot was logout")
-            }
+        launch {
+            jda.awaitReady()
+            log.info("JDA Ready")
+            initChannel()
         }
     }
 
     private suspend fun initChannel() {
-//        val groupConfigs = groupConfigRepository.findAll()
-        val guild = kord.guilds.firstOrNull() ?: return
-        guild.createChatInputCommand("bind", "Bind qq group") {
-            integer("group_id", "qq group id") {
-                required = true
-//                autocomplete = true
-//                bot.qq.qqBot.bot.groups.sortedBy {
-//                    it.botAsMember.lastSpeakTimestamp
-//                }.takeLast(25).forEach {
-//                    choice(it.name, it.id)
-//                }
-            }
-            boolean("new_channel", "Pass true to generate a channel for bind group, false default") {
-                required = true
-            }
+        val guild = jda.guilds.firstOrNull() ?: return
+        guild.upsertCommand("bind", "Bind qq group") {
+            addOption(OptionType.INTEGER, "group_id", "qq group id", true)
+            addOption(
+                OptionType.BOOLEAN,
+                "new_channel",
+                "Pass true to generate a channel for bind group, false default",
+                true
+            )
         }
 
-        kord.on<dev.kord.core.event.Event> {
-            log.trace(toString())
+        jda.listener<GenericEvent> {
+            log.trace("Received a generic event: {}", it)
         }
 
-        kord.on<GuildChatInputCommandInteractionCreateEvent> {
-            val command = interaction.command
-            if (command.data.name.value == "bind") {
-                handleBindCommand()
-            }
+        jda.onCommand("bind") {
+            handleBindCommand(it)
         }
 
-//        kord.on<GuildAutoCompleteInteractionCreateEvent> {
-//            val focused = interaction.command.options.entries.first {
-//                it.value.focused
-//            }
-//            if (focused.key == "group_id") {
-//                interaction.suggestInteger {
-//                    bot.qq.qqBot.groups
-//                        .filter {
-//                            it.name.contains(focused.value.value as String)
-//                        }.sortedBy { it.botAsMember.lastSpeakTimestamp }
-//                        .takeLast(25).forEach {
-//                            choice(it.name, it.id)
-//                        }
-//                }
-//            }
-//        }
-
-//        resolveMissChannel(groupConfigs)
-
-        incomingEventChannel.receiveAsFlow().collect { event ->
-            runCatching {
-                when (event) {
-                    is GroupMessageSyncEvent,
-                    is GroupMessageEvent -> {
-                        handleGroupMessageEvent(event as GroupAwareMessageEvent)
-                    }
-                }
-            }.onFailure {
-                log.error("Handle qq event error", it)
-                if (kord.isActive.not()) {
-                    coroutineScope {
-                        launch {
-                            runCatching {
-                                kord.login()
-                            }.onFailure { ex ->
-                                log.error("Try login failed", ex)
-                            }
-                        }
-                    }
-                }
-            }
+        bot.qq.qqBot.eventChannel.subscribeAlways<GroupAwareMessageEvent> {
+            incomingEventChannel.trySend(it)
         }
+
 
         bot.qq.qqBot.eventChannel.subscribeAlways<BotActiveEvent> { event ->
             when (event) {
@@ -201,32 +137,40 @@ class DiscordBot(
             }
         }
 
-        syncMessageChannel.receiveAsFlow().collect { source ->
-            handleSyncMessage(source)
+        launch {
+            syncMessageChannel.receiveAsFlow().collect { source ->
+                handleSyncMessage(source)
+            }
+        }
+        launch {
+            incomingEventChannel.receiveAsFlow().collect { event ->
+                handleGroupMessageEvent(event)
+            }
         }
     }
 
-    private suspend fun GuildChatInputCommandInteractionCreateEvent.handleBindCommand() {
-        val groupId = interaction.command.integers["group_id"]!! // it's required so it's never null
-        val new = interaction.command.booleans["new_channel"] ?: false
+    private suspend fun handleBindCommand(event: GenericCommandInteractionEvent) {
+        val params = event.options.associateBy { it.name }
+        val groupId = params["group_id"]?.asLong ?: return
+        val enabledNewChannel = params["new_channel"]?.asBoolean ?: return
         val group = bot.qq.qqBot.getGroup(groupId)
 
         if (group != null) {
-            val channel = if (new) {
+            val channel = if (enabledNewChannel) {
                 val category =
-                    interaction.channel.guild.channels.filterIsInstance<Category>().firstOrNull { it.name == "forward" }
+                    event.guild!!.channels.filterIsInstance<Category>().firstOrNull { it.name == "forward" }
                         ?: run {
-                            interaction.channel.guild.createCategory("forward")
+                            event.guild!!.createCategory("forward").await()
                         }
-                category.createTextChannel(group.name)
-            } else interaction.channel
+                category.createTextChannel(group.name).await()
+            } else event.channel!!
 
 
             val config = GroupConfigRepository.findByQqGroupId(groupId)
             if (config != null) {
-                if (config.discordChannelId != channel.id.value.toLong()) {
+                if (config.discordChannelId != channel.idLong) {
                     GroupConfigRepository.save(config.copy {
-                        discordChannelId = channel.id.value.toLong()
+                        discordChannelId = channel.idLong
                     })
                 }
             } else {
@@ -234,19 +178,20 @@ class DiscordBot(
                     new(GroupConfig::class).by {
                         this.qqGroupId = groupId
                         this.name = group.name
-                        discordChannelId = channel.id.value.toLong()
+                        discordChannelId = channel.idLong
                         id = snowFlake.nextId()
                     }
                 )
             }
         }
-        interaction.respondEphemeral {
-            content = if (group != null) {
+
+        event.reply_(
+            if (group != null) {
                 "Bind group ${group.name}(${group.id})"
             } else {
                 "Group $groupId not found"
-            }
-        }
+            },
+        ).queue()
     }
 
 //    suspend fun resolveMissChannel(groupConfigs: List<GroupConfig>) {
@@ -266,102 +211,97 @@ class DiscordBot(
 //
 //        missConfigs.forEach { config ->
 //            val channel = existChannel[config.name] ?: category.createTextChannel(config.name)
-//            config.discordChannelId = channel.id.value.toLong()
+//            config.discordChannelId = channel.idLong
 //        }
 //        GroupConfigRepository.saveAll(missConfigs)
 //    }
 
     private suspend fun handleSyncMessage(source: OnlineMessageSource.Outgoing) {
-        val channel = channelCache[source.target.id] ?: run {
-            val channelId = GroupConfigRepository.findByQqGroupId(source.target.id)?.discordChannelId ?: return
-            kord.getChannel(Snowflake(channelId)) as? TextChannel ?: return
-        }
-        channelCache.putIfAbsent(source.target.id, channel)
-        val webhook = channel.webhooks.firstOrNull() ?: channel.createWebhook("forward")
+        val channelId = GroupConfigRepository.findByQqGroupId(source.target.id)?.discordChannelId ?: return
+        val channel = jda.getChannel<TextChannel>(channelId) ?: return
+        val webhook =
+            channel.retrieveWebhooks().await().firstOrNull { it.name == "forward" } ?: channel.createWebhook("forward")
+                .await()
         val name = "${source.sender.nameCardOrNick} #${source.sender.id}"
         val avatarUrl = source.sender.avatarUrl
-        val token = webhook.token ?: error("Webhook token is null")
-        val group = source.target as? Group
-        handleMessage(source.originalMessage, webhook, token, name, avatarUrl, group)
+        val group = source.target as? Group ?: return
+        handleMessage(source.originalMessage, webhook, name, avatarUrl, group)
     }
 
     suspend fun handleGroupMessageEvent(event: GroupAwareMessageEvent) {
         val group = event.group
-        val channel = channelCache[group.id] ?: run {
-            val channelId = GroupConfigRepository.findByQqGroupId(group.id)?.discordChannelId ?: return
-            kord.getChannel(Snowflake(channelId)) as? TextChannel ?: return
-        }
-        channelCache.putIfAbsent(group.id, channel)
-        val webhook = channel.webhooks.firstOrNull() ?: channel.createWebhook("forward")
+        val channelId = GroupConfigRepository.findByQqGroupId(group.id)?.discordChannelId ?: return
+        val channel = jda.getChannel<TextChannel>(channelId) ?: return
+        val webhook =
+            channel.retrieveWebhooks().await().firstOrNull { it.name == "forward" } ?: channel.createWebhook("forward")
+                .await()
         val name = "${bot.userConfigService.idBindings[event.sender.id] ?: event.senderName} #${event.sender.id}"
         val avatarUrl = event.sender.avatarUrl
-        val token = webhook.token ?: error("Webhook token is null")
-        handleMessage(event.message, webhook, token, name, avatarUrl, group)
+        handleMessage(event.message, webhook, name, avatarUrl, group)
     }
 
     suspend fun handleMessage(
         messageChain: MessageChain,
         webhook: Webhook,
-        token: String,
         senderName: String,
         avatarUrl: String,
-        group: Group?
+        group: Group
     ) {
         messageChain.forEach { message ->
             when (message) {
-                is PlainText -> {
-                    webhook.execute(token) {
-                        this.username = senderName
-                        this.avatarUrl = avatarUrl
-                        this.content = message.contentToString()
-                    }
-                }
-
                 is Image -> {
-                    webhook.execute(token) {
-                        this.username = senderName
-                        this.avatarUrl = avatarUrl
-
-                        val url = message.queryUrl()
-                        var path = BotUtil.downloadImg(url)
-                        if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) {
-                            path = BotUtil.toWebp(path)
-                        }
-                        if (Files.size(path) > IMAGE_SIZE) {
-                            error("File size is too large")
-                        }
-                        addFile(path)
+                    val url = message.queryUrl()
+                    var path = BotUtil.downloadImg(url)
+                    if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) {
+                        path = BotUtil.toWebp(path)
                     }
+                    if (Files.size(path) > IMAGE_SIZE) {
+                        error("File size is too large")
+                    }
+
+                    val msg = MessageCreateBuilder {
+                        files += FileUpload.fromData(path)
+                    }.build()
+
+                    webhook.sendMessage(msg)
+                        .setAvatarUrl(avatarUrl)
+                        .setUsername(senderName)
+                        .queue()
                 }
 
                 is FileMessage -> {
-                    group?.let {
-                        webhook.execute(token) {
-                            this.username = senderName
-                            this.avatarUrl = avatarUrl
 
-                            val url = message.toAbsoluteFile(group)?.getUrl()?:error("Can't get document url")
-                            if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) {
-                                val raw = BotUtil.downloadImg(url)
-                                val target = BotUtil.toWebp(raw)
-                                addFile(target)
-                            } else {
-                                error("File size is too large")
-                            }
-                        }
-                    }
+                    val url = message.toAbsoluteFile(group)?.getUrl() ?: error("Can't get document url")
+                    if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) error("File size is too large")
+
+                    val raw = BotUtil.downloadImg(url)
+                    val target = BotUtil.toWebp(raw)
+
+                    val msg = MessageCreateBuilder {
+                        files += FileUpload.fromData(target)
+                    }.build()
+
+                    webhook.sendMessage(msg)
+                        .setAvatarUrl(avatarUrl)
+                        .setUsername(senderName)
+                        .queue()
                 }
 
-                else -> null
-            }?.let { receive ->
-//                QQDiscordRepository.save(
-//                    QQDiscord().apply {
-//                        this.qqGrpId = messageChain.source.targetId
-//                        this.qqMsgId = messageChain.source.ids[0]
-//                        this.discordChannelId = receive.channelId.value.toLong()
-//                        this.discordMsgId = receive.id.value.toLong()
-//                    }
-//                )
+                else -> {
+                    webhook.sendMessage(message.contentToString())
+                        .setAvatarUrl(avatarUrl)
+                        .setUsername(senderName)
+                        .queue()
+                }
+            }.let { receive ->
+                //                QQDiscordRepository.save(
+                //                    QQDiscord().apply {
+                //                        this.qqGrpId = messageChain.source.targetId
+                //                        this.qqMsgId = messageChain.source.ids[0]
+                //                        this.discordChannelId = receive.channelId.value.toLong()
+                //                        this.discordMsgId = receive.idLong
+                //                    }
+                //                )
             }
         }
     }

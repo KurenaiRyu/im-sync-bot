@@ -7,12 +7,14 @@ coroutines = "1.10.2"
 ktor = "3.4.2"
 log4j = "2.20.0"
 jimmer = "0.9.120"
-jackson = "2.19.2"
+jackson = "2.21.2"
 mirai = "2.16.0"
 serialize-xml = "0.91.2"
 vertx = "5.0.6"
 moshi = "1.15.2"
-kord = "0.18.1"
+tdlight = "3.4.4+td.1.8.52"
+jda = "6.4.1"
+jda-ktx = "0.14.2"
 
 [libraries]
 kotlin-bom = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "ktolin" }
@@ -46,7 +48,7 @@ zxing-core = { group = "com.google.zxing", name = "core", version = "3.5.2" }
 zxing-javase = { group = "com.google.zxing", name = "javase", version = "3.5.2" }
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version = "2.0.6" }
 diruptor = { group = "com.lmax", name = "disruptor", version = "3.4.4" }
-tdlight-bom = { module = "it.tdlight:tdlight-java-bom", version = "3.4.4+td.1.8.52" }
+tdlight-bom = { module = "it.tdlight:tdlight-java-bom", version.ref = "tdlight" }
 tdlight = { group = "it.tdlight", name = "tdlight-java" }
 jimmer-sql-kotlin = { module = "org.babyfish.jimmer:jimmer-sql-kotlin", version.ref = "jimmer" }
 jimmer-ksp = { module = "org.babyfish.jimmer:jimmer-ksp", version.ref = "jimmer" }
@@ -68,7 +70,8 @@ vertx-bom = { group = "io.vertx", name = "vertx-stack-depchain", version.ref = "
 vertx-web = { group = "io.vertx", name = "vertx-web" }
 vertx-kotlin = { group = "io.vertx", name = "vertx-lang-kotlin" }
 vertx-kotlin-coroutines = { group = "io.vertx", name = "vertx-lang-kotlin-coroutines" }
-kord = { group = "dev.kord", name = "kord-core", version.ref = "kord" }
+jda = { group = "net.dv8tion", name = "JDA", version.ref = "jda" }
+jda-ktx = { group = "club.minnced", name = "jda-ktx", version.ref = "jda-ktx" }
 
 [bundles]
 ktorClient = ["ktor-client-core", "ktor-client-okhttp", "ktor-serialization-kotlinx-json", "ktor-client-negotiation"]

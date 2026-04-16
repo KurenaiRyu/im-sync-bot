@@ -40,7 +40,7 @@ import it.tdlight.jni.TdApi.Function as TdFunction
 lateinit var defaultTelegramBot: TelegramBot
 
 class TelegramBot(
-    botProperties: BotProperties,
+    val botProperties: BotProperties,
     coroutineContext: CoroutineContext,
 ) {
 
@@ -117,11 +117,18 @@ class TelegramBot(
                 }
                 tgScope.launch {
                     updateCommand()
+                    for (config in bot.groupConfigService.configs) {
+                        if (getChat(config.telegramGroupId) == null) {
+                            runCatching {
+                                sendMessageText("Refresh group", config.telegramGroupId)
+                            }.onFailure {
+                                log.error("Refresh group {} failed", config.telegramGroupId)
+                            }
+                        }
+                    }
                 }
             }
         }
-
-
     }
 
     fun <R : TdApi.Object?, Event : TdApi.Update> addListener(
@@ -139,18 +146,16 @@ class TelegramBot(
         replayToMessageId: Long = 0,
         messageThreadId: Long = 0,
         untilPersistent: Boolean = false,
-    ) = sendMessageText(text.fmt(parseMode), chatId, replayToMessageId, messageThreadId, untilPersistent)
+    ) = sendMessageText(text.fmt(parseMode), chatId, replayToMessageId, untilPersistent)
 
     suspend inline fun sendMessageText(
-        formattedText: TdApi.FormattedText,
+        formattedText: FormattedText,
         chatId: Long,
         replyToMessageId: Long = 0,
-        messageThreadId: Long = 0,
         untilPersistent: Boolean = false,
     ): TdApi.Message = send(untilPersistent) {
         messageText(formattedText, chatId).apply {
             this.replyToMessageId = replyToMessageId
-            this.messageThreadId = messageThreadId
         }
     }
 
@@ -167,7 +172,6 @@ class TelegramBot(
         text.fmt(parseMode),
         chatId,
         replayToMessageId,
-        messageThreadId,
         untilPersistent
     )
 
@@ -176,12 +180,10 @@ class TelegramBot(
         formattedText: FormattedText,
         chatId: Long,
         replyToMessageId: Long = 0,
-        messageThreadId: Long = 0,
         untilPersistent: Boolean = false,
     ): Message {
         SendMessage().apply {
             this.replyToMessageId = replyToMessageId
-            this.messageThreadId = messageThreadId
             this.inputMessageContent = InputMessagePhoto().apply {
                 this.photo = FileService.download(url).inputFile
                 this.caption = formattedText
@@ -190,7 +192,6 @@ class TelegramBot(
         return send(untilPersistent = untilPersistent) {
             messageText(formattedText, chatId).apply {
                 this.replyToMessageId = replyToMessageId
-                this.messageThreadId = messageThreadId
             }
         }
     }

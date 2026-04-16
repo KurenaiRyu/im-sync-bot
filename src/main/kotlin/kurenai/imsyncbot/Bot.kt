@@ -5,8 +5,6 @@ import com.zaxxer.hikari.HikariDataSource
 import io.vertx.core.Vertx
 import it.tdlight.Init
 import kurenai.imsyncbot.bot.discord.DiscordBot
-import kurenai.imsyncbot.command.AbstractInlineCommand
-import kurenai.imsyncbot.command.AbstractQQCommand
 import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.domain.UserConfig
 import kurenai.imsyncbot.jimmer.SqliteDialect
@@ -18,7 +16,6 @@ import org.babyfish.jimmer.sql.event.TriggerType
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.newKSqlClient
 import org.babyfish.jimmer.sql.runtime.ConnectionManager
-import org.reflections.Reflections
 import org.slf4j.Logger
 import java.io.File
 import java.nio.file.Files
@@ -39,12 +36,9 @@ import kotlin.io.path.name
 
 internal val log: Logger = getLogger()
 internal val snowFlake = SnowFlake(1)
-internal val reflections = Reflections("kurenai.imsyncbot")
 internal val dfs: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
 //internal val callbacks = reflections.getSubTypesOf(Callback::class.java).map { it.getConstructor().newInstance() }
-internal val qqCommands = ArrayList<AbstractQQCommand>()
-internal val inlineCommands = HashMap<String, AbstractInlineCommand>()
 lateinit var configProperties: ConfigProperties
 lateinit var sqlClient: KSqlClient
 lateinit var vertx: Vertx
@@ -78,7 +72,7 @@ private fun initProperties() {
     configProperties = yamlMapper.readValue(Files.readString(configPath), ConfigProperties::class.java)
 }
 
-private suspend fun initFileServer() {
+private fun initFileServer() {
     vertx = Vertx.vertx()
     vertx.deployVerticle(WebApplication::class.qualifiedName)
 }
@@ -110,26 +104,6 @@ private fun commonInit() {
 //    registerInlineCommand()
 //    registerQQHandler()
     setUpTimer()
-}
-
-private fun registerQQCommand() {
-    reflections.getSubTypesOf(AbstractQQCommand::class.java)
-        .map { it.getDeclaredConstructor().newInstance() }
-        .forEach { command ->
-            qqCommands.add(command)
-            log.info("Registered qq command:  ${command.name}(${command::class.java.simpleName})")
-        }
-}
-
-private fun registerInlineCommand() {
-    reflections.getSubTypesOf(AbstractInlineCommand::class.java)
-        .map { it.getDeclaredConstructor().newInstance() }
-        .forEach { command ->
-            if (command.command.isNotBlank()) {
-                inlineCommands[command.command] = command
-            }
-            log.info("Registered inline command:  ${command.name}(${command::class.java.simpleName})")
-        }
 }
 
 private val largeFileSize = 200 * 1024L

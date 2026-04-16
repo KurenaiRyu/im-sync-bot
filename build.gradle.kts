@@ -87,7 +87,8 @@ dependencies {
 //    implementation(group = "it.tdlight", name = "tdlight-natives", classifier = "windows_amd64")
 
     // discord api
-    implementation(libs.kord)
+    implementation(libs.jda)
+    implementation(libs.jda.ktx)
 
     testImplementation(kotlin("test"))
 }
@@ -117,7 +118,7 @@ tasks.jacocoTestReport {
 }
 
 tasks.register<Sync>("syncLib") {
-    from(configurations.compileClasspath)
+    from(configurations.runtimeClasspath)
     into("${layout.buildDirectory.get()}/libs/lib")
 }
 
