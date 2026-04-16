@@ -65,12 +65,17 @@ class QQBot(
     private val messageDispatcher = MessageDispatcher(parentScope = qqScope, name = "qq")
 
     private suspend fun buildBot(): Bot {
-        val url = "ws://${botProperties.qq.host}:${botProperties.qq.port}/"
-        log.info("Connecting to $url")
-        return BotBuilder.positive(url)
-            .token(botProperties.qq.token)
+        val builder = if (botProperties.qq.reverse) {
+            log.info("Listening to port {}", botProperties.qq.port)
+            BotBuilder.reversed(botProperties.qq.port)
+        } else {
+            val url = "ws://${botProperties.qq.host}:${botProperties.qq.port}/"
+            log.info("Connecting to $url")
+            BotBuilder.positive(url)
+        }
+        return builder.token(botProperties.qq.token)
             .overrideLogger(LoggerFactory.getLogger("net.mamoe.mirai.Bot"))
-            .connect() ?: throw BotException("Connect to $url fail!")
+            .connect() ?: throw BotException("QQ Bot start failed!")
     }
 
     context(bot: ImSyncBot)

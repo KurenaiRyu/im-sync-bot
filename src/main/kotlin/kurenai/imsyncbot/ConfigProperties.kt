@@ -56,6 +56,7 @@ data class QQProperties(
     val token: String = "",
     val account: Long = 0L,
     val password: String = "",
+    val reverse: Boolean = false
 )
 
 @Serializable
