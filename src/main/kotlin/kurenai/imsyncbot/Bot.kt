@@ -161,12 +161,8 @@ private fun computeDirSize(dirFile: File) = dirFile.listFiles()?.sumOf { Files.s
 
 private fun doDeleteCacheFile(filesToDelete: List<File>) {
     if (filesToDelete.isNotEmpty()) {
-        //if deleting subdirs, replace null above with TrueFileFilter.INSTANCE
         log.info("Clearing cache files...")
-        filesToDelete.forEach {
-            log.debug("${it.name} deleted.")
-            it.delete()
-        } //I don't want an exception if a file is not deleted. Otherwise use filesToDelete.next().delete() in a try/catch
+        log.debug("Deleted files: {}", filesToDelete.map { it.name }.joinToString(", "))
         log.info("Clear ${filesToDelete.size} cache files.")
     }
 }
