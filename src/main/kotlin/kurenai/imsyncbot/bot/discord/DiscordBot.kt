@@ -338,7 +338,7 @@ class DiscordBot(
         avatarUrl: String,
         group: Group
     ) {
-        messageChain.forEach { message ->
+        for (message in messageChain) {
             when (message) {
                 is Image -> {
                     val url = message.queryUrl()
@@ -346,6 +346,7 @@ class DiscordBot(
                     if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) {
                         path = BotUtil.toWebp(path)
                     }
+
                     if (Files.size(path) > IMAGE_SIZE) {
                         error("File size is too large")
                     }
@@ -374,7 +375,7 @@ class DiscordBot(
 
                 else -> {
                     val content = message.contentToString()
-                    if (content.isBlank()) return
+                    if (content.isBlank()) continue
                     webhook.sendMessage(content)
                         .setAvatarUrl(avatarUrl)
                         .setUsername(senderName)

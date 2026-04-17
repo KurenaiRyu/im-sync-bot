@@ -13,11 +13,13 @@ import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceBuilder
 import net.mamoe.mirai.message.data.source
+import net.mamoe.mirai.utils.mkdirs
+import okio.Path
+import okio.Path.Companion.toPath
 import org.babyfish.jimmer.kt.new
 import top.mrxiaom.overflow.Overflow
 import top.mrxiaom.overflow.contact.RemoteBot
 import java.nio.file.Files
-import java.nio.file.Path
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import kotlin.io.path.*
@@ -35,7 +37,7 @@ object BotUtil {
     private val log = getLogger()
 
     suspend fun downloadDoc(filename: String, url: String, reject: Boolean = false, overwrite: Boolean = false): Path {
-        return download(Path.of(getDocumentPath(filename)), url, reject, overwrite)
+        return download(getDocumentPath(filename).toPath(true), url, reject, overwrite)
     }
 
     suspend fun downloadImg(
@@ -44,7 +46,7 @@ object BotUtil {
         onlyCache: Boolean = false,
         overwrite: Boolean = false
     ): Path {
-        val path = Path.of(getImagePath(filename))
+        val path = getImagePath(filename).toPath(true)
         return download(path, url, onlyCache, overwrite)
     }
 
@@ -53,16 +55,16 @@ object BotUtil {
         ext: String = "png",
         onlyCache: Boolean = false,
     ): Path {
-        val image = Path.of(getImagePath(snowFlake.nextAlpha()))
+        val image = getImagePath(snowFlake.nextAlpha()).toPath(true)
         val tmpPath = download(image, url, onlyCache, false)
         val type = ImageUtil.determineImageType(tmpPath)
         val ext = if (type != ImageUtil.ImageType.UNKNOWN) type.ext else ext
 
-        val path = Path.of(getImagePath(tmpPath.crc32c() + if (ext.isNotBlank()) ".$ext" else ""))
-        if (path.exists()) tmpPath.deleteExisting()
+        val path = getImagePath(tmpPath.crc32c() + if (ext.isNotBlank()) ".$ext" else "").toPath(true)
+        if (fs.exists(path)) fs.delete(tmpPath)
         else {
             withContext(Dispatchers.VT) {
-                Files.move(tmpPath, path)
+                fs.atomicMove(tmpPath, path)
             }
         }
         return path
@@ -100,19 +102,19 @@ object BotUtil {
 
     suspend fun webp2png(file: TdApi.File): Path {
         val filename = file.remote.uniqueId
-        val pngFile = Path.of(getImagePath("$filename.png"))
-        if (pngFile.exists()) return pngFile
-        val webpPath = file.local.path?.let(Path::of) ?: error("Webp local path cannot be null")
-        pngFile.parent.createDirectories()
+        val pngFile = getImagePath("$filename.png").toPath(true)
+        if (fs.exists(pngFile)) return pngFile
+        val webpPath = file.local.path?.toPath(true) ?: error("Webp local path cannot be null")
+        pngFile.parent?.run { fs.createDirectories(this) }
 //        val tmpFile = Path.of(getImagePath("$filename-tmp.png"))
 
         val toPngProcess = runCommandAwait(
             "dwebp",
-            webpPath.pathString,
+            webpPath.toString(),
             "-o",
-            pngFile.pathString
+            pngFile.toString()
         )
-        if (toPngProcess.exitValue() != 0 || !pngFile.exists() || pngFile.fileSize() == 0L) throw BotException("Webp to png fail")
+        if (toPngProcess.exitValue() != 0 || !fs.exists(pngFile) || fs.metadata(pngFile).size == 0L) throw BotException("Webp to png fail")
 
 //        val resizeProcess = runCommandAwait(
 //            "ffmpeg",
@@ -129,34 +131,34 @@ object BotUtil {
     }
 
     suspend fun toWebp(src: Path): Path {
-        val webpPath = Path.of(getImagePath(src.nameWithoutExtension + ".webp"))
+        val webpPath = getImagePath(src.name.substringBeforeLast(".") + ".webp").toPath(true)
         val toPngProcess = runCommandAwait(
             "cwebp",
-            src.pathString,
+            src.toString(),
             "-o",
-            webpPath.pathString
+            webpPath.toString()
         )
-        if (toPngProcess.exitValue() != 0 || !webpPath.exists() || webpPath.fileSize() == 0L) throw BotException("Webp to png fail")
+        if (toPngProcess.exitValue() != 0 || !fs.exists(webpPath) || fs.metadata(webpPath).size == 0L) throw BotException("Webp to png fail")
         return webpPath
     }
 
     suspend fun mp42gif(width: Int, file: TdApi.File): Path {
         val filename = file.remote.uniqueId
-        val gifPath = Path.of(getImagePath("$filename.gif"))
-        if (gifPath.exists()) return gifPath
-        val mp4Path = Path.of(file.local.path ?: error("Mp4 local file cannot be null"))
-        gifPath.parent.createDirectories()
+        val gifPath = getImagePath("$filename.gif").toPath(true)
+        if (fs.exists(gifPath)) return gifPath
+        val mp4Path = file.local.path ?: error("Mp4 local file cannot be null").toPath(true)
+        gifPath.parent?.run {fs.createDirectories(this) }
         val process = runCommandAwait(
             "ffmpeg",
             "-y",
             "-i",
-            mp4Path.pathString,
+            mp4Path.toString(),
             "-vf",
             "scale=${minOf(width, 320)}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
-            gifPath.pathString
+            gifPath.toString()
         )
 
-        if (process.exitValue() == 0 && gifPath.exists() && gifPath.fileSize() > 0) return gifPath
+        if (process.exitValue() == 0 && fs.exists(gifPath) && (fs.metadata(gifPath).size ?: 0) > 0L) return gifPath
         else {
             throw BotException("Mp4 to Gif fail")
         }

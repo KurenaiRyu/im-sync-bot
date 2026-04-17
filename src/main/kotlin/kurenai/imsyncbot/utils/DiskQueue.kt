@@ -33,7 +33,6 @@ class DiskQueue(
     private val metaPath = parentPath.resolve("$name.meta")
 
     private val lock = Mutex()
-    private val fs = FileSystem.SYSTEM
     private val queueHandle = fs.openReadWrite(queuePath)
     private val metaHandle = fs.openReadWrite(metaPath)
 

@@ -5,12 +5,19 @@ import io.ktor.client.call.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.*
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.copyTo
+import io.ktor.utils.io.core.copyTo
+import io.ktor.utils.io.readByteArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.exception.BotException
+import okio.BufferedSource
+import okio.Path
+import okio.Path.Companion.toPath
 import java.io.InputStream
-import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.createDirectories
@@ -29,8 +36,8 @@ object HttpUtil {
     }
 
     suspend fun download(path: Path, url: String, enableProxy: Boolean = false, overwrite: Boolean): Path {
-        return if (!overwrite && path.exists()) path
-        else if (!url.startsWith("http")) Path.of(url)
+        return if (!overwrite && fs.exists(path)) path
+        else if (!url.startsWith("http")) url.toPath(true)
         else doDownload(path, url, enableProxy)
     }
 
@@ -40,11 +47,11 @@ object HttpUtil {
         val size = getRemoteFileSize(url, enableProxy)
         if (size < 1024 * 1024 * 100) {
             withContext(Dispatchers.VT) {
-                path.parent.createDirectories()
-
-                client.get(url).body<InputStream>().buffered().use { input ->
-                    path.outputStream(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING).buffered().use {
-                        input.copyTo(it)
+                path.parent?.run {fs.createDirectories(this) }
+                val channel = client.get(url).bodyAsChannel()
+                fs.write(path, false) {
+                    while (!channel.isClosedForRead) {
+                        write(channel.readByteArray(DEFAULT_BUFFER_SIZE))
                     }
                 }
             }
@@ -52,15 +59,17 @@ object HttpUtil {
             throw BotException("The file is too large: $size")
         }
 
+        val exists = fs.exists(path)
+        val pathSize = if (exists) fs.metadataOrNull(path)?.size?:0L else 0
         val timeOfMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
-        val speed = path.fileSize() * 1000 / timeOfMillis
-        if (path.exists() && path.fileSize() <= 0)
+        val speed = pathSize * 1000 / timeOfMillis
+        if (exists && pathSize <= 0)
             throw BotException("File is null: $url")
-        if (!path.exists()) {
+        if (!exists) {
             throw BotException("Download file error: $url")
         }
         log.info(
-            "Downloaded ${path.fileName} ${path.fileSize().humanReadableByteCountBin()} in ${
+            "Downloaded ${path.name} ${pathSize.humanReadableByteCountBin()} in ${
                 String.format(
                     "%.2f",
                     timeOfMillis / 1000.0

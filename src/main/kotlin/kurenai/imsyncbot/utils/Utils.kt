@@ -15,11 +15,12 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
 import okio.ByteString
+import okio.FileSystem
+import okio.Path
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.lang.reflect.Field
-import java.nio.file.Path
 import java.security.MessageDigest
 import java.text.CharacterIterator
 import java.text.StringCharacterIterator
@@ -35,6 +36,9 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.io.path.inputStream
 import kotlin.math.abs
+
+
+val fs = FileSystem.SYSTEM
 
 /**
  * @author Kurenai
@@ -179,10 +183,9 @@ fun Path.crc32(): String {
 }
 
 private fun checksum(path: Path, checksum: Checksum): String {
-    path.inputStream().use { input ->
-        val buff = ByteArray(DEFAULT_BUFFER_SIZE)
-        while (input.read(buff) != -1) {
-            checksum.update(buff)
+    fs.read(path) {
+        while (!exhausted()) {
+            checksum.update(readByteArray(DEFAULT_BUFFER_SIZE.toLong()))
         }
     }
     return checksum.value.toHexString()
@@ -195,10 +198,9 @@ fun ByteArray.md5(): String {
 
 fun Path.md5(): String {
     val md = MessageDigest.getInstance("MD5")
-    this.inputStream().use { input ->
-        val buff = ByteArray(DEFAULT_BUFFER_SIZE)
-        while (input.read(buff) != -1) {
-            md.update(buff)
+    fs.read(this) {
+        while (!exhausted()) {
+            md.update(readByteArray(DEFAULT_BUFFER_SIZE.toLong()))
         }
     }
     return md.digest().toHex()
