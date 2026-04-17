@@ -20,6 +20,7 @@ import kurenai.imsyncbot.snowFlake
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
 import kurenai.imsyncbot.utils.getLogger
+import kurenai.imsyncbot.utils.telegram.escapeMarkdown
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.entities.Webhook
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel
@@ -29,11 +30,19 @@ import net.dv8tion.jda.api.interactions.commands.OptionType
 import net.dv8tion.jda.api.utils.FileUpload
 import net.mamoe.mirai.contact.Group
 import net.mamoe.mirai.contact.nameCardOrNick
+import net.mamoe.mirai.contact.remarkOrNameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.GroupAwareMessageEvent
 import net.mamoe.mirai.event.events.GroupEvent
 import net.mamoe.mirai.event.events.GroupMessagePostSendEvent
+import net.mamoe.mirai.event.events.GroupMuteAllEvent
 import net.mamoe.mirai.event.events.GroupTempMessagePostSendEvent
+import net.mamoe.mirai.event.events.MemberCardChangeEvent
+import net.mamoe.mirai.event.events.MemberJoinEvent
+import net.mamoe.mirai.event.events.MemberLeaveEvent
+import net.mamoe.mirai.event.events.MemberMuteEvent
+import net.mamoe.mirai.event.events.MemberSpecialTitleChangeEvent
+import net.mamoe.mirai.event.events.MemberUnmuteEvent
 import net.mamoe.mirai.message.data.FileMessage
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
@@ -41,6 +50,7 @@ import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.OnlineMessageSource
 import org.babyfish.jimmer.kt.new
 import java.nio.file.Files
+import kotlin.collections.get
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -119,50 +129,44 @@ class DiscordBot(
 
         bot.qq.qqBot.eventChannel.subscribeAlways<Event> { event ->
             when (event) {
+                is GroupAwareMessageEvent -> incomingMessageChannel.trySend(event)
                 is GroupMessagePostSendEvent -> {
                     event.receipt?.source?.let { syncMessageChannel.trySend(it) }
                 }
                 is GroupTempMessagePostSendEvent -> {
                     event.receipt?.source?.let { syncMessageChannel.trySend(it) }
                 }
-                is GroupEvent -> {
-                    when (event) {
-                        is GroupAwareMessageEvent -> incomingMessageChannel.trySend(event)
-                        else -> {
-                            incomingEventChannel.trySend(event)
-                        }
-                    }
-                }
+                is GroupEvent -> incomingEventChannel.trySend(event)
 
                 else -> {}
             }
         }
 
         launch {
-            syncMessageChannel.receiveAsFlow().collect { source ->
-                runCatching {
+            runCatching {
+                for (source in syncMessageChannel) {
                     handleSyncMessage(source)
-                }.onFailure {
-                    log.error("Handle sync message error", it)
                 }
+            }.onFailure {
+                log.error("Handle sync message error", it)
             }
         }
         launch {
-            incomingMessageChannel.receiveAsFlow().collect { event ->
-                runCatching {
+            runCatching {
+                for (event in incomingMessageChannel) {
                     handleGroupMessage(event)
-                }.onFailure {
-                    log.error("Handle group message error", it)
                 }
+            }.onFailure {
+                log.error("Handle group message error", it)
             }
         }
         launch {
-            incomingMessageChannel.receiveAsFlow().collect { event ->
-                runCatching {
+            runCatching {
+                for (event in incomingEventChannel) {
                     handleGroupEvent(event)
-                }.onFailure {
-                    log.error("Handle group message error", it)
                 }
+            }.onFailure {
+                log.error("Handle group message error", it)
             }
         }
     }
@@ -257,7 +261,61 @@ class DiscordBot(
         handleMessage(event.message, webhook, name, avatarUrl, group)
     }
 
-    suspend fun handleGroupEvent(event: GroupAwareMessageEvent) {
+    suspend fun handleGroupEvent(event: GroupEvent) {
+        val msg = when (event) {
+            is MemberJoinEvent -> {
+                when (event) {
+                    is MemberJoinEvent.Active -> {
+                        "${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick)}#${event.member.id} 入群 ${event.group.name} "
+                    }
+
+                    is MemberJoinEvent.Invite -> {
+                        "${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick)}#${event.member.id} 通过 ${(bot.userConfigService.idBindings[event.invitor.id] ?: event.invitor.remarkOrNameCardOrNick)}#${event.invitor.id} 的邀请入群"
+                    }
+
+                    else -> return
+                }
+            }
+
+            is MemberLeaveEvent.Kick -> {
+                "${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick)}#${event.member.id} 被踢出群"
+            }
+
+            is MemberLeaveEvent.Quit -> {
+                "${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick)}#${event.member.id} 退出群"
+            }
+
+
+            is MemberMuteEvent -> {
+                "${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick)}#${event.member.id} 被禁言${event.durationSeconds / 60}分钟"
+            }
+
+            is GroupMuteAllEvent -> {
+                "${(bot.userConfigService.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick) ?: "?"}#${event.operator?.id?:"?"} 禁言了所有人"
+            }
+
+            is MemberUnmuteEvent -> {
+                "${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick)}#${event.member.id} 被 ${(bot.userConfigService.idBindings[event.operator?.id] ?: event.operator?.remarkOrNameCardOrNick) ?: "?"}#${event.operator?.id ?: "?"} 解除禁言"
+            }
+
+            is MemberCardChangeEvent -> {
+                if (event.new.isNotEmpty()) {
+                    "${(bot.userConfigService.idBindings[event.member.id] ?: event.origin)}#${event.member.id} 名称改为 ${event.new} "
+                } else {
+                    return
+                }
+            }
+
+            is MemberSpecialTitleChangeEvent -> {
+                "`${(bot.userConfigService.idBindings[event.member.id] ?: event.member.remarkOrNameCardOrNick)}#${event.member.id} 获得头衔 ${event.new}`"
+            }
+
+            else -> {
+                log.debug("未支持群事件 {} 的处理", event.javaClass)
+                return
+            }
+        }
+
         val group = event.group
         val channelId = GroupConfigRepository.findByQqGroupId(group.id)?.discordChannelId ?: return
         val channel = jda.getChannel<TextChannel>(channelId) ?: return
@@ -267,7 +325,7 @@ class DiscordBot(
         val name = "Group Event"
         val avatarUrl = group.avatarUrl
 
-        webhook.sendMessage(event.message.contentToString())
+        webhook.sendMessage(msg)
             .setUsername(name)
             .setAvatarUrl(avatarUrl)
             .await()
