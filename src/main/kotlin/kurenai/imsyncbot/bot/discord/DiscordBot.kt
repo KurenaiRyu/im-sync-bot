@@ -15,6 +15,7 @@ import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.GroupConfigRepository
+import kurenai.imsyncbot.repository.UserConfigRepository
 import kurenai.imsyncbot.snowFlake
 import kurenai.imsyncbot.utils.BotUtil
 import kurenai.imsyncbot.utils.HttpUtil
@@ -31,11 +32,8 @@ import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.contact.remarkOrNameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
-import net.mamoe.mirai.message.data.FileMessage
-import net.mamoe.mirai.message.data.Image
+import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
-import net.mamoe.mirai.message.data.MessageChain
-import net.mamoe.mirai.message.data.OnlineMessageSource
 import org.babyfish.jimmer.kt.new
 import java.nio.file.Files
 import kotlin.coroutines.CoroutineContext
@@ -361,7 +359,20 @@ class DiscordBot(
                 }
 
                 else -> {
-                    val content = message.contentToString()
+                    val content = when (message) {
+                        is At -> {
+                            val id = message.target
+                            val name =
+                                UserConfigRepository.findByQQ(id)?.bindingName ?: group[id]?.remarkOrNameCardOrNick
+                                ?: "?"
+                            "@${name} #id"
+                        }
+
+                        else -> {
+                            message.contentToString()
+                        }
+                    }
+
                     if (content.isBlank()) continue
                     webhook.sendMessage(content)
                         .setAvatarUrl(avatarUrl)
