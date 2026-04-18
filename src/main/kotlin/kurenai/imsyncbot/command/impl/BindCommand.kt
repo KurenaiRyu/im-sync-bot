@@ -1,5 +1,7 @@
 package kurenai.imsyncbot.command.impl
 
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.ContributesIntoSet
 import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
@@ -12,6 +14,7 @@ import net.mamoe.mirai.message.data.sourceOrNull
 
 private val log = getLogger()
 
+@ContributesIntoSet(AppScope::class)
 class BindCommand : AbstractTelegramCommand() {
 
     override val command = "bind"
@@ -86,6 +89,7 @@ class BindCommand : AbstractTelegramCommand() {
     }
 }
 
+@ContributesIntoSet(AppScope::class)
 class UnbindCommand : AbstractTelegramCommand() {
 
     override val command = "unbind"
@@ -95,11 +99,11 @@ class UnbindCommand : AbstractTelegramCommand() {
 
     context(bot: ImSyncBot)
     override suspend fun execute(message: Message, sender: MessageSenderUser, input: String): String? {
-        val param = message.content.formattedText?.text ?: return "参数错误"
-        return if (param.isNotBlank()) {
+        return if (input.isNotBlank()) {
             try {
-                bot.groupConfigService.remove(param.toLong())
-                "解绑Q群成功"
+                val config = bot.groupConfigService.findByTg(input.toLong())
+                bot.groupConfigService.remove(input.toLong())
+                "解绑Q群[${config?.name ?: "?"} ${config?.id ?: 0}]成功"
             } catch (e: Exception) {
                 log.error("参数错误", e)
                 "参数错误"
