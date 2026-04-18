@@ -6,7 +6,6 @@ import it.tdlight.jni.TdApi.*
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.command.AbstractTelegramCommand
 import kurenai.imsyncbot.utils.BotUtil
-import kotlin.io.path.pathString
 
 
 @ContributesIntoSet(AppScope::class)
@@ -28,7 +27,7 @@ class SyncAvatarCommand : AbstractTelegramCommand() {
                 bot.tg.send {
                     SetChatPhoto(
                         message.chatId,
-                        InputChatPhotoStatic(InputFileLocal(avatarPath.pathString))
+                        InputChatPhotoStatic(InputFileLocal(avatarPath.toString()))
                     )
                 }
                 handled = true
@@ -40,7 +39,7 @@ class SyncAvatarCommand : AbstractTelegramCommand() {
                 bot.tg.send {
                     SetChatPhoto(
                         message.chatId,
-                        InputChatPhotoStatic(InputFileLocal(avatarPath.pathString))
+                        InputChatPhotoStatic(InputFileLocal(avatarPath.toString()))
                     )
                 }
                 handled = true

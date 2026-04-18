@@ -37,7 +37,6 @@ import org.jsoup.Jsoup
 import org.jsoup.parser.Parser
 import java.nio.file.Path
 import kotlin.io.path.fileSize
-import kotlin.io.path.pathString
 
 /**
  * 信息上下文
@@ -459,7 +458,7 @@ class GroupMessageContext(
                 this.inputMessageContent = InputMessageVideo().apply {
                     this.caption = "${shortVideo.filename}.${shortVideo.fileFormat}"
                         .escapeMarkdown().formatMsg(senderId, senderName).fmt()
-                    this.video = InputFileLocal(BotUtil.downloadDoc(name, url).pathString)
+                    this.video = InputFileLocal(BotUtil.downloadDoc(name, url).toString())
                 }
             }
             return arrayOf(bot.tg.send(true, params = func))
@@ -476,7 +475,7 @@ class GroupMessageContext(
                 this.replyToMessageId = this@GroupMessageContext.replayToMessageId
                 this.inputMessageContent = InputMessageVideo().apply {
                     this.caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
-                    this.video = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
+                    this.video = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).toString())
                 }
             }
             return arrayOf(bot.tg.send(true, params = func))
@@ -496,7 +495,7 @@ class GroupMessageContext(
                 this.chatId = this@GroupMessageContext.chatId
                 this.inputMessageContent = InputMessageDocument().apply {
                     this.caption = getContentWithAtAndWithoutImage().formatMsg(senderId, senderName).fmt()
-                    this.document = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).pathString)
+                    this.document = InputFileLocal(BotUtil.downloadDoc(fileMessage.name, url).toString())
                 }
             }
             return arrayOf(bot.tg.send(true, params = func))

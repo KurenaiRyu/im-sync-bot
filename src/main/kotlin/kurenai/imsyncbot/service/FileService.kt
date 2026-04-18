@@ -3,9 +3,7 @@ package kurenai.imsyncbot.service
 import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.InputFile
 import it.tdlight.jni.TdApi.InputFileLocal
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.domain.FileCache
 import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.domain.copy
@@ -16,14 +14,8 @@ import kurenai.imsyncbot.utils.telegram.file
 import net.mamoe.mirai.message.data.Image
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import net.mamoe.mirai.utils.MiraiInternalApi
+import okio.Path.Companion.toPath
 import org.babyfish.jimmer.kt.new
-import java.net.URI
-import java.nio.file.Files
-import java.nio.file.Path
-import kotlin.io.path.exists
-import kotlin.io.path.name
-import kotlin.io.path.pathString
-import kotlin.io.path.toPath
 
 /**
  * @author Kurenai
@@ -40,7 +32,7 @@ object FileService {
 //                BotUtil.downloadImg(
 //                    "${image.imageId.substring(1..36).replace("-", "")}.${image.imageType.formatName}",
 //                    image.queryUrl()
-//                ).pathString
+//                ).toString()
 //            )
 //        }
         download(image.queryUrl())
@@ -56,7 +48,7 @@ object FileService {
 //
 //        imgMap.entries.takeIf { it.isNotEmpty() }?.forEach { (_, img) ->
 //            val filename = "${img.imageId.substring(1..36).replace("-", "")}.${img.imageType.formatName}"
-//            send(InputFileLocal(BotUtil.downloadImg(filename, img.queryUrl()).pathString))
+//            send(InputFileLocal(BotUtil.downloadImg(filename, img.queryUrl()).toString()))
 //        }
 
         images.forEach {
@@ -68,7 +60,7 @@ object FileService {
         val localFile = !url.startsWith("http")
 
         val tmpPath =
-            if (localFile) URI.create(url).toPath()
+            if (localFile) url.toPath(true)
             else BotUtil.downloadImg(url, ext)
         val crc32c = tmpPath.crc32c()
 
@@ -79,8 +71,8 @@ object FileService {
         // return if image has extension
         val tmpExt = tmpPath.name.substringAfterLast(".")
         if (tmpExt.isNotEmpty()) {
-            val type = ImageUtil.ImageType.values().find { it.ext == tmpExt }?: ImageUtil.ImageType.UNKNOWN
-            return ImageInfo(crc32c, url, InputFileLocal(tmpPath.pathString), type)
+            val type = ImageUtil.ImageType.entries.find { it.ext == tmpExt } ?: ImageUtil.ImageType.UNKNOWN
+            return ImageInfo(crc32c, url, InputFileLocal(tmpPath.toString()), type)
         }
 
         val type = ImageUtil.determineImageType(tmpPath)
@@ -89,13 +81,11 @@ object FileService {
             else tmpExt.ifBlank { "png" }
 
 
-        val path = Path.of(getImagePath("$crc32c.$extension"))
-        if (!path.exists()) {
-            withContext(Dispatchers.VT) {
-                Files.move(tmpPath, path)
-            }
+        val path = getImagePath("$crc32c.$extension").toPath(true)
+        if (!fs.exists(path)) {
+            fs.atomicMove(tmpPath, path)
         }
-        return ImageInfo(crc32c, url, InputFileLocal(path.pathString), type)
+        return ImageInfo(crc32c, url, InputFileLocal(path.toString()), type)
     }
 
     @OptIn(MiraiInternalApi::class)

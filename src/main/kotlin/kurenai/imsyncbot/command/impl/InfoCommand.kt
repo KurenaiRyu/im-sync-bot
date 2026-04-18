@@ -17,7 +17,6 @@ import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.message.data.sourceOrNull
 import java.time.Instant
 import java.time.ZoneId
-import kotlin.io.path.pathString
 
 @ContributesIntoSet(AppScope::class)
 class InfoCommand : AbstractTelegramCommand() {
@@ -88,7 +87,7 @@ class InfoCommand : AbstractTelegramCommand() {
                             bot.tg.send {
                                 messagePhoto(
                                     message.chatId,
-                                    path.pathString,
+                                    path.toString(),
                                     list.joinToString("\n").fmt(ParseMode.MARKDOWN_V2)
                                 )
                             }
@@ -141,7 +140,7 @@ class InfoCommand : AbstractTelegramCommand() {
             val photoPath =
                 withVT { BotUtil.downloadImg(photoName, photoUrl, overwrite = true) }
             bot.tg.send {
-                messagePhoto(message.chatId, photoPath.pathString, list.joinToString("\n").fmt(ParseMode.MARKDOWN_V2))
+                messagePhoto(message.chatId, photoPath.toString(), list.joinToString("\n").fmt(ParseMode.MARKDOWN_V2))
             }
             null
         }
