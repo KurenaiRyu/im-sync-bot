@@ -12,22 +12,18 @@ import kurenai.imsyncbot.jimmer.scalar.GroupStatusScalarProvider
 import kurenai.imsyncbot.jimmer.scalar.UserStatusScalarProvider
 import kurenai.imsyncbot.utils.*
 import net.mamoe.mirai.Bot
+import okio.Path
+import okio.Path.Companion.toPath
 import org.babyfish.jimmer.sql.event.TriggerType
 import org.babyfish.jimmer.sql.kt.KSqlClient
 import org.babyfish.jimmer.sql.kt.newKSqlClient
 import org.babyfish.jimmer.sql.runtime.ConnectionManager
 import org.slf4j.Logger
-import java.io.File
-import java.nio.file.Files
-import java.nio.file.Path
 import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.timerTask
-import kotlin.io.path.fileSize
 import kotlin.io.path.inputStream
-import kotlin.io.path.isDirectory
-import kotlin.io.path.name
 
 /**
  * @author Kurenai
@@ -58,18 +54,18 @@ suspend fun main() {
 }
 
 private fun initProperties() {
-    Files.list(Path.of(".")).filter {
-        it.name.endsWith(".env") && it.name != "example.env" && !it.isDirectory()
-    }.findFirst().ifPresent {
+    fs.list(".".toPath()).filter {
+        it.name.endsWith(".env") && it.name != "example.env" && !fs.metadata(it).isDirectory
+    }.firstOrNull()?.let {
         val pop = Properties()
-        it.inputStream().use { stream ->
-            pop.load(stream)
+        it.toNioPath().inputStream().use { input ->
+            pop.load(input)
             setEnv(pop)
         }
     }
 
-    val configPath = Path.of("config.yaml")
-    configProperties = yamlMapper.readValue(Files.readString(configPath), ConfigProperties::class.java)
+    val configPath = "config.yaml".toPath()
+    configProperties = yamlMapper.readValue(fs.read(configPath) { readByteArray() }, ConfigProperties::class.java)
 }
 
 private fun initFileServer() {
@@ -106,7 +102,6 @@ private fun commonInit() {
     setUpTimer()
 }
 
-private val largeFileSize = 200 * 1024L
 private val cacheAllowSize = 100 * 1024 * 1024L
 
 private const val cachePath = "./cache"
@@ -114,55 +109,39 @@ private val clearCacheTimer = Timer("ClearCache", true)
 
 private fun setUpTimer() {
     clearCacheTimer.scheduleAtFixedRate(timerTask {
-        val cacheDir = File(cachePath)
-        cacheDir.mkdirs()
-        for (dirFile in cacheDir.listFiles()?.filter { it.isDirectory } ?: emptyList()) {
-            try {
-                if (!dirFile.exists()) {
-                    log.warn("${dirFile.absolutePath} not exist!")
-                    continue
-                }
+        runCatching {
+            val cacheDir = cachePath.toPath(true)
+            if (!fs.exists(cacheDir)) fs.createDirectories(cacheDir)
 
-                val sizeOfDir = computeDirSize(dirFile)
-                val filesToDelete = ArrayList<File>()
-                if (sizeOfDir > cacheAllowSize) {
-                    var deleteSize = 0L
-                    val fileSet =
-                        dirFile.listFiles()?.sortedByDescending { it.lastModified() }?.toMutableSet() ?: continue
+            for (subDir in fs.list(cacheDir).filter { fs.metadata(it).isDirectory }) {
+                val list = fs.list(subDir)
+                    .map { fs.metadata(it) to it }
+                    .sortedBy { (metadata, _) -> metadata.lastModifiedAtMillis }
 
-                    // remove large file
-                    fileSet.filter { f ->
-                        f.toPath().fileSize() > largeFileSize
-                    }.forEach {
-                        deleteSize += Files.size(it.toPath())
-                        fileSet.remove(it)
-                        filesToDelete.add(it)
-                    }
+                var totalSize = list.sumOf { (metadata, _) -> metadata.size ?: 0 }
+                if (totalSize < cacheAllowSize) continue
 
-                    // remove until dir size less than allow cache size
-                    for (file in fileSet) {
-                        if (sizeOfDir - deleteSize > cacheAllowSize) {
-                            deleteSize += Files.size(file.toPath())
-                            filesToDelete.add(file)
-                        } else
-                            break
-                    }
-                    doDeleteCacheFile(filesToDelete)
-                }
-                log.info("Cache folder [${dirFile.name}] size: ${sizeOfDir.humanReadableByteCountBin()}")
-            } catch (e: Exception) {
-                log.error(e.message, e)
+                val fileToDelete = mutableListOf<Path>()
+                for ((metadata, path) in list) {
+                    fileToDelete.add(path)
+                    totalSize -= metadata.size ?: 0
+                    if (totalSize < cacheAllowSize) break
             }
+
+                doDeleteCacheFile(fileToDelete)
+                log.info("Cache folder [${subDir.name}] size: ${totalSize.humanReadableByteCountBin()}")
+        }
+        }.onFailure {
+            log.error("Clear cache file error", it)
         }
     }, 5000L, TimeUnit.HOURS.toMillis(1))
 }
 
-private fun computeDirSize(dirFile: File) = dirFile.listFiles()?.sumOf { Files.size(it.toPath()) } ?: 0L
-
-private fun doDeleteCacheFile(filesToDelete: List<File>) {
+private fun doDeleteCacheFile(filesToDelete: List<Path>) {
     if (filesToDelete.isNotEmpty()) {
         log.info("Clearing cache files...")
-        log.debug("Deleted files: {}", filesToDelete.map { it.name }.joinToString(", "))
+        filesToDelete.forEach { fs.delete(it) }
+        log.debug("Deleted files: {}", filesToDelete.joinToString(", ") { it.name })
         log.info("Clear ${filesToDelete.size} cache files.")
     }
 }
