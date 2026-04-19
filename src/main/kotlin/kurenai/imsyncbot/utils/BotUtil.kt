@@ -1,7 +1,11 @@
 package kurenai.imsyncbot.utils
 
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.sksamuel.aedile.core.asCache
 import it.tdlight.jni.TdApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.domain.by
@@ -13,16 +17,14 @@ import net.mamoe.mirai.message.data.MessageChain
 import net.mamoe.mirai.message.data.MessageSource
 import net.mamoe.mirai.message.data.MessageSourceBuilder
 import net.mamoe.mirai.message.data.source
-import net.mamoe.mirai.utils.mkdirs
 import okio.Path
 import okio.Path.Companion.toPath
 import org.babyfish.jimmer.kt.new
 import top.mrxiaom.overflow.Overflow
 import top.mrxiaom.overflow.contact.RemoteBot
-import java.nio.file.Files
 import java.time.LocalDateTime
 import java.time.ZoneOffset
-import kotlin.io.path.*
+import java.util.concurrent.TimeUnit
 
 
 object BotUtil {
@@ -35,6 +37,10 @@ object BotUtil {
     const val NEWLINE_PATTERN = "\$newline"
 
     private val log = getLogger()
+    private val mutex = Mutex()
+    private val fileCache = Caffeine.newBuilder()
+        .expireAfterWrite(5, TimeUnit.MINUTES)
+        .asCache<String, Path>()
 
     suspend fun downloadDoc(filename: String, url: String, reject: Boolean = false, overwrite: Boolean = false): Path {
         return download(getDocumentPath(filename).toPath(true), url, reject, overwrite)
@@ -45,16 +51,19 @@ object BotUtil {
         url: String,
         onlyCache: Boolean = false,
         overwrite: Boolean = false
-    ): Path {
+    ) = mutex.withLock {
+        fileCache.get(url) {
         val path = getImagePath(filename).toPath(true)
-        return download(path, url, onlyCache, overwrite)
+            download(path, url, onlyCache, overwrite)
+        }
     }
 
     suspend fun downloadImg(
         url: String,
         ext: String = "png",
         onlyCache: Boolean = false,
-    ): Path {
+    ) = mutex.withLock {
+        fileCache.get(url) {
         val image = getImagePath(snowFlake.nextAlpha()).toPath(true)
         val tmpPath = download(image, url, onlyCache, false)
         val type = ImageUtil.determineImageType(tmpPath)
@@ -67,7 +76,8 @@ object BotUtil {
                 fs.atomicMove(tmpPath, path)
             }
         }
-        return path
+            path
+        }
     }
 
     private suspend fun download(path: Path, url: String, onlyCache: Boolean, overwrite: Boolean): Path {

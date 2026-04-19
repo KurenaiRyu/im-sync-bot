@@ -1,9 +1,6 @@
 package kurenai.imsyncbot.utils
 
-import okio.FileSystem
 import okio.Path
-import kotlin.io.path.bufferedReader
-import kotlin.io.path.inputStream
 
 object ImageUtil {
 
@@ -29,7 +26,7 @@ object ImageUtil {
 
     private fun readMagicNum(path: Path): ByteArray {
         return fs.read(path) {
-            this.readByteArray(4)
+            this.readByteArray(buffer.size.coerceAtMost(4))
         }
     }
 

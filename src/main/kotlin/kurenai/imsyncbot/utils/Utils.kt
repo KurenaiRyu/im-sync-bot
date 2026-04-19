@@ -34,7 +34,6 @@ import java.util.zip.CRC32C
 import java.util.zip.Checksum
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.io.path.inputStream
 import kotlin.math.abs
 
 
@@ -185,7 +184,7 @@ fun Path.crc32(): String {
 private fun checksum(path: Path, checksum: Checksum): String {
     fs.read(path) {
         while (!exhausted()) {
-            checksum.update(readByteArray(DEFAULT_BUFFER_SIZE.toLong()))
+            checksum.update(readByteArray(buffer.size.coerceAtMost(DEFAULT_BUFFER_SIZE.toLong())))
         }
     }
     return checksum.value.toHexString()
@@ -200,7 +199,7 @@ fun Path.md5(): String {
     val md = MessageDigest.getInstance("MD5")
     fs.read(this) {
         while (!exhausted()) {
-            md.update(readByteArray(DEFAULT_BUFFER_SIZE.toLong()))
+            md.update(readByteArray(buffer.size.coerceAtMost(DEFAULT_BUFFER_SIZE.toLong())))
         }
     }
     return md.digest().toHex()
