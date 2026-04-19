@@ -384,7 +384,7 @@ class DiscordBot(
                         .findByBotIdAndTargetIdAndMessageId(source.botId, source.targetId, source.ids[0])
                         ?.toMessageChain()
                         ?: continue
-                    val replyInfo = QQDiscordRepository.findByQQ(source.ids[0]).firstOrNull()
+                    val replyInfo = QQDiscordRepository.findByQQ(source.ids[0], group.id).firstOrNull()
                     val member = group[source.fromId]
 
                     embeds.add(EmbedBuilder {
