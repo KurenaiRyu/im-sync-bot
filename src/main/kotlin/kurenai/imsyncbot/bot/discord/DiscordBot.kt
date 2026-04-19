@@ -6,6 +6,7 @@ import dev.minn.jda.ktx.events.onCommand
 import dev.minn.jda.ktx.generics.getChannel
 import dev.minn.jda.ktx.interactions.commands.upsertCommand
 import dev.minn.jda.ktx.jdabuilder.light
+import dev.minn.jda.ktx.messages.EmbedBuilder
 import dev.minn.jda.ktx.messages.reply_
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
@@ -15,13 +16,15 @@ import kurenai.imsyncbot.domain.GroupConfig
 import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.GroupConfigRepository
+import kurenai.imsyncbot.repository.QQMessageRepository
 import kurenai.imsyncbot.repository.UserConfigRepository
 import kurenai.imsyncbot.snowFlake
 import kurenai.imsyncbot.utils.BotUtil
+import kurenai.imsyncbot.utils.BotUtil.toMessageChain
 import kurenai.imsyncbot.utils.HttpUtil
+import kurenai.imsyncbot.utils.fs
 import kurenai.imsyncbot.utils.getLogger
 import net.dv8tion.jda.api.JDA
-import net.dv8tion.jda.api.entities.Webhook
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel
 import net.dv8tion.jda.api.events.GenericEvent
 import net.dv8tion.jda.api.events.interaction.command.GenericCommandInteractionEvent
@@ -35,7 +38,6 @@ import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import org.babyfish.jimmer.kt.new
-import java.nio.file.Files
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -52,7 +54,7 @@ class DiscordBot(
 
     companion object {
         val log = getLogger()
-        val IMAGE_SIZE: Int = 10_000_000
+        const val IMAGE_SIZE: Int = 10 * 1024 * 1024 - 100
     }
 
     lateinit var jda: JDA
@@ -128,30 +130,30 @@ class DiscordBot(
         }
 
         launch {
-            runCatching {
-                for (source in syncMessageChannel) {
+            for (source in syncMessageChannel) {
+                runCatching {
                     handleSyncMessage(source)
+                }.onFailure {
+                    log.error("Handle sync message error", it)
                 }
-            }.onFailure {
-                log.error("Handle sync message error", it)
             }
         }
         launch {
-            runCatching {
-                for (event in incomingMessageChannel) {
+            for (event in incomingMessageChannel) {
+                runCatching {
                     handleGroupMessage(event)
+                }.onFailure {
+                    log.error("Handle group message error", it)
                 }
-            }.onFailure {
-                log.error("Handle group message error", it)
             }
         }
         launch {
-            runCatching {
-                for (event in incomingEventChannel) {
+            for (event in incomingEventChannel) {
+                runCatching {
                     handleGroupEvent(event)
+                }.onFailure {
+                    log.error("Handle group message error", it)
                 }
-            }.onFailure {
-                log.error("Handle group message error", it)
             }
         }
     }
@@ -231,7 +233,11 @@ class DiscordBot(
         val name = "${source.sender.nameCardOrNick} #${source.sender.id}"
         val avatarUrl = source.sender.avatarUrl
         val group = source.target as? Group ?: return
-        handleMessage(source.originalMessage, webhook, name, avatarUrl, group)
+
+        with(MessageContext(source.originalMessage, webhook, name, avatarUrl, group)) {
+            handleMessage()
+        }
+
     }
 
     suspend fun handleGroupMessage(event: GroupAwareMessageEvent) {
@@ -241,9 +247,12 @@ class DiscordBot(
         val webhook =
             channel.retrieveWebhooks().await().firstOrNull { it.name == "forward" } ?: channel.createWebhook("forward")
                 .await()
-        val name = "${bot.userConfigService.idBindings[event.sender.id] ?: event.senderName} #${event.sender.id}"
+        val name =
+            "${bot.userConfigService.idBindings[event.sender.id] ?: group[event.sender.id]?.remarkOrNameCardOrNick ?: event.sender.remark.takeIf { it.isNotBlank() } ?: event.senderName} #${event.sender.id}"
         val avatarUrl = event.sender.avatarUrl
-        handleMessage(event.message, webhook, name, avatarUrl, group)
+        with(MessageContext(event.message, webhook, name, avatarUrl, group)) {
+            handleMessage()
+        }
     }
 
     suspend fun handleGroupEvent(event: GroupEvent) {
@@ -316,56 +325,88 @@ class DiscordBot(
             .await()
     }
 
-    suspend fun handleMessage(
-        messageChain: MessageChain,
-        webhook: Webhook,
-        senderName: String,
-        avatarUrl: String,
-        group: Group
-    ) {
-        for (message in messageChain) {
+    context(ctx: MessageContext)
+    suspend fun handleMessage() = ctx.apply {
+        for ((index, message) in messageChain.withIndex()) {
+            log.debug("Received message: {}", message.toString())
             when (message) {
+                is MessageSource -> {
+                    continue
+                }
                 is Image -> {
+
                     val url = message.queryUrl()
                     var path = BotUtil.downloadImg(url)
-                    if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) {
+                    var size = (fs.metadataOrNull(path)?.size ?: 0)
+                    if (size >= IMAGE_SIZE) {
                         path = BotUtil.toWebp(path)
+                        size = (fs.metadataOrNull(path)?.size ?: 0)
                     }
 
-                    if (Files.size(path) > IMAGE_SIZE) {
+                    if (size > IMAGE_SIZE) {
+                        doSendMessage()
                         error("File size is too large")
                     }
 
-                    webhook.sendMessage("")
-                        .setFiles(FileUpload.fromData(path))
-                        .setAvatarUrl(avatarUrl)
-                        .setUsername(senderName)
-                        .await()
+                    if (files.isNotEmpty())
+                        doSendMessage()
+
+                    ctx.images.add(FileUpload.fromData(path.toNioPath()))
                 }
 
                 is FileMessage -> {
 
-                    val url = message.toAbsoluteFile(group)?.getUrl() ?: error("Can't get document url")
-                    if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) error("File size is too large")
+                    val url = message.toAbsoluteFile(group)?.getUrl() ?: doError("Can't get document url")
+                    if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) doError("File size is too large")
 
                     val raw = BotUtil.downloadImg(url)
                     val target = BotUtil.toWebp(raw)
 
-                    webhook.sendMessage("")
-                        .setFiles(FileUpload.fromData(target))
-                        .setAvatarUrl(avatarUrl)
-                        .setUsername(senderName)
-                        .await()
+                    if (images.isNotEmpty())
+                        doSendMessage()
+
+                    files.add(FileUpload.fromData(target.toNioPath()))
+                }
+
+                is OnlineShortVideo -> {
+                    val size = message.fileSize
+                    if (size > IMAGE_SIZE) {
+                        doError("Video size is too large")
+                    }
+
+                    val path = BotUtil.downloadDoc("${message.filename}.${message.fileFormat}", message.urlForDownload)
+                    files.add(FileUpload.fromData(path.toNioPath()))
+                }
+
+                is QuoteReply -> {
+                    val source = message.source
+                    val sourceMsg = QQMessageRepository
+                        .findByBotIdAndTargetIdAndMessageId(source.botId, source.targetId, source.ids[0])
+                        ?.toMessageChain()
+                        ?: continue
+                    val member = group[source.fromId]
+
+                    embeds.add(EmbedBuilder {
+                        author {
+                            iconUrl = member?.avatarUrl
+                            name = "${member?.remarkOrNameCardOrNick ?: "???"} #${member?.id ?: 0}"
+                        }
+                        description = sourceMsg.content.takeIf { it.isNotBlank() } ?: "No things"
+                    }.build())
                 }
 
                 else -> {
+                    if (files.isNotEmpty() || images.isNotEmpty() || embeds.isNotEmpty()) doSendMessage()
+
                     val content = when (message) {
                         is At -> {
+                            if (messageChain[(index - 1).coerceAtLeast(0)] is QuoteReply) continue
+
                             val id = message.target
                             val name =
                                 UserConfigRepository.findByQQ(id)?.bindingName ?: group[id]?.remarkOrNameCardOrNick
                                 ?: "?"
-                            "@${name} #id"
+                            "@${name} #${id}"
                         }
 
                         else -> {
@@ -374,21 +415,38 @@ class DiscordBot(
                     }
 
                     if (content.isBlank()) continue
-                    webhook.sendMessage(content)
-                        .setAvatarUrl(avatarUrl)
-                        .setUsername(senderName)
-                        .await()
+
+                    this.content.append(content)
                 }
-            }.let { receive ->
-                //                QQDiscordRepository.save(
-                //                    QQDiscord().apply {
-                //                        this.qqGrpId = messageChain.source.targetId
-                //                        this.qqMsgId = messageChain.source.ids[0]
-                //                        this.discordChannelId = receive.channelId.value.toLong()
-                //                        this.discordMsgId = receive.idLong
-                //                    }
-                //                )
             }
+        }
+        doSendMessage()
+    }
+
+    context(ctx: MessageContext)
+    private suspend fun doError(string: String): String {
+        doSendMessage()
+        error(string)
+    }
+
+    context(ctx: MessageContext)
+    private suspend fun doSendMessage() = ctx.apply {
+        if (content.isBlank() && files.isEmpty() && images.isEmpty() && embeds.isEmpty()) return@apply
+
+        val action = webhook.sendMessage(content.toString())
+            .setUsername(senderName)
+            .setAvatarUrl(avatarUrl)
+        if (files.isNotEmpty()) action.setFiles(files)
+        if (images.isNotEmpty()) action.setFiles(images)
+        if (embeds.isNotEmpty()) action.setEmbeds(embeds)
+
+        try {
+            action.await()
+        } finally {
+            content.setLength(0)
+            files.clear()
+            images.clear()
+            embeds.clear()
         }
     }
 
