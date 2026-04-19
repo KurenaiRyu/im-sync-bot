@@ -175,6 +175,32 @@ CREATE TABLE IF NOT EXISTS qq_tg
     null
 );
 
+CREATE TABLE IF NOT EXISTS qq_tg
+(
+    id
+    bigint
+    not
+    null
+    primary
+    key,
+    qq_id
+    bigint,
+    qq_msg_id
+    integer,
+    guild_id
+    bigint,
+    channel_id
+    bigint,
+    message_id
+    bigint,
+    version
+    integer
+    default
+    0
+    not
+    null
+);
+
 CREATE TABLE IF NOT EXISTS user_config
 (
     id

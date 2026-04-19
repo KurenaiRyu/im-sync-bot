@@ -13,9 +13,11 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kurenai.imsyncbot.ImSyncBot
 import kurenai.imsyncbot.domain.GroupConfig
+import kurenai.imsyncbot.domain.QQDiscord
 import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.domain.copy
 import kurenai.imsyncbot.repository.GroupConfigRepository
+import kurenai.imsyncbot.repository.QQDiscordRepository
 import kurenai.imsyncbot.repository.QQMessageRepository
 import kurenai.imsyncbot.repository.UserConfigRepository
 import kurenai.imsyncbot.snowFlake
@@ -384,12 +386,18 @@ class DiscordBot(
                         .findByBotIdAndTargetIdAndMessageId(source.botId, source.targetId, source.ids[0])
                         ?.toMessageChain()
                         ?: continue
+                    val replyInfo = QQDiscordRepository.findByQQ(source.ids[0]).firstOrNull()
                     val member = group[source.fromId]
 
                     embeds.add(EmbedBuilder {
                         author {
                             iconUrl = member?.avatarUrl
                             name = "${member?.remarkOrNameCardOrNick ?: "???"} #${member?.id ?: 0}"
+                        }
+                        //https://discord.com/channels/804632979057410068/1494027438555009027/1495419126800453822
+                        if (replyInfo != null) {
+                            url =
+                                "https://discord.com/channels/${replyInfo.guildId}/${replyInfo.channelId}/${replyInfo.messageId}}"
                         }
                         description = sourceMsg.content.takeIf { it.isNotBlank() } ?: "No things"
                     }.build())
@@ -441,7 +449,13 @@ class DiscordBot(
         if (embeds.isNotEmpty()) action.setEmbeds(embeds)
 
         try {
-            action.await()
+            val res = action.await()
+            QQDiscordRepository.save(new(QQDiscord::class).by {
+                qqMsgId = messageChain.source.ids[0]
+                guildId = res.guildIdLong
+                channelId = res.channelIdLong
+                messageId = res.idLong
+            })
         } finally {
             content.setLength(0)
             files.clear()
