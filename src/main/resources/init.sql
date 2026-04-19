@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS qq_tg
     null
 );
 
-CREATE TABLE IF NOT EXISTS qq_tg
+CREATE TABLE IF NOT EXISTS qq_discord
 (
     id
     bigint
@@ -183,10 +183,10 @@ CREATE TABLE IF NOT EXISTS qq_tg
     null
     primary
     key,
-    qq_id
-    bigint,
     qq_msg_id
-    integer,
+    bigint,
+    qq_group_id
+    bigint,
     guild_id
     bigint,
     channel_id

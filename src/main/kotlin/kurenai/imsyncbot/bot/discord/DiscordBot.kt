@@ -336,9 +336,8 @@ class DiscordBot(
                     continue
                 }
                 is Image -> {
-
                     val url = message.queryUrl()
-                    var path = BotUtil.downloadImg(url)
+                    var path = BotUtil.downloadImg(url = url, filename = message.imageId)
                     var size = (fs.metadataOrNull(path)?.size ?: 0)
                     if (size >= IMAGE_SIZE) {
                         path = BotUtil.toWebp(path)
@@ -361,13 +360,12 @@ class DiscordBot(
                     val url = message.toAbsoluteFile(group)?.getUrl() ?: doError("Can't get document url")
                     if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) doError("File size is too large")
 
-                    val raw = BotUtil.downloadImg(url)
-                    val target = BotUtil.toWebp(raw)
+                    val path = BotUtil.downloadDoc(url = url, filename = message.name)
 
                     if (images.isNotEmpty())
                         doSendMessage()
 
-                    files.add(FileUpload.fromData(target.toNioPath()))
+                    files.add(FileUpload.fromData(path.toNioPath()))
                 }
 
                 is OnlineShortVideo -> {
@@ -452,6 +450,7 @@ class DiscordBot(
             val res = action.await()
             QQDiscordRepository.save(new(QQDiscord::class).by {
                 qqMsgId = messageChain.source.ids[0]
+                qqGroupId = messageChain.source.targetId
                 guildId = res.guildIdLong
                 channelId = res.channelIdLong
                 messageId = res.idLong

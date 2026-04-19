@@ -53,7 +53,7 @@ object BotUtil {
         overwrite: Boolean = false
     ) = mutex.withLock {
         fileCache.get(url) {
-        val path = getImagePath(filename).toPath(true)
+            val path = getImagePath(filename).toPath(true)
             download(path, url, onlyCache, overwrite)
         }
     }
@@ -64,18 +64,17 @@ object BotUtil {
         onlyCache: Boolean = false,
     ) = mutex.withLock {
         fileCache.get(url) {
-        val image = getImagePath(snowFlake.nextAlpha()).toPath(true)
-        val tmpPath = download(image, url, onlyCache, false)
-        val type = ImageUtil.determineImageType(tmpPath)
-        val ext = if (type != ImageUtil.ImageType.UNKNOWN) type.ext else ext
-
-        val path = getImagePath(tmpPath.crc32c() + if (ext.isNotBlank()) ".$ext" else "").toPath(true)
-        if (fs.exists(path)) fs.delete(tmpPath)
-        else {
-            withContext(Dispatchers.VT) {
-                fs.atomicMove(tmpPath, path)
+            val image = getImagePath(snowFlake.nextAlpha()).toPath(true)
+            val tmpPath = download(image, url, onlyCache, false)
+            val type = ImageUtil.determineImageType(tmpPath)
+            val ext = if (type != ImageUtil.ImageType.UNKNOWN) type.ext else ext
+            val path = getImagePath(tmpPath.crc32c() + if (ext.isNotBlank()) ".$ext" else "").toPath(true)
+            if (fs.exists(path)) fs.delete(tmpPath)
+            else {
+                withContext(Dispatchers.VT) {
+                    fs.atomicMove(tmpPath, path)
+                }
             }
-        }
             path
         }
     }

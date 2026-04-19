@@ -14,6 +14,7 @@ interface QQDiscord {
     @GeneratedValue(generatorType = SnowFlakeGenerator::class)
     val id: Long
     val qqMsgId: Int
+    val qqGroupId: Long
 
 
     @Key
