@@ -42,6 +42,7 @@ import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
 import org.babyfish.jimmer.kt.new
+import top.mrxiaom.overflow.message.data.withUrl
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -383,7 +384,7 @@ class DiscordBot(
 
                 is FileMessage -> {
 
-                    val url = message.toAbsoluteFile(group)?.getUrl() ?: doError("Can't get document url")
+                    val url = message.withUrl.url
                     if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) doError("File size is too large")
 
                     val path = BotUtil.downloadDoc(url = url, filename = message.name)
