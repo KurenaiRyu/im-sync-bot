@@ -7,6 +7,7 @@ import dev.minn.jda.ktx.generics.getChannel
 import dev.minn.jda.ktx.interactions.commands.upsertCommand
 import dev.minn.jda.ktx.jdabuilder.light
 import dev.minn.jda.ktx.messages.EmbedBuilder
+import dev.minn.jda.ktx.messages.MessageEditBuilder
 import dev.minn.jda.ktx.messages.reply_
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
@@ -258,7 +259,28 @@ class DiscordBot(
     }
 
     suspend fun handleGroupEvent(event: GroupEvent) {
+        val group = event.group
+        val channelId = GroupConfigRepository.findByQqGroupId(group.id)?.discordChannelId ?: return
+        val channel = jda.getChannel<TextChannel>(channelId) ?: return
+        val webhook =
+            channel.retrieveWebhooks().await().firstOrNull { it.name == "forward" } ?: channel.createWebhook("forward")
+                .await()
+
         val msg = when (event) {
+            is MessageRecallEvent.GroupRecall -> {
+                val infos = QQDiscordRepository.findByQQ(event.messageIds[0], event.group.id)?:return
+                for (info in infos) {
+                    val origin = webhook.retrieveMessageById(info.messageId.toString()).await()
+                    val content = StringBuilder("")
+                    origin.contentRaw.replace("^~~|~~&", "")
+                        .lines().forEach { content.appendLine("~~$it~~") }
+                    val msg = MessageEditBuilder(content.toString()).build()
+                    webhook.editMessageById(info.messageId, msg)
+                        .await()
+                }
+                return
+            }
+
             is MemberJoinEvent -> {
                 when (event) {
                     is MemberJoinEvent.Active -> {
@@ -312,12 +334,6 @@ class DiscordBot(
             }
         }
 
-        val group = event.group
-        val channelId = GroupConfigRepository.findByQqGroupId(group.id)?.discordChannelId ?: return
-        val channel = jda.getChannel<TextChannel>(channelId) ?: return
-        val webhook =
-            channel.retrieveWebhooks().await().firstOrNull { it.name == "forward" } ?: channel.createWebhook("forward")
-                .await()
         val name = "Group Event"
         val avatarUrl = group.avatarUrl
 
@@ -335,9 +351,15 @@ class DiscordBot(
                 is MessageSource -> {
                     continue
                 }
-                is Image -> {
-                    val url = message.queryUrl()
-                    var path = BotUtil.downloadImg(url = url, filename = message.imageId)
+                is FlashImage, Image -> {
+                    val image = when (message) {
+                        is FlashImage -> message.image
+                        is Image -> message
+                        else -> continue
+                    }
+
+                    val url = image.queryUrl()
+                    var path = BotUtil.downloadImg(url = url, filename = image.imageId)
                     var size = (fs.metadataOrNull(path)?.size ?: 0)
                     if (size >= IMAGE_SIZE) {
                         path = BotUtil.toWebp(path)
@@ -345,8 +367,7 @@ class DiscordBot(
                     }
 
                     if (size > IMAGE_SIZE) {
-                        doSendMessage()
-                        error("File size is too large")
+                        doError("File size is too large")
                     }
 
                     if (files.isNotEmpty())
@@ -388,16 +409,15 @@ class DiscordBot(
                     val member = group[source.fromId]
 
                     embeds.add(EmbedBuilder {
+                        description = sourceMsg.content.takeIf { it.isNotBlank() } ?: "No things"
                         author {
                             iconUrl = member?.avatarUrl
                             name = "${member?.remarkOrNameCardOrNick ?: "???"} #${member?.id ?: 0}"
+                            //https://discord.com/channels/804632979057410068/1494027438555009027/1495419126800453822
+                            if (replyInfo != null) {
+                                url = "https://discord.com/channels/${replyInfo.guildId}/${replyInfo.channelId}/${replyInfo.messageId}}"
+                            }
                         }
-                        //https://discord.com/channels/804632979057410068/1494027438555009027/1495419126800453822
-                        if (replyInfo != null) {
-                            url =
-                                "https://discord.com/channels/${replyInfo.guildId}/${replyInfo.channelId}/${replyInfo.messageId}}"
-                        }
-                        description = sourceMsg.content.takeIf { it.isNotBlank() } ?: "No things"
                     }.build())
                 }
 
