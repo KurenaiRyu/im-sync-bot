@@ -40,6 +40,7 @@ import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
+import nl.adaptivity.xmlutil.core.impl.multiplatform.name
 import org.babyfish.jimmer.kt.new
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -346,7 +347,6 @@ class DiscordBot(
     context(ctx: MessageContext)
     suspend fun handleMessage() = ctx.apply {
         for ((index, message) in messageChain.withIndex()) {
-            log.debug("Received message: {}", message.toString())
             when (message) {
                 is MessageSource -> {
                     continue
@@ -436,6 +436,7 @@ class DiscordBot(
                         }
 
                         else -> {
+                            log.debug("${message::class.simpleName}: ${message.contentToString()}")
                             message.contentToString()
                         }
                     }
