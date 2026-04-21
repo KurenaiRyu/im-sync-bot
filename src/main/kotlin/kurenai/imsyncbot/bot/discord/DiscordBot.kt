@@ -29,6 +29,7 @@ import kurenai.imsyncbot.utils.fs
 import kurenai.imsyncbot.utils.getLogger
 import net.dv8tion.jda.api.JDA
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel
+import net.dv8tion.jda.api.entities.emoji.Emoji
 import net.dv8tion.jda.api.events.GenericEvent
 import net.dv8tion.jda.api.events.interaction.command.GenericCommandInteractionEvent
 import net.dv8tion.jda.api.interactions.commands.OptionType
@@ -40,7 +41,6 @@ import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
-import nl.adaptivity.xmlutil.core.impl.multiplatform.name
 import org.babyfish.jimmer.kt.new
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -272,12 +272,17 @@ class DiscordBot(
                 val infos = QQDiscordRepository.findByQQ(event.messageIds[0], event.group.id)?:return
                 for (info in infos) {
                     val origin = webhook.retrieveMessageById(info.messageId.toString()).await()
-                    val content = StringBuilder("")
-                    origin.contentRaw.replace("^~~|~~&", "")
-                        .lines().forEach { content.appendLine("~~$it~~") }
-                    val msg = MessageEditBuilder(content.toString()).build()
-                    webhook.editMessageById(info.messageId, msg)
-                        .await()
+                    if (origin.contentStripped.isBlank()) {
+                        origin.addReaction(Emoji.fromUnicode("\uD83D\uDDD1")) // 🗑
+                            .await()
+                    } else {
+                        val content = StringBuilder("")
+                        origin.contentRaw.replace("^~~|~~&", "")
+                            .lines().forEach { content.appendLine("~~$it~~") }
+                        val msg = MessageEditBuilder(content.toString()).build()
+                        webhook.editMessageById(info.messageId, msg)
+                            .await()
+                    }
                 }
                 return
             }
@@ -370,10 +375,10 @@ class DiscordBot(
                         doError("File size is too large")
                     }
 
-                    if (files.isNotEmpty())
+                    if (files.isNotEmpty() || images.size >= 10)
                         doSendMessage()
 
-                    ctx.images.add(FileUpload.fromData(path.toNioPath()))
+                    images.add(FileUpload.fromData(path.toNioPath()))
                 }
 
                 is FileMessage -> {
@@ -383,7 +388,7 @@ class DiscordBot(
 
                     val path = BotUtil.downloadDoc(url = url, filename = message.name)
 
-                    if (images.isNotEmpty())
+                    if (images.isNotEmpty() || files.size >= 10)
                         doSendMessage()
 
                     files.add(FileUpload.fromData(path.toNioPath()))
