@@ -356,7 +356,7 @@ class DiscordBot(
                 is MessageSource -> {
                     continue
                 }
-                is FlashImage, Image -> {
+                is FlashImage, is Image -> {
                     val image = when (message) {
                         is FlashImage -> message.image
                         is Image -> message
