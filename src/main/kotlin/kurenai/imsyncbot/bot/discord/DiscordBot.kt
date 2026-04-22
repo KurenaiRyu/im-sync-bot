@@ -442,7 +442,7 @@ class DiscordBot(
                         }
 
                         else -> {
-                            log.debug("${message::class.simpleName}: ${message.contentToString()}")
+                            log.debug("{}: {} | {}", message::class.simpleName, message.contentToString(), message)
                             message.contentToString()
                         }
                     }

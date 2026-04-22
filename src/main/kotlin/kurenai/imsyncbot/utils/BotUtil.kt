@@ -11,6 +11,7 @@ import kurenai.imsyncbot.domain.QQMessage
 import kurenai.imsyncbot.domain.by
 import kurenai.imsyncbot.exception.BotException
 import kurenai.imsyncbot.imSyncBot
+import kurenai.imsyncbot.service.HttpFileService
 import kurenai.imsyncbot.snowFlake
 import net.mamoe.mirai.event.events.MessageEvent
 import net.mamoe.mirai.message.data.MessageChain
@@ -51,7 +52,10 @@ object BotUtil {
         url: String,
         onlyCache: Boolean = false,
         overwrite: Boolean = false
-    ) = mutex.withLock {
+    ): Path = mutex.withLock {
+        if (url.contains("://${HttpFileService.host}:${HttpFileService.port}", true))
+            return HttpFileService.retrievePath(url)
+
         fileCache.get(url) {
             val path = getImagePath(filename).toPath(true)
             download(path, url, onlyCache, overwrite)
@@ -62,7 +66,10 @@ object BotUtil {
         url: String,
         ext: String = "png",
         onlyCache: Boolean = false,
-    ) = mutex.withLock {
+    ): Path = mutex.withLock {
+        if (url.contains("://${HttpFileService.host}:${HttpFileService.port}", true))
+            return HttpFileService.retrievePath(url)
+
         fileCache.get(url) {
             val image = getImagePath(snowFlake.nextAlpha()).toPath(true)
             val tmpPath = download(image, url, onlyCache, false)

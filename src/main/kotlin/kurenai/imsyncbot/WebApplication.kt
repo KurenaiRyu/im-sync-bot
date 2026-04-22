@@ -13,7 +13,7 @@ class WebApplication : AbstractVerticle() {
     override fun start() {
         val router = Router.router(kurenai.imsyncbot.vertx)
         router.route().handler(BodyHandler.create())
-        router.getWithRegex("/file/.*").handler(HttpFileService::retrieveFile)
+        router.getWithRegex("/file/.*").handler(HttpFileService::retrieveFileAndResponse)
         router.get("/health").handler { ctx ->
             ctx.response().setStatusCode(200).end("OK")
         }

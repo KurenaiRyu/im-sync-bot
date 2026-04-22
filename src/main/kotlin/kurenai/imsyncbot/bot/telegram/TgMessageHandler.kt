@@ -41,11 +41,14 @@ class TgMessageHandler(
     private var tgMsgFormat = $$"$name: $msg"
     private var qqMsgFormat = $$"$name: $msg"
 
-    private val traceEnabled = TelegramBot.log.isTraceEnabled
+    private val traceEnabled = log.isTraceEnabled
 
     private val listenerLock = Mutex()
     private val listeners: MutableList<Listener<out Object?, out Update>> = mutableListOf()
     private val startUpTime = System.currentTimeMillis() / 1000
+
+    private var lastUploadMessageTime = 0L
+    private var lastUploadFileId = 0
 
     init {
         if (botProperties.tgMsgFormat.contains($$"$msg")) tgMsgFormat = botProperties.tgMsgFormat
@@ -58,7 +61,7 @@ class TgMessageHandler(
         log.trace("Incoming update: {}", update.toString().trim())
         val status = bot.tg.status.value
         if (status != Running) {
-            TelegramBot.log.debug(
+            log.debug(
                 "Telegram bot status {}, do not handle {}.",
                 status.javaClass.simpleName,
                 update::class.qualifiedName
@@ -66,7 +69,7 @@ class TgMessageHandler(
             return@launch
         }
         if (bot.qq.status.value != Running) {
-            TelegramBot.log.debug(
+            log.debug(
                 "QQ bot status {}, do not handle {}.",
                 status.javaClass.simpleName,
                 update::class.qualifiedName
@@ -77,7 +80,7 @@ class TgMessageHandler(
         runCatching {
             doHandle(update)
         }.onFailure { ex ->
-            TelegramBot.log.error("Command handle error: ${ex.message}", ex)
+            log.error("Command handle error: ${ex.message}", ex)
             when (update) {
                 is UpdateNewMessage -> update.message
                 is UpdateMessageContent -> bot.tg.getMessage(update.chatId, update.messageId)
@@ -188,7 +191,7 @@ class TgMessageHandler(
 
         when (update) {
             is UpdateNewInlineQuery -> {
-                TelegramBot.log.debug(
+                log.debug(
                     "New inline query ({})[{}] from user {}, offset {}",
                     update.id,
                     update.query,
@@ -199,14 +202,14 @@ class TgMessageHandler(
 
             is UpdateNewMessage -> {
                 if (update.message.isOutgoing) {
-                    TelegramBot.log.debug(
+                    log.debug(
                         "New message(out going) {} from chat {}",
                         update.message.id,
                         update.message.chatId
                     )
                     return
                 } else {
-                    TelegramBot.log.debug(
+                    log.debug(
                         "New message {} from chat {}",
                         update.message.id,
                         update.message.chatId
@@ -215,7 +218,7 @@ class TgMessageHandler(
             }
 
             is UpdateMessageEdited -> {
-                TelegramBot.log.debug(
+                log.debug(
                     "Edited message {} from chat {}",
                     update.messageId,
                     update.chatId
@@ -223,7 +226,7 @@ class TgMessageHandler(
             }
 
             is UpdateMessageContent -> {
-                TelegramBot.log.debug(
+                log.debug(
                     "Edited message content {} from chat {}",
                     update.messageId,
                     update.chatId
@@ -231,7 +234,7 @@ class TgMessageHandler(
             }
 
             is UpdateDeleteMessages -> {
-                TelegramBot.log.debug(
+                log.debug(
                     "Deleted messages {} from chat {}",
                     update.messageIds,
                     update.chatId,
@@ -239,7 +242,7 @@ class TgMessageHandler(
             }
 
             is UpdateMessageSendSucceeded -> {
-                TelegramBot.log.debug(
+                log.debug(
                     "Sent message {} -> {} to chat {}",
                     update.oldMessageId,
                     update.message.id,
@@ -248,7 +251,7 @@ class TgMessageHandler(
             }
 
             is UpdateMessageSendFailed -> {
-                TelegramBot.log.error(
+                log.error(
                     "Sent message {} -> {} to chat {} fail: {} {}",
                     update.oldMessageId,
                     update.message.id,
@@ -260,9 +263,12 @@ class TgMessageHandler(
 
             is UpdateFile -> {
                 val file = update.file
+                val time = System.currentTimeMillis()
+                if (file.id == lastUploadFileId && time - lastUploadMessageTime < 1000) return
+
                 val minSize = min(file.local.downloadedSize, file.remote.uploadedSize)
                 val maxSize = max(file.local.downloadedSize, file.remote.uploadedSize)
-                TelegramBot.log.debug(
+                log.debug(
                     "Update file [{}] {} {}/{}({}%) : {}",
                     file.id,
                     if (file.local.isDownloadingActive) "downloading"
@@ -273,17 +279,20 @@ class TgMessageHandler(
                     (minSize * 100.0 / maxSize).roundToInt(),
                     file.local.path
                 )
+                lastUploadMessageTime = time
+                lastUploadFileId = update.file.id
             }
 
+
             is UpdateConnectionState -> {
-                TelegramBot.log.debug(
+                log.debug(
                     "Update connection state: {}",
                     update.state::class.java
                 )
             }
 
             else -> {
-                TelegramBot.log.debug("Not handle {}", update::class.java)
+                log.debug("Not handle {}", update::class.java)
             }
         }
 
