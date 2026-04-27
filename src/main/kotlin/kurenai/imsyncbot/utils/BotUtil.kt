@@ -56,6 +56,10 @@ object BotUtil {
         if (url.contains("://${HttpFileService.host}:${HttpFileService.port}", true))
             return HttpFileService.retrievePath(url)
 
+        if (filename.startsWith("https://") || filename.startsWith("http://") || filename.contains("://")) {
+            return downloadImg(url, onlyCache = onlyCache)
+        }
+
         fileCache.get(url) {
             val path = getImagePath(filename).toPath(true)
             download(path, url, onlyCache, overwrite)
