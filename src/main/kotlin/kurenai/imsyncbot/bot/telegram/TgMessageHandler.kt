@@ -490,6 +490,8 @@ class TgMessageHandler(
                 parentScope.launch {
                     MessageService.cache(it, message)
                 }
+
+                bot.discord.syncGroupMessageChannel.trySend(it)
             }.onFailure {
                 log.warn("Cache message error", it)
             }

@@ -39,8 +39,10 @@ import net.mamoe.mirai.contact.nameCardOrNick
 import net.mamoe.mirai.contact.remarkOrNameCardOrNick
 import net.mamoe.mirai.event.Event
 import net.mamoe.mirai.event.events.*
+import net.mamoe.mirai.message.MessageReceipt
 import net.mamoe.mirai.message.data.*
 import net.mamoe.mirai.message.data.Image.Key.queryUrl
+import net.mamoe.mirai.message.sourceMessage
 import org.babyfish.jimmer.kt.new
 import top.mrxiaom.overflow.message.data.withUrl
 import kotlin.coroutines.CoroutineContext
@@ -65,7 +67,7 @@ class DiscordBot(
     lateinit var jda: JDA
     val incomingMessageChannel: Channel<GroupAwareMessageEvent> = Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
     val incomingEventChannel: Channel<GroupEvent> = Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
-    private val syncMessageChannel: Channel<OnlineMessageSource.Outgoing> =
+    val syncGroupMessageChannel: Channel<MessageReceipt<Group>> =
         Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
     override val coroutineContext: CoroutineContext = SupervisorJob(coroutineContext[Job]) +
             Dispatchers.Default +
@@ -122,12 +124,12 @@ class DiscordBot(
         bot.qq.qqBot.eventChannel.subscribeAlways<Event> { event ->
             when (event) {
                 is GroupAwareMessageEvent -> incomingMessageChannel.trySend(event)
-                is GroupMessagePostSendEvent -> {
-                    event.receipt?.source?.let { syncMessageChannel.trySend(it) }
-                }
-                is GroupTempMessagePostSendEvent -> {
-                    event.receipt?.source?.let { syncMessageChannel.trySend(it) }
-                }
+//                is GroupMessagePostSendEvent -> {
+//                    event.receipt?.source?.let { syncGroupMessageChannel.trySend(it) }
+//                }
+//                is GroupTempMessagePostSendEvent -> {
+//                    event.receipt?.source?.let { syncGroupMessageChannel.trySend(it) }
+//                }
                 is GroupEvent -> incomingEventChannel.trySend(event)
 
                 else -> {}
@@ -135,9 +137,9 @@ class DiscordBot(
         }
 
         launch {
-            for (source in syncMessageChannel) {
+            for (source in syncGroupMessageChannel) {
                 runCatching {
-                    handleSyncMessage(source)
+                    handleSyncGroupMessage(source)
                 }.onFailure {
                     log.error("Handle sync message error", it)
                 }
@@ -229,17 +231,17 @@ class DiscordBot(
 //        GroupConfigRepository.saveAll(missConfigs)
 //    }
 
-    private suspend fun handleSyncMessage(source: OnlineMessageSource.Outgoing) {
-        val channelId = GroupConfigRepository.findByQqGroupId(source.target.id)?.discordChannelId ?: return
+    private suspend fun handleSyncGroupMessage(receipt: MessageReceipt<Group>) {
+        val channelId = GroupConfigRepository.findByQqGroupId(receipt.target.id)?.discordChannelId ?: return
         val channel = jda.getChannel<TextChannel>(channelId) ?: return
         val webhook =
             channel.retrieveWebhooks().await().firstOrNull { it.name == "forward" } ?: channel.createWebhook("forward")
                 .await()
-        val name = "${source.sender.nameCardOrNick} #${source.sender.id}"
-        val avatarUrl = source.sender.avatarUrl
-        val group = source.target as? Group ?: return
+        val name = "${receipt.source.sender.nameCardOrNick} #${receipt.source.sender.id}"
+        val avatarUrl = receipt.source.sender.avatarUrl
+        val group = receipt.target
 
-        with(MessageContext(source.originalMessage, webhook, name, avatarUrl, group)) {
+        with(MessageContext(receipt.sourceMessage, webhook, name, avatarUrl, group)) {
             handleMessage()
         }
 
@@ -352,105 +354,118 @@ class DiscordBot(
 
     context(ctx: MessageContext)
     suspend fun handleMessage() = ctx.apply {
+        log.debug("Handling message: {} | {}", messageChain, messageChain.contentToString())
         for ((index, message) in messageChain.withIndex()) {
-            when (message) {
-                is MessageSource -> {
-                    continue
-                }
-                is FlashImage, is Image -> {
-                    val image = when (message) {
-                        is FlashImage -> message.image
-                        is Image -> message
-                        else -> continue
+            runCatching {
+                when (message) {
+                    is MessageSource -> {
+                        continue
                     }
 
-                    val url = image.queryUrl()
-                    var path = BotUtil.downloadImg(url = url, filename = image.imageId)
-                    var size = (fs.metadataOrNull(path)?.size ?: 0)
-                    if (size >= IMAGE_SIZE) {
-                        path = BotUtil.toWebp(path)
-                        size = (fs.metadataOrNull(path)?.size ?: 0)
+                    is FlashImage, is Image -> {
+                        val image = when (message) {
+                            is FlashImage -> message.image
+                            is Image -> message
+                            else -> continue
+                        }
+
+                        val url = image.queryUrl()
+                        var path = BotUtil.downloadImg(url = url, filename = image.imageId)
+                        var size = (fs.metadataOrNull(path)?.size ?: 0)
+                        if (size >= IMAGE_SIZE) {
+                            path = BotUtil.toWebp(path)
+                            size = (fs.metadataOrNull(path)?.size ?: 0)
+                        }
+
+                        if (size > IMAGE_SIZE) {
+                            doError("File size is too large")
+                        }
+
+                        if (files.isNotEmpty() || images.size >= 10)
+                            doSendMessage()
+
+                        images.add(FileUpload.fromData(path.toNioPath()))
                     }
 
-                    if (size > IMAGE_SIZE) {
-                        doError("File size is too large")
+                    is FileMessage -> {
+
+                        val url = message.withUrl.url
+                        if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) doError("File size is too large")
+
+                        val path = BotUtil.downloadDoc(url = url, filename = message.name)
+
+                        if (images.isNotEmpty() || files.size >= 10)
+                            doSendMessage()
+
+                        files.add(FileUpload.fromData(path.toNioPath()))
                     }
 
-                    if (files.isNotEmpty() || images.size >= 10)
-                        doSendMessage()
+                    is OnlineShortVideo -> {
+                        val size = message.fileSize
+                        if (size > IMAGE_SIZE) {
+                            doError("Video size is too large")
+                        }
 
-                    images.add(FileUpload.fromData(path.toNioPath()))
-                }
-
-                is FileMessage -> {
-
-                    val url = message.withUrl.url
-                    if (HttpUtil.getRemoteFileSize(url) >= IMAGE_SIZE) doError("File size is too large")
-
-                    val path = BotUtil.downloadDoc(url = url, filename = message.name)
-
-                    if (images.isNotEmpty() || files.size >= 10)
-                        doSendMessage()
-
-                    files.add(FileUpload.fromData(path.toNioPath()))
-                }
-
-                is OnlineShortVideo -> {
-                    val size = message.fileSize
-                    if (size > IMAGE_SIZE) {
-                        doError("Video size is too large")
+                        val path =
+                            BotUtil.downloadDoc("${message.filename}.${message.fileFormat}", message.urlForDownload)
+                        files.add(FileUpload.fromData(path.toNioPath()))
                     }
 
-                    val path = BotUtil.downloadDoc("${message.filename}.${message.fileFormat}", message.urlForDownload)
-                    files.add(FileUpload.fromData(path.toNioPath()))
-                }
+                    is QuoteReply -> {
+                        val source = message.source
+                        val sourceMsg = QQMessageRepository
+                            .findByBotIdAndTargetIdAndMessageId(source.botId, source.targetId, source.ids[0])
+                            ?.toMessageChain()
+                            ?: continue
+                        val replyInfo = QQDiscordRepository.findByQQ(source.ids[0], group.id).firstOrNull()
+                        val member = group[source.fromId]
 
-                is QuoteReply -> {
-                    val source = message.source
-                    val sourceMsg = QQMessageRepository
-                        .findByBotIdAndTargetIdAndMessageId(source.botId, source.targetId, source.ids[0])
-                        ?.toMessageChain()
-                        ?: continue
-                    val replyInfo = QQDiscordRepository.findByQQ(source.ids[0], group.id).firstOrNull()
-                    val member = group[source.fromId]
+                        embeds.add(EmbedBuilder {
+                            description = sourceMsg.content.takeIf { it.isNotBlank() } ?: "No things"
+                            author {
+                                iconUrl = member?.avatarUrl
+                                name = "${member?.remarkOrNameCardOrNick ?: "???"} #${member?.id ?: 0}"
+                                //https://discord.com/channels/804632979057410068/1494027438555009027/1495419126800453822
+                                if (replyInfo != null) {
+                                    url =
+                                        "https://discord.com/channels/${replyInfo.guildId}/${replyInfo.channelId}/${replyInfo.messageId}}"
+                                }
+                            }
+                        }.build())
+                    }
 
-                    embeds.add(EmbedBuilder {
-                        description = sourceMsg.content.takeIf { it.isNotBlank() } ?: "No things"
-                        author {
-                            iconUrl = member?.avatarUrl
-                            name = "${member?.remarkOrNameCardOrNick ?: "???"} #${member?.id ?: 0}"
-                            //https://discord.com/channels/804632979057410068/1494027438555009027/1495419126800453822
-                            if (replyInfo != null) {
-                                url = "https://discord.com/channels/${replyInfo.guildId}/${replyInfo.channelId}/${replyInfo.messageId}}"
+                    else -> {
+                        if (files.isNotEmpty() || images.isNotEmpty() || embeds.isNotEmpty()) doSendMessage()
+
+                        val content = when (message) {
+                            is At -> {
+                                if (messageChain[(index - 1).coerceAtLeast(0)] is QuoteReply) continue
+
+                                val id = message.target
+                                val name =
+                                    UserConfigRepository.findByQQ(id)?.bindingName ?: group[id]?.remarkOrNameCardOrNick
+                                    ?: "?"
+                                "@${name} #${id}"
+                            }
+
+                            else -> {
+                                log.debug(
+                                    "Fallback handling {}: {} | {}",
+                                    message::class.simpleName,
+                                    message.contentToString(),
+                                    message
+                                )
+                                message.contentToString()
                             }
                         }
-                    }.build())
-                }
 
-                else -> {
-                    if (files.isNotEmpty() || images.isNotEmpty() || embeds.isNotEmpty()) doSendMessage()
+                        if (content.isBlank()) continue
 
-                    val content = when (message) {
-                        is At -> {
-                            if (messageChain[(index - 1).coerceAtLeast(0)] is QuoteReply) continue
-
-                            val id = message.target
-                            val name =
-                                UserConfigRepository.findByQQ(id)?.bindingName ?: group[id]?.remarkOrNameCardOrNick
-                                ?: "?"
-                            "@${name} #${id}"
-                        }
-
-                        else -> {
-                            log.debug("{}: {} | {}", message::class.simpleName, message.contentToString(), message)
-                            message.contentToString()
-                        }
+                        this.content.append(content)
                     }
-
-                    if (content.isBlank()) continue
-
-                    this.content.append(content)
                 }
+            }.onFailure {
+                log.error("Handle message error", it)
             }
         }
         doSendMessage()
