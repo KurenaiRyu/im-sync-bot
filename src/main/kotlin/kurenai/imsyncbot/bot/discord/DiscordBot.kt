@@ -68,7 +68,7 @@ class DiscordBot(
     val incomingMessageChannel: Channel<GroupAwareMessageEvent> = Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
     val incomingEventChannel: Channel<GroupEvent> = Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
     val syncGroupMessageChannel: Channel<MessageReceipt<Group>> =
-        Channel(Channel.BUFFERED, BufferOverflow.DROP_OLDEST)
+        Channel(Channel.BUFFERED, BufferOverflow.DROP_LATEST)
     override val coroutineContext: CoroutineContext = SupervisorJob(coroutineContext[Job]) +
             Dispatchers.Default +
             CoroutineName("DiscordBot") +

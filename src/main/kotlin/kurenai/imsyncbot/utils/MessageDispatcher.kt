@@ -7,6 +7,7 @@ import kurenai.imsyncbot.exception.BotException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class MessageDispatcher(
@@ -33,7 +34,7 @@ class MessageDispatcher(
             runCatching {
                 val now = System.currentTimeMillis()
                 for (worker in workers.values) {
-                    if (now - worker.lastAccessTime > idleTimeout.inWholeMilliseconds && worker.channel.isEmpty) {
+                    if (now - worker.lastAccessTime > idleTimeoutMillis && worker.channel.isEmpty) {
                         workers.remove(worker.id)
                         worker.channel.close()
                         log.debug("Clean worker({}-{})", name, worker.nameWithId)
@@ -42,7 +43,7 @@ class MessageDispatcher(
                             "Worker({}-{}) remaining idle timeout is {}s, channel empty: {}",
                             name,
                             worker.nameWithId,
-                            ((worker.lastAccessTime + idleTimeout.inWholeMilliseconds - now) / 1000.0).coerceAtLeast(0.0),
+                            ((worker.lastAccessTime + idleTimeoutMillis - now) / 1000.0).coerceAtLeast(0.0),
                             worker.channel.isEmpty
                         )
                     }
@@ -50,7 +51,7 @@ class MessageDispatcher(
             }.onFailure {
                 log.error("Error during cleanup worker", it)
             }
-            delay(idleTimeout / 2)
+            delay((idleTimeoutMillis / 2).milliseconds)
         }
     }
 

@@ -4,6 +4,8 @@ import it.tdlight.jni.TdApi
 import it.tdlight.jni.TdApi.TextEntity
 import it.tdlight.jni.TdApi.TextEntityTypeMentionName
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
@@ -113,16 +115,16 @@ class QQBot(
                             }
                         }
 
-                        is BotOfflineEvent.Force, is BotOfflineEvent.Dropped -> {
-                            status.update { Stopped }
-                            log.warn("QQ bot offline.")
-                            false
-                        }
-
-                        is BotReloginEvent, is BotOnlineEvent -> {
-                            status.update { Running }
-                            false
-                        }
+//                        is BotOfflineEvent.Force, is BotOfflineEvent.Dropped -> {
+//                            status.update { Stopped }
+//                            log.warn("QQ bot offline.")
+//                            false
+//                        }
+//
+//                        is BotReloginEvent, is BotOnlineEvent -> {
+//                            status.update { Running }
+//                            false
+//                        }
 
                         else -> {
                             true
