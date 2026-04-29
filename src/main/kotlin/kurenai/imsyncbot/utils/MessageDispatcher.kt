@@ -5,15 +5,17 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kurenai.imsyncbot.exception.BotException
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 class MessageDispatcher(
     private val parentScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
-    private val idleTimeoutMillis: Long = TimeUnit.MINUTES.toMillis(60),
+    idleTimeout: Duration = 60.seconds,
     private val name: String = "MessageDispatcher-${count.getAndIncrement()}",
     private val capacityEachChannel: Int = 64
 ) {
+    private val idleTimeoutMillis: Long = idleTimeout.inWholeMilliseconds
     private data class Worker(
         val id: String,
         val name: String,
@@ -21,17 +23,17 @@ class MessageDispatcher(
         val job: Job
     ) {
         val nameWithId = if (id == name) id else "$name($id)"
-        var lastAccessTime: Long = 0L
+        var lastAccessTime: Long = 0
     }
 
     private val workers = ConcurrentHashMap<String, Worker>()
     private val cleanerJob = parentScope.launch {
-        delay(60_000L)
+        delay(60.seconds)
         while (true) {
             runCatching {
                 val now = System.currentTimeMillis()
                 for (worker in workers.values) {
-                    if (now - worker.lastAccessTime > idleTimeoutMillis && worker.channel.isEmpty) {
+                    if (now - worker.lastAccessTime > idleTimeout.inWholeMilliseconds && worker.channel.isEmpty) {
                         workers.remove(worker.id)
                         worker.channel.close()
                         log.debug("Clean worker({}-{})", name, worker.nameWithId)
@@ -40,7 +42,7 @@ class MessageDispatcher(
                             "Worker({}-{}) remaining idle timeout is {}s, channel empty: {}",
                             name,
                             worker.nameWithId,
-                            (worker.lastAccessTime + idleTimeoutMillis - now) / 1000.0,
+                            ((worker.lastAccessTime + idleTimeout.inWholeMilliseconds - now) / 1000.0).coerceAtLeast(0.0),
                             worker.channel.isEmpty
                         )
                     }
@@ -48,7 +50,7 @@ class MessageDispatcher(
             }.onFailure {
                 log.error("Error during cleanup worker", it)
             }
-            delay(idleTimeoutMillis / 2)
+            delay(idleTimeout / 2)
         }
     }
 
@@ -66,7 +68,7 @@ class MessageDispatcher(
     private fun addWorkerIfNeed(id: String, name: String): Worker = workers.compute(id) { key, prev ->
         if (prev != null && !(prev.channel.isClosedForSend)) return@compute prev
 
-        val channel = Channel<suspend () -> Unit>(Channel.BUFFERED, BufferOverflow.SUSPEND)
+        val channel = Channel<suspend () -> Unit>(capacityEachChannel, BufferOverflow.SUSPEND)
         val job = parentScope.launch {
             for (f in channel) {
                 runCatching { f() }.onFailure { log.error("{}-{} execute error: {}", name, id, it.message, it) }
